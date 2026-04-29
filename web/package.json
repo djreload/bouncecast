@@ -75,7 +75,7 @@
     "sanitize-html": "^2.11.0",
     "semver": "^7.6.3",
     "sharp": "0.34.5",
-    "ua-parser-js": "1.0.41",
+    "ua-parser-js": "2.0.9",
     "video.js": "^8.3.0",
     "workbox-precaching": "^7.0.0",
     "workbox-window": "^7.0.0",
