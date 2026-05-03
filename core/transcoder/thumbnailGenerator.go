@@ -90,6 +90,10 @@ func fireThumbnailGenerator(segmentPath string, variantIndex int) error {
 	}
 	configRepository := configrepository.Get()
 	initSegment := path.Join(framePath, "init.mp4")
+	// Skip thumbnail generation until the fMP4 init segment is available.
+	if _, err := os.Stat(initSegment); err != nil {
+		return nil
+	}
 	mostRecentFile := path.Join(framePath, names[0])
 	// fMP4 segments require the init segment to be readable by ffmpeg
 	inputArg := fmt.Sprintf("concat:%s|%s", initSegment, mostRecentFile)

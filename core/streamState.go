@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"io"
+	"os"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -101,6 +102,11 @@ func SetStreamAsDisconnected() {
 		log.Errorln(err)
 		return
 	}
+	// Clean up temp files after all variants have been updated.
+	defer func() {
+		_ = os.Remove(offlineInitPath)
+		_ = os.Remove(offlineSegmentPath)
+	}()
 
 	transcoder.StopThumbnailGenerator()
 	rtmp.Disconnect()
