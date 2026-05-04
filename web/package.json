@@ -111,7 +111,7 @@
     "chromatic": "16.6.3",
     "css-loader": "7.1.4",
     "cypress": "^15.0.0",
-    "eslint": "8.57.1",
+    "eslint": "10.3.0",
     "eslint-config-airbnb": "19.0.4",
     "eslint-config-next": "14.2.35",
     "eslint-config-prettier": "10.1.8",
