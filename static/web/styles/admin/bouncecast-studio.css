@@ -1,0 +1,184 @@
+.app-container .side-nav {
+  background:
+    linear-gradient(
+      180deg,
+      rgb(12 14 22 / 98%) 0%,
+      rgb(20 20 30 / 98%) 48%,
+      rgb(12 14 18 / 98%) 100%
+    ),
+    var(--theme-color-palette-1);
+  border-right: 1px solid rgb(255 255 255 / 8%);
+}
+
+.app-container .menu-container .ant-menu-item,
+.app-container .menu-container .ant-menu-submenu-title {
+  border-radius: 8px;
+  margin: 3px 10px;
+  width: calc(100% - 20px);
+  transition:
+    background-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.app-container .menu-container .ant-menu-item:hover,
+.app-container .menu-container .ant-menu-submenu-title:hover {
+  background-color: rgb(255 255 255 / 8%);
+  transform: translateX(2px);
+}
+
+.app-container .menu-container .ant-menu-item-selected {
+  background: linear-gradient(90deg, rgb(35 146 255 / 25%), rgb(255 72 176 / 18%));
+  box-shadow: inset 3px 0 0 #32d8ff;
+}
+
+.app-container .layout-header {
+  min-height: 74px;
+  border-bottom: 1px solid rgb(255 255 255 / 8%);
+  box-shadow: 0 12px 24px rgb(0 0 0 / 12%);
+}
+
+.app-container .main-content-container {
+  min-height: calc(100vh - 118px);
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 3%) 0%, rgb(255 255 255 / 0%) 42%),
+    var(--theme-color-palette-3);
+}
+
+.admin-command-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: rgb(255 255 255 / 70%);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.app-container h1.owncast-title .logo-container {
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 12%),
+    0 10px 24px rgb(50 216 255 / 18%);
+}
+
+.global-stream-title-container {
+  box-shadow: none;
+}
+
+.global-stream-title-container .textfield-with-submit-container .input-side {
+  background-color: rgb(255 255 255 / 7%);
+  border-color: rgb(50 216 255 / 38%);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 16%);
+}
+
+.bouncecast-admin-page {
+  animation: studio-page-in 220ms ease-out;
+}
+
+.studio-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+  padding: 1.5rem;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgb(50 216 255 / 14%), rgb(255 72 176 / 10%)), rgb(255 255 255 / 4%);
+  box-shadow: 0 16px 36px rgb(0 0 0 / 18%);
+}
+
+.studio-hero h1.ant-typography {
+  margin: 0.15rem 0 0.35rem;
+  color: rgb(255 255 255 / 94%);
+  font-size: 1.85rem;
+  line-height: 1.15;
+}
+
+.studio-hero .ant-typography {
+  max-width: 760px;
+}
+
+.studio-eyebrow {
+  color: #32d8ff;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.studio-stat-row {
+  margin-bottom: 1rem;
+}
+
+.bouncecast-admin-page .ant-card {
+  border-color: rgb(255 255 255 / 10%);
+  border-radius: 8px;
+  background-color: rgb(255 255 255 / 4%);
+  box-shadow: 0 12px 30px rgb(0 0 0 / 14%);
+  transition:
+    border-color 180ms ease,
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.bouncecast-admin-page .ant-card:hover {
+  border-color: rgb(50 216 255 / 34%);
+  transform: translateY(-1px);
+  box-shadow: 0 16px 34px rgb(0 0 0 / 20%);
+}
+
+.bouncecast-admin-page .ant-card-head {
+  border-bottom-color: rgb(255 255 255 / 9%);
+}
+
+.bouncecast-admin-page .ant-statistic-title,
+.bouncecast-admin-page .ant-typography-secondary {
+  color: rgb(255 255 255 / 62%);
+}
+
+.studio-panel {
+  margin-bottom: 1rem;
+}
+
+.studio-panel .ant-table {
+  background: transparent;
+}
+
+.studio-panel .ant-table-thead > tr > th {
+  background-color: rgb(255 255 255 / 7%);
+}
+
+.studio-panel .ant-table-tbody > tr > td {
+  border-bottom-color: rgb(255 255 255 / 7%);
+}
+
+.studio-panel .ant-empty-description {
+  color: rgb(255 255 255 / 64%);
+}
+
+@keyframes studio-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (width <= 900px) {
+  .studio-hero {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-command-label {
+    display: none;
+  }
+}

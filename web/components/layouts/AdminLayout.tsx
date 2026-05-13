@@ -27,6 +27,7 @@ export const AdminLayout: FC<AdminLayoutProps> = ({ page }) => (
     <link rel="stylesheet" href="/styles/admin/config-public-details.css" />
     <link rel="stylesheet" href="/styles/admin/home.css" />
     <link rel="stylesheet" href="/styles/admin/chat.css" />
+    <link rel="stylesheet" href="/styles/admin/bouncecast-studio.css" />
 
     <ServerStatusProvider>
       <AlertMessageProvider>

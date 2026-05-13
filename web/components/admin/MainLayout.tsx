@@ -34,6 +34,14 @@ const LineChartOutlined = dynamic(() => import('@ant-design/icons/LineChartOutli
   ssr: false,
 });
 
+const TeamOutlined = dynamic(() => import('@ant-design/icons/TeamOutlined'), {
+  ssr: false,
+});
+
+const CalendarOutlined = dynamic(() => import('@ant-design/icons/CalendarOutlined'), {
+  ssr: false,
+});
+
 const ToolOutlined = dynamic(() => import('@ant-design/icons/ToolOutlined'), {
   ssr: false,
 });
@@ -181,6 +189,17 @@ export const MainLayout: FC<MainLayoutProps> = ({ children }) => {
     },
   ];
 
+  const studioMenu = [
+    {
+      label: <Link href="/admin/streamers">Streamers</Link>,
+      key: '/admin/streamers',
+    },
+    {
+      label: <Link href="/admin/schedule">Schedule</Link>,
+      key: '/admin/schedule',
+    },
+  ];
+
   const utilitiesMenu = [
     {
       label: <Link href="/admin/hardware-info">Hardware</Link>,
@@ -233,6 +252,12 @@ export const MainLayout: FC<MainLayoutProps> = ({ children }) => {
       label: <Link href="/admin/viewer-info">Viewers</Link>,
       icon: <LineChartOutlined />,
       key: '/admin/viewer-info',
+    },
+    {
+      label: <span>Studio</span>,
+      icon: <TeamOutlined />,
+      children: studioMenu,
+      key: 'studio',
     },
     !chatDisabled && {
       label: <span>Chat &amp; Users</span>,
@@ -337,6 +362,10 @@ export const MainLayout: FC<MainLayoutProps> = ({ children }) => {
 
       <Layout className="layout-main">
         <Header className="layout-header">
+          <div className="admin-command-label">
+            <CalendarOutlined />
+            <span>Live DJ control room</span>
+          </div>
           <Space direction="horizontal">
             <Tooltip title="Compose post to your social followers">
               <Button
