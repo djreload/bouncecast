@@ -116,6 +116,8 @@ func beginBounceCastGoLiveEvent(match *bounceCastStreamerKeyMatch, remoteAddr ne
 			log.Debugln("unable to mark BounceCast schedule live", err)
 		}
 	}
+
+	queueBounceCastGoLiveNotifications(eventID, scheduleID)
 }
 
 func endBounceCastGoLiveEvent(match *bounceCastStreamerKeyMatch) {
@@ -145,5 +147,80 @@ func endBounceCastGoLiveEvent(match *bounceCastStreamerKeyMatch) {
 		if _, err := db.Exec(`UPDATE bouncecast_stream_schedule SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, scheduleID.Int64); err != nil {
 			log.Debugln("unable to complete BounceCast schedule", err)
 		}
+	}
+}
+
+func queueBounceCastGoLiveNotifications(goLiveEventID int64, scheduleID sql.NullInt64) {
+	if goLiveEventID == 0 {
+		return
+	}
+
+	db := data.GetDatabase()
+	if db == nil {
+		return
+	}
+
+	enabledChannels := map[string]bool{
+		"email":   true,
+		"push":    true,
+		"webhook": true,
+	}
+
+	if scheduleID.Valid {
+		var notifyEmail bool
+		var notifyPush bool
+		var notifyWebhook bool
+		if err := db.QueryRow(`
+			SELECT notify_email, notify_push, notify_webhook
+			FROM bouncecast_stream_schedule
+			WHERE id = ?
+		`, scheduleID.Int64).Scan(&notifyEmail, &notifyPush, &notifyWebhook); err != nil {
+			log.Debugln("unable to read BounceCast schedule notification settings", err)
+		} else {
+			enabledChannels["email"] = notifyEmail
+			enabledChannels["push"] = notifyPush
+			enabledChannels["webhook"] = notifyWebhook
+		}
+	}
+
+	rows, err := db.Query(`
+		SELECT id, channel, destination
+		FROM bouncecast_notification_subscribers
+		WHERE disabled_at IS NULL
+	`)
+	if err != nil {
+		log.Debugln("unable to query BounceCast notification subscribers", err)
+		return
+	}
+	defer rows.Close()
+
+	queuedCount := 0
+	for rows.Next() {
+		var subscriberID int64
+		var channel string
+		var destination string
+		if err := rows.Scan(&subscriberID, &channel, &destination); err != nil {
+			log.Debugln("unable to scan BounceCast notification subscriber", err)
+			continue
+		}
+		if !enabledChannels[channel] {
+			continue
+		}
+		if _, err := db.Exec(`
+			INSERT INTO bouncecast_notification_deliveries(go_live_event_id, subscriber_id, channel, destination)
+			VALUES(?, ?, ?, ?)
+		`, goLiveEventID, subscriberID, channel, destination); err != nil {
+			log.Debugln("unable to queue BounceCast notification delivery", err)
+			continue
+		}
+		queuedCount++
+	}
+
+	state := "none"
+	if queuedCount > 0 {
+		state = "queued"
+	}
+	if _, err := db.Exec(`UPDATE bouncecast_go_live_events SET notification_state = ? WHERE id = ?`, state, goLiveEventID); err != nil {
+		log.Debugln("unable to update BounceCast notification state", err)
 	}
 }

@@ -21,6 +21,8 @@ import {
 import { AdminLayout } from '../../components/layouts/AdminLayout';
 import {
   BOUNCECAST_LIVE_EVENTS,
+  BOUNCECAST_NOTIFICATION_SUBSCRIBERS,
+  BOUNCECAST_NOTIFICATION_SUBSCRIBER_DISABLE,
   BOUNCECAST_SCHEDULE,
   BOUNCECAST_STREAMERS,
   fetchData,
@@ -65,6 +67,15 @@ type GoLiveEvent = {
   notificationState: string;
 };
 
+type NotificationSubscriber = {
+  id: number;
+  channel: string;
+  destination: string;
+  displayName: string;
+  createdAt: string;
+  disabledAt?: string;
+};
+
 const columns = [
   {
     title: 'Set',
@@ -104,22 +115,28 @@ export default function Schedule() {
   const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
   const [streamers, setStreamers] = useState<Streamer[]>([]);
   const [liveEvents, setLiveEvents] = useState<GoLiveEvent[]>([]);
+  const [subscribers, setSubscribers] = useState<NotificationSubscriber[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [subscriberModalOpen, setSubscriberModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
+  const [subscriberForm] = Form.useForm();
 
   const loadStudioData = async () => {
     setLoading(true);
     try {
-      const [scheduleResult, streamerResult, liveEventsResult] = await Promise.all([
-        fetchData(BOUNCECAST_SCHEDULE),
-        fetchData(BOUNCECAST_STREAMERS),
-        fetchData(BOUNCECAST_LIVE_EVENTS),
-      ]);
+      const [scheduleResult, streamerResult, liveEventsResult, subscriberResult] =
+        await Promise.all([
+          fetchData(BOUNCECAST_SCHEDULE),
+          fetchData(BOUNCECAST_STREAMERS),
+          fetchData(BOUNCECAST_LIVE_EVENTS),
+          fetchData(BOUNCECAST_NOTIFICATION_SUBSCRIBERS),
+        ]);
       setSchedule(scheduleResult || []);
       setStreamers(streamerResult || []);
       setLiveEvents(liveEventsResult || []);
+      setSubscribers(subscriberResult || []);
     } catch (error) {
       console.error(error);
     } finally {
@@ -151,6 +168,30 @@ export default function Schedule() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const createSubscriber = async () => {
+    const values = await subscriberForm.validateFields();
+    setSaving(true);
+    try {
+      await fetchData(BOUNCECAST_NOTIFICATION_SUBSCRIBERS, {
+        method: 'POST',
+        data: values,
+      });
+      subscriberForm.resetFields();
+      setSubscriberModalOpen(false);
+      await loadStudioData();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const disableSubscriber = async (id: number) => {
+    await fetchData(BOUNCECAST_NOTIFICATION_SUBSCRIBER_DISABLE, {
+      method: 'POST',
+      data: { id },
+    });
+    await loadStudioData();
   };
 
   return (
@@ -186,7 +227,11 @@ export default function Schedule() {
         </Col>
         <Col xs={24} md={8}>
           <Card>
-            <Statistic title="Subscriber channels" value={0} prefix={<BellOutlined />} />
+            <Statistic
+              title="Subscriber channels"
+              value={subscribers.filter(subscriber => !subscriber.disabledAt).length}
+              prefix={<BellOutlined />}
+            />
           </Card>
         </Col>
       </Row>
@@ -252,6 +297,60 @@ export default function Schedule() {
               title: 'Alerts',
               dataIndex: 'notificationState',
               key: 'notificationState',
+            },
+          ]}
+        />
+      </Card>
+
+      <Card
+        title="Notification subscribers"
+        className="studio-panel"
+        extra={
+          <Button size="small" icon={<BellOutlined />} onClick={() => setSubscriberModalOpen(true)}>
+            Add subscriber
+          </Button>
+        }
+      >
+        <Table
+          dataSource={subscribers}
+          rowKey="id"
+          pagination={false}
+          columns={[
+            {
+              title: 'Name',
+              dataIndex: 'displayName',
+              key: 'displayName',
+              render: displayName => displayName || 'Subscriber',
+            },
+            {
+              title: 'Channel',
+              dataIndex: 'channel',
+              key: 'channel',
+              render: channel => <Tag>{channel}</Tag>,
+            },
+            {
+              title: 'Destination',
+              dataIndex: 'destination',
+              key: 'destination',
+            },
+            {
+              title: 'Status',
+              key: 'status',
+              render: (_, subscriber) => (
+                <Tag color={subscriber.disabledAt ? 'default' : 'green'}>
+                  {subscriber.disabledAt ? 'disabled' : 'active'}
+                </Tag>
+              ),
+            },
+            {
+              title: 'Action',
+              key: 'action',
+              render: (_, subscriber) =>
+                subscriber.disabledAt ? null : (
+                  <Button size="small" danger onClick={() => disableSubscriber(subscriber.id)}>
+                    Disable
+                  </Button>
+                ),
             },
           ]}
         />
@@ -325,6 +424,46 @@ export default function Schedule() {
               <Checkbox>Webhook notification</Checkbox>
             </Form.Item>
           </Space>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="Add notification subscriber"
+        open={subscriberModalOpen}
+        onCancel={() => setSubscriberModalOpen(false)}
+        onOk={createSubscriber}
+        confirmLoading={saving}
+      >
+        <Form
+          form={subscriberForm}
+          layout="vertical"
+          initialValues={{
+            channel: 'email',
+          }}
+        >
+          <Form.Item name="displayName" label="Display name">
+            <Input placeholder="Promoter list" />
+          </Form.Item>
+          <Form.Item
+            name="channel"
+            label="Channel"
+            rules={[{ required: true, message: 'Choose a channel' }]}
+          >
+            <Select
+              options={[
+                { label: 'Email', value: 'email' },
+                { label: 'Push', value: 'push' },
+                { label: 'Webhook', value: 'webhook' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item
+            name="destination"
+            label="Destination"
+            rules={[{ required: true, message: 'Add a destination' }]}
+          >
+            <Input placeholder="email@example.com or endpoint URL" />
+          </Form.Item>
         </Form>
       </Modal>
     </div>

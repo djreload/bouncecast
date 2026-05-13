@@ -68,6 +68,16 @@ type BounceCastGoLiveEvent struct {
 	NotificationState string     `json:"notificationState"`
 }
 
+type BounceCastNotificationSubscriber struct {
+	ID          int64      `json:"id"`
+	Channel     string     `json:"channel"`
+	Destination string     `json:"destination"`
+	DisplayName string     `json:"displayName"`
+	VerifiedAt  *time.Time `json:"verifiedAt,omitempty"`
+	CreatedAt   time.Time  `json:"createdAt"`
+	DisabledAt  *time.Time `json:"disabledAt,omitempty"`
+}
+
 type createStreamerRequest struct {
 	DisplayName string `json:"displayName"`
 	Handle      string `json:"handle"`
@@ -93,6 +103,16 @@ type createStreamKeyRequest struct {
 }
 
 type revokeStreamKeyRequest struct {
+	ID int64 `json:"id"`
+}
+
+type createNotificationSubscriberRequest struct {
+	Channel     string `json:"channel"`
+	Destination string `json:"destination"`
+	DisplayName string `json:"displayName"`
+}
+
+type disableNotificationSubscriberRequest struct {
 	ID int64 `json:"id"`
 }
 
@@ -322,6 +342,107 @@ func GetBounceCastGoLiveEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	webutils.WriteResponse(w, events)
+}
+
+// GetBounceCastNotificationSubscribers returns notification destinations managed by BounceCast Studio.
+func GetBounceCastNotificationSubscribers(w http.ResponseWriter, r *http.Request) {
+	rows, err := data.GetDatabase().Query(`
+		SELECT id, channel, destination, COALESCE(display_name, ''), verified_at, created_at, disabled_at
+		FROM bouncecast_notification_subscribers
+		ORDER BY created_at DESC
+	`)
+	if err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+	defer rows.Close()
+
+	subscribers := []BounceCastNotificationSubscriber{}
+	for rows.Next() {
+		var subscriber BounceCastNotificationSubscriber
+		var verifiedAt sql.NullTime
+		var disabledAt sql.NullTime
+		if err := rows.Scan(
+			&subscriber.ID,
+			&subscriber.Channel,
+			&subscriber.Destination,
+			&subscriber.DisplayName,
+			&verifiedAt,
+			&subscriber.CreatedAt,
+			&disabledAt,
+		); err != nil {
+			webutils.InternalErrorHandler(w, err)
+			return
+		}
+		if verifiedAt.Valid {
+			subscriber.VerifiedAt = &verifiedAt.Time
+		}
+		if disabledAt.Valid {
+			subscriber.DisabledAt = &disabledAt.Time
+		}
+		subscribers = append(subscribers, subscriber)
+	}
+
+	webutils.WriteResponse(w, subscribers)
+}
+
+// CreateBounceCastNotificationSubscriber adds a notification destination.
+func CreateBounceCastNotificationSubscriber(w http.ResponseWriter, r *http.Request) {
+	var request createNotificationSubscriberRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+
+	channel := strings.TrimSpace(request.Channel)
+	destination := strings.TrimSpace(request.Destination)
+	if channel == "" || destination == "" {
+		webutils.BadRequestHandler(w, errors.New("channel and destination are required"))
+		return
+	}
+	if channel != "email" && channel != "push" && channel != "webhook" {
+		webutils.BadRequestHandler(w, errors.New("channel must be email, push, or webhook"))
+		return
+	}
+
+	result, err := data.GetDatabase().Exec(`
+		INSERT INTO bouncecast_notification_subscribers(channel, destination, display_name, verified_at)
+		VALUES(?, ?, NULLIF(?, ''), CURRENT_TIMESTAMP)
+		ON CONFLICT(channel, destination) DO UPDATE SET
+			display_name = excluded.display_name,
+			disabled_at = NULL
+	`, channel, destination, strings.TrimSpace(request.DisplayName))
+	if err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+
+	id, _ := result.LastInsertId()
+	webutils.WriteResponse(w, map[string]interface{}{"id": id})
+}
+
+// DisableBounceCastNotificationSubscriber disables a notification destination.
+func DisableBounceCastNotificationSubscriber(w http.ResponseWriter, r *http.Request) {
+	var request disableNotificationSubscriberRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+	if request.ID == 0 {
+		webutils.BadRequestHandler(w, errors.New("id is required"))
+		return
+	}
+
+	if _, err := data.GetDatabase().Exec(`
+		UPDATE bouncecast_notification_subscribers
+		SET disabled_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, request.ID); err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+
+	webutils.WriteSimpleResponse(w, true, "disabled notification subscriber")
 }
 
 // GetBounceCastSchedule returns upcoming BounceCast schedule rows.

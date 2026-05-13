@@ -118,6 +118,10 @@ export const BOUNCECAST_STREAM_KEY_REVOKE = `${API_LOCATION}bouncecast/streamkey
 
 export const BOUNCECAST_LIVE_EVENTS = `${API_LOCATION}bouncecast/live-events`;
 
+export const BOUNCECAST_NOTIFICATION_SUBSCRIBERS = `${API_LOCATION}bouncecast/notification-subscribers`;
+
+export const BOUNCECAST_NOTIFICATION_SUBSCRIBER_DISABLE = `${API_LOCATION}bouncecast/notification-subscribers/disable`;
+
 export const BOUNCECAST_SCHEDULE = `${API_LOCATION}bouncecast/schedule`;
 
 export const API_YP_RESET = `${API_LOCATION}yp/reset`;
