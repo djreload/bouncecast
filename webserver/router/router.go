@@ -19,6 +19,7 @@ import (
 	"github.com/owncast/owncast/core/chat"
 	"github.com/owncast/owncast/core/data"
 	"github.com/owncast/owncast/webserver/handlers"
+	adminhandlers "github.com/owncast/owncast/webserver/handlers/admin"
 	"github.com/owncast/owncast/webserver/router/middleware"
 )
 
@@ -47,6 +48,15 @@ func Start(enableVerboseLogging bool) error {
 
 	// The admin web app.
 	r.HandleFunc("/admin/*", middleware.RequireAdminAuth(handlers.IndexHandler))
+
+	// BounceCast Studio admin APIs. These are kept separate from the generated
+	// Owncast-compatible API while the multi-streamer surface is still growing.
+	r.Options("/api/admin/bouncecast/streamers", middleware.RequireAdminAuth(adminhandlers.GetBounceCastStreamers))
+	r.Get("/api/admin/bouncecast/streamers", middleware.RequireAdminAuth(adminhandlers.GetBounceCastStreamers))
+	r.Post("/api/admin/bouncecast/streamers", middleware.RequireAdminAuth(adminhandlers.CreateBounceCastStreamer))
+	r.Options("/api/admin/bouncecast/schedule", middleware.RequireAdminAuth(adminhandlers.GetBounceCastSchedule))
+	r.Get("/api/admin/bouncecast/schedule", middleware.RequireAdminAuth(adminhandlers.GetBounceCastSchedule))
+	r.Post("/api/admin/bouncecast/schedule", middleware.RequireAdminAuth(adminhandlers.CreateBounceCastSchedule))
 
 	// Single ActivityPub Actor
 	r.HandleFunc("/federation/user/*", middleware.RequireActivityPubOrRedirect(aphandlers.ActorHandler))
