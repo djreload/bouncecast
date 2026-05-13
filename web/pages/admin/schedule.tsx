@@ -21,6 +21,7 @@ import {
 import { AdminLayout } from '../../components/layouts/AdminLayout';
 import {
   BOUNCECAST_LIVE_EVENTS,
+  BOUNCECAST_NOTIFICATION_DELIVERIES,
   BOUNCECAST_NOTIFICATION_SUBSCRIBERS,
   BOUNCECAST_NOTIFICATION_SUBSCRIBER_DISABLE,
   BOUNCECAST_SCHEDULE,
@@ -76,6 +77,18 @@ type NotificationSubscriber = {
   disabledAt?: string;
 };
 
+type NotificationDelivery = {
+  id: number;
+  streamer: string;
+  channel: string;
+  destination: string;
+  status: string;
+  attemptCount: number;
+  lastError: string;
+  createdAt: string;
+  sentAt?: string;
+};
+
 const columns = [
   {
     title: 'Set',
@@ -111,11 +124,22 @@ const columns = [
   },
 ];
 
+function deliveryStatusColor(status: string) {
+  if (status === 'sent') {
+    return 'green';
+  }
+  if (status === 'failed') {
+    return 'red';
+  }
+  return 'gold';
+}
+
 export default function Schedule() {
   const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
   const [streamers, setStreamers] = useState<Streamer[]>([]);
   const [liveEvents, setLiveEvents] = useState<GoLiveEvent[]>([]);
   const [subscribers, setSubscribers] = useState<NotificationSubscriber[]>([]);
+  const [deliveries, setDeliveries] = useState<NotificationDelivery[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [subscriberModalOpen, setSubscriberModalOpen] = useState(false);
@@ -126,17 +150,19 @@ export default function Schedule() {
   const loadStudioData = async () => {
     setLoading(true);
     try {
-      const [scheduleResult, streamerResult, liveEventsResult, subscriberResult] =
+      const [scheduleResult, streamerResult, liveEventsResult, subscriberResult, deliveryResult] =
         await Promise.all([
           fetchData(BOUNCECAST_SCHEDULE),
           fetchData(BOUNCECAST_STREAMERS),
           fetchData(BOUNCECAST_LIVE_EVENTS),
           fetchData(BOUNCECAST_NOTIFICATION_SUBSCRIBERS),
+          fetchData(BOUNCECAST_NOTIFICATION_DELIVERIES),
         ]);
       setSchedule(scheduleResult || []);
       setStreamers(streamerResult || []);
       setLiveEvents(liveEventsResult || []);
       setSubscribers(subscriberResult || []);
+      setDeliveries(deliveryResult || []);
     } catch (error) {
       console.error(error);
     } finally {
@@ -351,6 +377,51 @@ export default function Schedule() {
                     Disable
                   </Button>
                 ),
+            },
+          ]}
+        />
+      </Card>
+
+      <Card title="Notification deliveries" className="studio-panel">
+        <Table
+          dataSource={deliveries}
+          rowKey="id"
+          pagination={false}
+          columns={[
+            {
+              title: 'DJ',
+              dataIndex: 'streamer',
+              key: 'streamer',
+              render: streamer => streamer || 'Unknown',
+            },
+            {
+              title: 'Channel',
+              dataIndex: 'channel',
+              key: 'channel',
+              render: channel => <Tag>{channel}</Tag>,
+            },
+            {
+              title: 'Status',
+              dataIndex: 'status',
+              key: 'status',
+              render: status => <Tag color={deliveryStatusColor(status)}>{status}</Tag>,
+            },
+            {
+              title: 'Attempts',
+              dataIndex: 'attemptCount',
+              key: 'attemptCount',
+            },
+            {
+              title: 'Created',
+              dataIndex: 'createdAt',
+              key: 'createdAt',
+              render: createdAt => new Date(createdAt).toLocaleString(),
+            },
+            {
+              title: 'Error',
+              dataIndex: 'lastError',
+              key: 'lastError',
+              render: lastError => lastError || 'None',
             },
           ]}
         />

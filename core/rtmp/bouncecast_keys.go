@@ -1,8 +1,14 @@
 package rtmp
 
 import (
+	"bytes"
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"net"
+	"net/http"
+	"net/url"
+	"time"
 
 	"github.com/owncast/owncast/core/data"
 	"github.com/owncast/owncast/utils"
@@ -223,4 +229,143 @@ func queueBounceCastGoLiveNotifications(goLiveEventID int64, scheduleID sql.Null
 	if _, err := db.Exec(`UPDATE bouncecast_go_live_events SET notification_state = ? WHERE id = ?`, state, goLiveEventID); err != nil {
 		log.Debugln("unable to update BounceCast notification state", err)
 	}
+
+	if queuedCount > 0 {
+		go sendBounceCastWebhookDeliveries(goLiveEventID)
+	}
+}
+
+type bounceCastWebhookPayload struct {
+	EventID       int64  `json:"eventId"`
+	StreamerID    int64  `json:"streamerId"`
+	Streamer      string `json:"streamer"`
+	ScheduleID    *int64 `json:"scheduleId,omitempty"`
+	ScheduleTitle string `json:"scheduleTitle,omitempty"`
+	StartedAt     string `json:"startedAt"`
+	Status        string `json:"status"`
+	Type          string `json:"type"`
+}
+
+func sendBounceCastWebhookDeliveries(goLiveEventID int64) {
+	db := data.GetDatabase()
+	if db == nil {
+		return
+	}
+
+	payload, err := getBounceCastWebhookPayload(goLiveEventID)
+	if err != nil {
+		log.Debugln("unable to build BounceCast webhook payload", err)
+		return
+	}
+
+	rows, err := db.Query(`
+		SELECT id, destination
+		FROM bouncecast_notification_deliveries
+		WHERE go_live_event_id = ? AND channel = 'webhook' AND status = 'queued'
+	`, goLiveEventID)
+	if err != nil {
+		log.Debugln("unable to query BounceCast webhook deliveries", err)
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var deliveryID int64
+		var destination string
+		if err := rows.Scan(&deliveryID, &destination); err != nil {
+			log.Debugln("unable to scan BounceCast webhook delivery", err)
+			continue
+		}
+		if err := sendBounceCastWebhook(destination, payload); err != nil {
+			if _, updateErr := db.Exec(`
+				UPDATE bouncecast_notification_deliveries
+				SET status = 'failed', attempt_count = attempt_count + 1, last_error = ?
+				WHERE id = ?
+			`, err.Error(), deliveryID); updateErr != nil {
+				log.Debugln("unable to mark BounceCast webhook delivery failed", updateErr)
+			}
+			continue
+		}
+		if _, err := db.Exec(`
+			UPDATE bouncecast_notification_deliveries
+			SET status = 'sent', attempt_count = attempt_count + 1, sent_at = CURRENT_TIMESTAMP, last_error = NULL
+			WHERE id = ?
+		`, deliveryID); err != nil {
+			log.Debugln("unable to mark BounceCast webhook delivery sent", err)
+		}
+	}
+}
+
+func getBounceCastWebhookPayload(goLiveEventID int64) (bounceCastWebhookPayload, error) {
+	db := data.GetDatabase()
+	if db == nil {
+		return bounceCastWebhookPayload{}, fmt.Errorf("database unavailable")
+	}
+
+	var payload bounceCastWebhookPayload
+	var scheduleID sql.NullInt64
+	var scheduleTitle sql.NullString
+	var startedAt time.Time
+	if err := db.QueryRow(`
+		SELECT e.id, e.streamer_id, COALESCE(a.display_name, ''), e.schedule_id, s.title, e.started_at, e.status
+		FROM bouncecast_go_live_events e
+		LEFT JOIN bouncecast_streamer_accounts a ON a.id = e.streamer_id
+		LEFT JOIN bouncecast_stream_schedule s ON s.id = e.schedule_id
+		WHERE e.id = ?
+	`, goLiveEventID).Scan(
+		&payload.EventID,
+		&payload.StreamerID,
+		&payload.Streamer,
+		&scheduleID,
+		&scheduleTitle,
+		&startedAt,
+		&payload.Status,
+	); err != nil {
+		return bounceCastWebhookPayload{}, err
+	}
+
+	if scheduleID.Valid {
+		payload.ScheduleID = &scheduleID.Int64
+	}
+	if scheduleTitle.Valid {
+		payload.ScheduleTitle = scheduleTitle.String
+	}
+	payload.StartedAt = startedAt.Format(time.RFC3339)
+	payload.Type = "bouncecast.go_live"
+
+	return payload, nil
+}
+
+func sendBounceCastWebhook(destination string, payload bounceCastWebhookPayload) error {
+	parsedURL, err := url.Parse(destination)
+	if err != nil {
+		return err
+	}
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return fmt.Errorf("webhook destination must be http or https")
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	client := http.Client{Timeout: 10 * time.Second}
+	request, err := http.NewRequest(http.MethodPost, destination, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("User-Agent", "BounceCast")
+
+	response, err := client.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("webhook returned HTTP %d", response.StatusCode)
+	}
+	return nil
 }

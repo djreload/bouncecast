@@ -78,6 +78,19 @@ type BounceCastNotificationSubscriber struct {
 	DisabledAt  *time.Time `json:"disabledAt,omitempty"`
 }
 
+type BounceCastNotificationDelivery struct {
+	ID            int64      `json:"id"`
+	GoLiveEventID *int64     `json:"goLiveEventId,omitempty"`
+	Streamer      string     `json:"streamer"`
+	Channel       string     `json:"channel"`
+	Destination   string     `json:"destination"`
+	Status        string     `json:"status"`
+	AttemptCount  int64      `json:"attemptCount"`
+	LastError     string     `json:"lastError"`
+	CreatedAt     time.Time  `json:"createdAt"`
+	SentAt        *time.Time `json:"sentAt,omitempty"`
+}
+
 type createStreamerRequest struct {
 	DisplayName string `json:"displayName"`
 	Handle      string `json:"handle"`
@@ -443,6 +456,55 @@ func DisableBounceCastNotificationSubscriber(w http.ResponseWriter, r *http.Requ
 	}
 
 	webutils.WriteSimpleResponse(w, true, "disabled notification subscriber")
+}
+
+// GetBounceCastNotificationDeliveries returns recent notification delivery attempts.
+func GetBounceCastNotificationDeliveries(w http.ResponseWriter, r *http.Request) {
+	rows, err := data.GetDatabase().Query(`
+		SELECT d.id, d.go_live_event_id, COALESCE(a.display_name, ''), d.channel, COALESCE(d.destination, ''),
+			d.status, d.attempt_count, COALESCE(d.last_error, ''), d.created_at, d.sent_at
+		FROM bouncecast_notification_deliveries d
+		LEFT JOIN bouncecast_go_live_events e ON e.id = d.go_live_event_id
+		LEFT JOIN bouncecast_streamer_accounts a ON a.id = e.streamer_id
+		ORDER BY d.created_at DESC
+		LIMIT 50
+	`)
+	if err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+	defer rows.Close()
+
+	deliveries := []BounceCastNotificationDelivery{}
+	for rows.Next() {
+		var delivery BounceCastNotificationDelivery
+		var goLiveEventID sql.NullInt64
+		var sentAt sql.NullTime
+		if err := rows.Scan(
+			&delivery.ID,
+			&goLiveEventID,
+			&delivery.Streamer,
+			&delivery.Channel,
+			&delivery.Destination,
+			&delivery.Status,
+			&delivery.AttemptCount,
+			&delivery.LastError,
+			&delivery.CreatedAt,
+			&sentAt,
+		); err != nil {
+			webutils.InternalErrorHandler(w, err)
+			return
+		}
+		if goLiveEventID.Valid {
+			delivery.GoLiveEventID = &goLiveEventID.Int64
+		}
+		if sentAt.Valid {
+			delivery.SentAt = &sentAt.Time
+		}
+		deliveries = append(deliveries, delivery)
+	}
+
+	webutils.WriteResponse(w, deliveries)
 }
 
 // GetBounceCastSchedule returns upcoming BounceCast schedule rows.
