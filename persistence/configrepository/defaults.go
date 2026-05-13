@@ -19,7 +19,7 @@ func (r *SqlConfigRepository) PopulateDefaults() {
 	_ = r.SetHTTPPortNumber(float64(defaults.WebServerPort))
 	_ = r.SetRTMPPortNumber(float64(defaults.RTMPServerPort))
 	_ = r.SetLogoPath(defaults.Logo)
-	_ = r.SetServerMetadataTags([]string{"owncast", "streaming"})
+	_ = r.SetServerMetadataTags([]string{"bouncecast", "streaming"})
 	_ = r.SetServerSummary(defaults.Summary)
 	_ = r.SetServerWelcomeMessage("")
 	_ = r.SetServerName(defaults.Name)
@@ -28,7 +28,7 @@ func (r *SqlConfigRepository) PopulateDefaults() {
 	_ = r.SetSocialHandles([]models.SocialHandle{
 		{
 			Platform: "github",
-			URL:      "https://github.com/owncast/owncast",
+			URL:      "https://github.com/djreload/bouncecast",
 		},
 	})
 

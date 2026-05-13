@@ -155,7 +155,7 @@ export default function Help() {
         <div>
           {t(Localization.Admin.Help.bugPlease)}
           <a
-            href="https://github.com/owncast/owncast/issues/new/choose"
+            href="https://github.com/djreload/bouncecast/issues/new"
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -181,7 +181,7 @@ export default function Help() {
           </a>{' '}
           {t(Localization.Admin.Help.orExist)}{' '}
           <a
-            href="https://github.com/owncast/owncast/discussions"
+            href="https://github.com/djreload/bouncecast/discussions"
             target="_blank"
             rel="noopener noreferrer"
           >

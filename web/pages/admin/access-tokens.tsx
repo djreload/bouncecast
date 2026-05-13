@@ -248,7 +248,7 @@ const AccessTokens = () => {
       <Title>Access Tokens</Title>
       <Paragraph>
         Access tokens are used to allow external, 3rd party tools to perform specific actions on
-        your Owncast server. They should be kept secure and never included in client code, instead
+        your BounceCast server. They should be kept secure and never included in client code, instead
         they should be kept on a server that you control.
       </Paragraph>
       <Paragraph>

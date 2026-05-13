@@ -320,7 +320,7 @@ export default function FediverseFollowers() {
   const pendingRequestsTab = (
     <>
       <p>
-        The following people are requesting to follow your Owncast server on the{' '}
+        The following people are requesting to follow your BounceCast server on the{' '}
         <a href="https://en.wikipedia.org/wiki/Fediverse" target="_blank" rel="noopener noreferrer">
           Fediverse
         </a>{' '}

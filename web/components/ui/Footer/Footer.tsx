@@ -17,17 +17,17 @@ export const Footer: FC = () => {
         <Translation
           translationKey={Localization.Common.poweredByOwncastVersion}
           vars={{ versionNumber }}
-          defaultText="Powered by <a href='https://owncast.online'>Owncast v{{versionNumber}}</a>"
+          defaultText="Powered by <a href='https://github.com/djreload/bouncecast'>BounceCast v{{versionNumber}}</a>, forked from <a href='https://owncast.online'>Owncast</a>"
         />
       </span>
       <span className={styles.links}>
-        <a href="https://owncast.online/docs" target="_blank" rel="noreferrer">
+        <a href="https://github.com/djreload/bouncecast" target="_blank" rel="noreferrer">
           {t(Localization.Frontend.Footer.documentation)}
         </a>
-        <a href="https://owncast.online/help" target="_blank" rel="noreferrer">
+        <a href="https://github.com/djreload/bouncecast/issues" target="_blank" rel="noreferrer">
           {t(Localization.Frontend.Footer.contribute)}
         </a>
-        <a href="https://github.com/owncast/owncast" target="_blank" rel="noreferrer">
+        <a href="https://github.com/djreload/bouncecast" target="_blank" rel="noreferrer">
           {t(Localization.Frontend.Footer.source)}
         </a>
       </span>

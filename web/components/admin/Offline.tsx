@@ -104,7 +104,7 @@ export const Offline: FC<OfflineProps> = ({ logs = [], config }) => {
             target="_blank"
             rel="noopener noreferrer"
           >
-            {t('Learn how you can add your Owncast stream to other sites you control.')}
+            {t('Learn how you can add your BounceCast stream to other sites you control.')}
           </a>
         </div>
       ),
@@ -135,10 +135,10 @@ export const Offline: FC<OfflineProps> = ({ logs = [], config }) => {
   if (!config?.federation?.enabled) {
     data.push({
       icon: <img alt="fediverse" width="20px" src="/img/fediverse-color.png" />,
-      title: t('Add your Owncast instance to the Fediverse'),
+      title: t('Add your BounceCast instance to the Fediverse'),
       content: (
         <div>
-          <Link href="/admin/config-federation/">{t('Enable Owncast social features')}</Link>{' '}
+          <Link href="/admin/config-federation/">{t('Enable BounceCast social features')}</Link>{' '}
           {t(
             'to have your instance join the Fediverse, allowing people to follow, share and engage with your live stream.',
           )}

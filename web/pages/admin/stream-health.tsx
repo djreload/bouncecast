@@ -273,7 +273,7 @@ const StreamHealth = () => {
         number of viewers.
       </Typography.Paragraph>
       <Typography.Paragraph>
-        The data is only collected by those using the Owncast web interface and is unable to gain
+        The data is only collected by those using the BounceCast web interface and is unable to gain
         insight into external players people may be using such as VLC, MPV, QuickTime, etc.
       </Typography.Paragraph>
       <Space direction="vertical" size="middle">

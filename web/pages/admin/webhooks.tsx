@@ -252,7 +252,7 @@ const Webhooks = () => {
       <Title>Webhooks</Title>
       <Paragraph>
         A webhook is a callback made to an external API in response to an event that takes place
-        within Owncast. This can be used to build chat bots or sending automatic notifications that
+        within BounceCast. This can be used to build chat bots or sending automatic notifications that
         you&apos;ve started streaming.
       </Paragraph>
       <Paragraph>

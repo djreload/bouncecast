@@ -310,7 +310,7 @@ export const MainLayout: FC<MainLayoutProps> = ({ children }) => {
   return (
     <Layout id="admin-page" className={appClass}>
       <Head>
-        <title>Owncast Admin</title>
+        <title>BounceCast Admin</title>
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
@@ -323,7 +323,7 @@ export const MainLayout: FC<MainLayoutProps> = ({ children }) => {
           <span className="logo-container">
             <OwncastLogo variant="simple" />
           </span>
-          <span className="title-label">Owncast Admin</span>
+          <span className="title-label">BounceCast Admin</span>
         </h1>
         <Menu
           mode="inline"
@@ -368,8 +368,12 @@ export const MainLayout: FC<MainLayoutProps> = ({ children }) => {
         <Content className="main-content-container">{children}</Content>
 
         <Footer className="footer-container">
-          <a href="https://owncast.online/?source=admin" target="_blank" rel="noopener noreferrer">
-            About Owncast v{versionNumber}
+          <a
+            href="https://github.com/djreload/bouncecast"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            About BounceCast v{versionNumber}
           </a>
         </Footer>
       </Layout>

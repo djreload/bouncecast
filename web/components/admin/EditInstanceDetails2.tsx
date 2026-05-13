@@ -56,7 +56,7 @@ export default function EditInstanceDetails() {
   };
 
   const showConfigurationRestartMessage = () => {
-    setMessage('Updating server settings requires a restart of your Owncast server.');
+    setMessage('Updating server settings requires a restart of your BounceCast server.');
   };
 
   const showStreamKeyChangeMessage = () => {
@@ -114,7 +114,7 @@ export default function EditInstanceDetails() {
       <Collapse className="advanced-settings">
         <Panel header="Advanced Settings" key="1">
           <Typography.Paragraph>
-            If you have a CDN in front of your entire Owncast instance, specify your origin server
+            If you have a CDN in front of your entire BounceCast instance, specify your origin server
             here for the websocket to connect to. Most people will never need to set this.
           </Typography.Paragraph>
           <TextFieldWithSubmit

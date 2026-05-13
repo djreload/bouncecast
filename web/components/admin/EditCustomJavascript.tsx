@@ -84,7 +84,7 @@ export const EditCustomJavascript: FC = () => {
       </Title>
 
       <p className="description">
-        Insert custom Javascript into your Owncast page to add your own functionality or to add 3rd
+        Insert custom Javascript into your BounceCast page to add your own functionality or to add 3rd
         party scripts. Read more about how to use this feature in the{' '}
         <a href="https://owncast.online/docs/website/" rel="noopener noreferrer" target="_blank">
           Web page documentation.

@@ -77,7 +77,7 @@ let serverStatusRefreshPoll: ReturnType<typeof setInterval>;
 let hasBeenModeratorNotified = false;
 let hasWebsocketDisconnected = false;
 
-const serverConnectivityError = `Cannot connect to the Owncast service. Please check your internet connection and verify this Owncast server is running.`;
+const serverConnectivityError = `Cannot connect to the BounceCast service. Please check your internet connection and verify this BounceCast server is running.`;
 
 // Server status is what gets updated such as viewer count, durations,
 // stream title, online/offline state, etc.
@@ -263,7 +263,7 @@ export const ClientConfigStore: FC = () => {
       setGlobalFatalErrorMessage(null);
       setHasLoadedConfig(true);
     } catch (error) {
-      setGlobalFatalError('Unable to reach Owncast server', serverConnectivityError);
+      setGlobalFatalError('Unable to reach BounceCast server', serverConnectivityError);
       console.error(`ClientConfigService -> getConfig() ERROR: \n`, error);
     }
   };
@@ -282,7 +282,7 @@ export const ClientConfigStore: FC = () => {
       setGlobalFatalErrorMessage(null);
     } catch (error) {
       sendEvent([AppStateEvent.Fail]);
-      setGlobalFatalError('Unable to reach Owncast server', serverConnectivityError);
+      setGlobalFatalError('Unable to reach BounceCast server', serverConnectivityError);
       console.error(`serverStatusState -> getStatus() ERROR: \n`, error);
     }
   };

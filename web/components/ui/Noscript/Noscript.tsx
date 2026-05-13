@@ -10,13 +10,14 @@ export const Noscript: FC = () => (
         <br />
         <p>
           This website is powered by&nbsp;
-          <a href="https://owncast.online" rel="noopener noreferrer" target="_blank">
-            Owncast
+          <a href="https://github.com/djreload/bouncecast" rel="noopener noreferrer" target="_blank">
+            BounceCast
           </a>
+          , forked from Owncast
           .
         </p>
         <p>
-          Owncast uses JavaScript for playing the HTTP Live Streaming (HLS) video, and its chat
+          BounceCast uses JavaScript for playing the HTTP Live Streaming (HLS) video, and its chat
           client. But your web browser does not seem to support JavaScript, or you have it disabled.
         </p>
         <p>

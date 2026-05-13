@@ -196,13 +196,13 @@ const StreamKeys = () => {
   return (
     <div>
       <Paragraph>
-        A streaming key is used with your broadcasting software to authenticate itself to Owncast.
+        A streaming key is used with your broadcasting software to authenticate itself to BounceCast.
         Most people will only need one. However, if you share a server with others or you want
         different keys for different broadcasting sources you can add more here.
       </Paragraph>
       <Paragraph>
         These keys are unrelated to the admin password and will not grant you access to make changes
-        to Owncast&apos;s configuration.
+        to BounceCast&apos;s configuration.
       </Paragraph>
       <Paragraph>
         Read more about broadcasting at{' '}

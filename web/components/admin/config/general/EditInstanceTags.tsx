@@ -115,7 +115,7 @@ export default function EditInstanceTags() {
         Add Tags
       </Title>
       <p className="description">
-        This is a great way to categorize your Owncast server on the Directory!
+        This is a great way to categorize your BounceCast server on the Directory!
       </p>
 
       <div className="edit-current-strings">

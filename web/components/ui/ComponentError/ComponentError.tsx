@@ -12,7 +12,7 @@ export type ComponentErrorProps = {
 
 const openBugReport = () => {
   window.open(
-    'https://github.com/owncast/owncast/issues/new?assignees=&labels=&template=bug-report-feature-request.yml',
+    'https://github.com/djreload/bouncecast/issues/new',
     '_blank',
   );
 };

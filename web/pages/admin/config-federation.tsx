@@ -48,9 +48,9 @@ const FederationInfoModal: FC<FederationInfoModalProps> = ({ cancelPressed, okPr
       </div>
     }
   >
-    <Typography.Title level={3}>How do Owncast's social features work?</Typography.Title>
+    <Typography.Title level={3}>How do BounceCast's social features work?</Typography.Title>
     <Typography.Paragraph>
-      Owncast's social features are accomplished by having your server join The{' '}
+      BounceCast's social features are accomplished by having your server join The{' '}
       <a href="https://en.wikipedia.org/wiki/Fediverse" rel="noopener noreferrer" target="_blank">
         Fediverse
       </a>
@@ -68,7 +68,7 @@ const FederationInfoModal: FC<FederationInfoModalProps> = ({ cancelPressed, okPr
         These features are brand new. Given the variability of interfacing with the rest of the
         world, bugs are possible. Please report anything that you think isn't working quite right.
       </li>
-      <li>You must always host your Owncast server with SSL using a https url.</li>
+      <li>You must always host your BounceCast server with SSL using a https url.</li>
       <li>
         You should not change your server name URL or social username once people begin following
         you, as your server will be seen as a completely different user on the Fediverse, and the
@@ -292,7 +292,7 @@ const ConfigFederation = () => {
 
   const invalidPortWarning = (
     <Alert
-      message="Only Owncast instances available on the default SSL port 443 support this feature."
+      message="Only BounceCast instances available on the default SSL port 443 support this feature."
       type="warning"
       showIcon
     />
@@ -305,7 +305,7 @@ const ConfigFederation = () => {
     <div>
       <Title>Configure Social Features</Title>
       <p>
-        Owncast provides the ability for people to follow and engage with your instance. It's a
+        BounceCast provides the ability for people to follow and engage with your instance. It's a
         great way to promote alerting, sharing and engagement of your stream.
       </p>
       <p>

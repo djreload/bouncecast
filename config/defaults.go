@@ -47,8 +47,8 @@ func GetDefaults() Defaults {
 	defaultStreamKey := "abc123"
 	defaultStreamKeyComment := "Default stream key"
 	return Defaults{
-		Name:                 "New Owncast Server",
-		Summary:              "This is a new live video streaming server powered by Owncast.",
+		Name:                 "New BounceCast Server",
+		Summary:              "BounceCast is a self-hosted livestreaming and chat server forked from Owncast, focused on custom branding, creator tools, and future modular streaming features.",
 		ServerWelcomeMessage: "",
 		Logo:                 "logo.svg",
 		AdminPassword:        "abc123",
@@ -56,24 +56,20 @@ func GetDefaults() Defaults {
 			{Key: &defaultStreamKey, Comment: &defaultStreamKeyComment},
 		},
 		Tags: []string{
-			"owncast",
+			"bouncecast",
 			"streaming",
 		},
 
 		PageBodyContent: `
-# Welcome to Owncast!
+# Welcome to BounceCast!
 
-- This is a live stream powered by [Owncast](https://owncast.online), a free and open source live streaming server.
+- This is a live stream powered by BounceCast, a self-hosted livestreaming and chat server forked from [Owncast](https://owncast.online).
 
-- To discover more examples of streams, visit [Owncast's directory](https://owncast.directory).
+- Customize this page, your logo, and your stream details in the admin.
 
 - If you're the owner of this server you should visit the admin and customize the content on this page.
 
 <hr/>
-
-<video id="video" controls preload="metadata" style="width: 60vw; max-width: 600px; min-width: 200px;" poster="https://videos.owncast.online/t/xaJ3xNn9Y6pWTdB25m9ai3">
-  <source src="https://assets.owncast.tv/video/owncast-embed.mp4" type="video/mp4" />
-</video>
 	`,
 
 		DatabaseFilePath: "data/owncast.db",

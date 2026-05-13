@@ -85,7 +85,7 @@ export const EditCustomStyles: FC = () => {
       </Title>
 
       <p className="description">
-        Customize the look and feel of your Owncast instance by overriding the CSS styles of various
+        Customize the look and feel of your BounceCast instance by overriding the CSS styles of various
         components on the page. Refer to the{' '}
         <a href="https://owncast.online/docs/website/" rel="noopener noreferrer" target="_blank">
           CSS &amp; Components guide
