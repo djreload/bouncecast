@@ -19,7 +19,12 @@ import {
   Typography,
 } from 'antd';
 import { AdminLayout } from '../../components/layouts/AdminLayout';
-import { BOUNCECAST_SCHEDULE, BOUNCECAST_STREAMERS, fetchData } from '../../utils/apis';
+import {
+  BOUNCECAST_LIVE_EVENTS,
+  BOUNCECAST_SCHEDULE,
+  BOUNCECAST_STREAMERS,
+  fetchData,
+} from '../../utils/apis';
 
 const CalendarOutlined = dynamic(() => import('@ant-design/icons/CalendarOutlined'), {
   ssr: false,
@@ -48,6 +53,16 @@ type ScheduleItem = {
   notifyEmail: boolean;
   notifyPush: boolean;
   notifyWebhook: boolean;
+};
+
+type GoLiveEvent = {
+  id: number;
+  streamer: string;
+  scheduleTitle: string;
+  startedAt: string;
+  endedAt?: string;
+  status: string;
+  notificationState: string;
 };
 
 const columns = [
@@ -88,6 +103,7 @@ const columns = [
 export default function Schedule() {
   const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
   const [streamers, setStreamers] = useState<Streamer[]>([]);
+  const [liveEvents, setLiveEvents] = useState<GoLiveEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -96,12 +112,14 @@ export default function Schedule() {
   const loadStudioData = async () => {
     setLoading(true);
     try {
-      const [scheduleResult, streamerResult] = await Promise.all([
+      const [scheduleResult, streamerResult, liveEventsResult] = await Promise.all([
         fetchData(BOUNCECAST_SCHEDULE),
         fetchData(BOUNCECAST_STREAMERS),
+        fetchData(BOUNCECAST_LIVE_EVENTS),
       ]);
       setSchedule(scheduleResult || []);
       setStreamers(streamerResult || []);
+      setLiveEvents(liveEventsResult || []);
     } catch (error) {
       console.error(error);
     } finally {
@@ -199,6 +217,45 @@ export default function Schedule() {
           </Card>
         </Col>
       </Row>
+
+      <Card title="Recent live events" className="studio-panel">
+        <Table
+          dataSource={liveEvents}
+          rowKey="id"
+          pagination={false}
+          columns={[
+            {
+              title: 'DJ',
+              dataIndex: 'streamer',
+              key: 'streamer',
+              render: streamer => streamer || 'Unknown',
+            },
+            {
+              title: 'Schedule',
+              dataIndex: 'scheduleTitle',
+              key: 'scheduleTitle',
+              render: scheduleTitle => scheduleTitle || 'Unscheduled',
+            },
+            {
+              title: 'Started',
+              dataIndex: 'startedAt',
+              key: 'startedAt',
+              render: startedAt => new Date(startedAt).toLocaleString(),
+            },
+            {
+              title: 'Status',
+              dataIndex: 'status',
+              key: 'status',
+              render: status => <Tag color={status === 'live' ? 'green' : 'default'}>{status}</Tag>,
+            },
+            {
+              title: 'Alerts',
+              dataIndex: 'notificationState',
+              key: 'notificationState',
+            },
+          ]}
+        />
+      </Card>
 
       {!loading && schedule.length === 0 && (
         <Card className="studio-panel">

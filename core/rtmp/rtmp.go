@@ -20,8 +20,9 @@ import (
 var _hasInboundRTMPConnection = false
 
 var (
-	_pipe           *io.PipeWriter
-	_rtmpConnection net.Conn
+	_pipe                         *io.PipeWriter
+	_rtmpConnection               net.Conn
+	_bounceCastCurrentStreamerKey *bounceCastStreamerKeyMatch
 )
 
 var (
@@ -91,7 +92,8 @@ func HandleConn(c *rtmp.Conn, nc net.Conn) {
 		validStreamingKeys = []generated.StreamKey{{Key: &config.TemporaryStreamKey}}
 	}
 
-	accessGranted = validateBounceCastStreamerKey(c.URL.Path)
+	bounceCastStreamerKey := validateBounceCastStreamerKey(c.URL.Path)
+	accessGranted = bounceCastStreamerKey != nil
 	if !accessGranted {
 		for _, key := range validStreamingKeys {
 			if key.Key != nil && secretMatch(*key.Key, c.URL.Path) {
@@ -110,6 +112,8 @@ func HandleConn(c *rtmp.Conn, nc net.Conn) {
 	rtmpOut, rtmpIn := io.Pipe()
 	_pipe = rtmpIn
 	log.Infoln("Inbound stream connected from", nc.RemoteAddr().String())
+	beginBounceCastGoLiveEvent(bounceCastStreamerKey, nc.RemoteAddr())
+	_bounceCastCurrentStreamerKey = bounceCastStreamerKey
 	_setStreamAsConnected(rtmpOut)
 
 	_hasInboundRTMPConnection = true
@@ -152,6 +156,8 @@ func handleDisconnect(conn net.Conn) {
 	}
 
 	log.Infoln("Inbound stream disconnected.")
+	endBounceCastGoLiveEvent(_bounceCastCurrentStreamerKey)
+	_bounceCastCurrentStreamerKey = nil
 	_ = conn.Close()
 	_ = _pipe.Close()
 	_hasInboundRTMPConnection = false

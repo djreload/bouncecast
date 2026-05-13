@@ -55,6 +55,19 @@ type BounceCastStreamKey struct {
 	RevokedAt  *time.Time `json:"revokedAt,omitempty"`
 }
 
+type BounceCastGoLiveEvent struct {
+	ID                int64      `json:"id"`
+	StreamerID        *int64     `json:"streamerId,omitempty"`
+	Streamer          string     `json:"streamer"`
+	ScheduleID        *int64     `json:"scheduleId,omitempty"`
+	ScheduleTitle     string     `json:"scheduleTitle"`
+	StartedAt         time.Time  `json:"startedAt"`
+	EndedAt           *time.Time `json:"endedAt,omitempty"`
+	RemoteAddr        string     `json:"remoteAddr"`
+	Status            string     `json:"status"`
+	NotificationState string     `json:"notificationState"`
+}
+
 type createStreamerRequest struct {
 	DisplayName string `json:"displayName"`
 	Handle      string `json:"handle"`
@@ -256,6 +269,59 @@ func RevokeBounceCastStreamKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	webutils.WriteSimpleResponse(w, true, "revoked stream key")
+}
+
+// GetBounceCastGoLiveEvents returns recent per-streamer live events.
+func GetBounceCastGoLiveEvents(w http.ResponseWriter, r *http.Request) {
+	rows, err := data.GetDatabase().Query(`
+		SELECT e.id, e.streamer_id, COALESCE(a.display_name, ''), e.schedule_id, COALESCE(s.title, ''),
+			e.started_at, e.ended_at, COALESCE(e.remote_addr, ''), e.status, e.notification_state
+		FROM bouncecast_go_live_events e
+		LEFT JOIN bouncecast_streamer_accounts a ON a.id = e.streamer_id
+		LEFT JOIN bouncecast_stream_schedule s ON s.id = e.schedule_id
+		ORDER BY e.started_at DESC
+		LIMIT 25
+	`)
+	if err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+	defer rows.Close()
+
+	events := []BounceCastGoLiveEvent{}
+	for rows.Next() {
+		var event BounceCastGoLiveEvent
+		var streamerID sql.NullInt64
+		var scheduleID sql.NullInt64
+		var endedAt sql.NullTime
+		if err := rows.Scan(
+			&event.ID,
+			&streamerID,
+			&event.Streamer,
+			&scheduleID,
+			&event.ScheduleTitle,
+			&event.StartedAt,
+			&endedAt,
+			&event.RemoteAddr,
+			&event.Status,
+			&event.NotificationState,
+		); err != nil {
+			webutils.InternalErrorHandler(w, err)
+			return
+		}
+		if streamerID.Valid {
+			event.StreamerID = &streamerID.Int64
+		}
+		if scheduleID.Valid {
+			event.ScheduleID = &scheduleID.Int64
+		}
+		if endedAt.Valid {
+			event.EndedAt = &endedAt.Time
+		}
+		events = append(events, event)
+	}
+
+	webutils.WriteResponse(w, events)
 }
 
 // GetBounceCastSchedule returns upcoming BounceCast schedule rows.

@@ -58,6 +58,8 @@ func Start(enableVerboseLogging bool) error {
 	r.Get("/api/admin/bouncecast/streamkeys", middleware.RequireAdminAuth(adminhandlers.GetBounceCastStreamKeys))
 	r.Post("/api/admin/bouncecast/streamkeys", middleware.RequireAdminAuth(adminhandlers.CreateBounceCastStreamKey))
 	r.Post("/api/admin/bouncecast/streamkeys/revoke", middleware.RequireAdminAuth(adminhandlers.RevokeBounceCastStreamKey))
+	r.Options("/api/admin/bouncecast/live-events", middleware.RequireAdminAuth(adminhandlers.GetBounceCastGoLiveEvents))
+	r.Get("/api/admin/bouncecast/live-events", middleware.RequireAdminAuth(adminhandlers.GetBounceCastGoLiveEvents))
 	r.Options("/api/admin/bouncecast/schedule", middleware.RequireAdminAuth(adminhandlers.GetBounceCastSchedule))
 	r.Get("/api/admin/bouncecast/schedule", middleware.RequireAdminAuth(adminhandlers.GetBounceCastSchedule))
 	r.Post("/api/admin/bouncecast/schedule", middleware.RequireAdminAuth(adminhandlers.CreateBounceCastSchedule))
