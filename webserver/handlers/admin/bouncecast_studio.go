@@ -9,20 +9,22 @@ import (
 	"time"
 
 	"github.com/owncast/owncast/core/data"
+	"github.com/owncast/owncast/utils"
 	webutils "github.com/owncast/owncast/webserver/utils"
 )
 
 type BounceCastStreamer struct {
-	ID          int64      `json:"id"`
-	DisplayName string     `json:"displayName"`
-	Handle      string     `json:"handle"`
-	Email       string     `json:"email"`
-	Role        string     `json:"role"`
-	Status      string     `json:"status"`
-	AvatarURL   string     `json:"avatarUrl"`
-	CreatedAt   time.Time  `json:"createdAt"`
-	UpdatedAt   time.Time  `json:"updatedAt"`
-	LastLoginAt *time.Time `json:"lastLoginAt,omitempty"`
+	ID             int64      `json:"id"`
+	DisplayName    string     `json:"displayName"`
+	Handle         string     `json:"handle"`
+	Email          string     `json:"email"`
+	Role           string     `json:"role"`
+	Status         string     `json:"status"`
+	AvatarURL      string     `json:"avatarUrl"`
+	StreamKeyCount int64      `json:"streamKeyCount"`
+	CreatedAt      time.Time  `json:"createdAt"`
+	UpdatedAt      time.Time  `json:"updatedAt"`
+	LastLoginAt    *time.Time `json:"lastLoginAt,omitempty"`
 }
 
 type BounceCastScheduleItem struct {
@@ -41,6 +43,16 @@ type BounceCastScheduleItem struct {
 	NotifyWebhook bool       `json:"notifyWebhook"`
 	CreatedAt     time.Time  `json:"createdAt"`
 	UpdatedAt     time.Time  `json:"updatedAt"`
+}
+
+type BounceCastStreamKey struct {
+	ID         int64      `json:"id"`
+	StreamerID int64      `json:"streamerId"`
+	Label      string     `json:"label"`
+	Enabled    bool       `json:"enabled"`
+	CreatedAt  time.Time  `json:"createdAt"`
+	LastUsedAt *time.Time `json:"lastUsedAt,omitempty"`
+	RevokedAt  *time.Time `json:"revokedAt,omitempty"`
 }
 
 type createStreamerRequest struct {
@@ -62,12 +74,24 @@ type createScheduleRequest struct {
 	NotifyWebhook bool   `json:"notifyWebhook"`
 }
 
+type createStreamKeyRequest struct {
+	StreamerID int64  `json:"streamerId"`
+	Label      string `json:"label"`
+}
+
+type revokeStreamKeyRequest struct {
+	ID int64 `json:"id"`
+}
+
 // GetBounceCastStreamers returns BounceCast dashboard streamer accounts.
 func GetBounceCastStreamers(w http.ResponseWriter, r *http.Request) {
 	rows, err := data.GetDatabase().Query(`
-		SELECT id, display_name, handle, COALESCE(email, ''), role, status, COALESCE(avatar_url, ''), created_at, updated_at, last_login_at
-		FROM bouncecast_streamer_accounts
-		ORDER BY display_name COLLATE NOCASE ASC
+		SELECT a.id, a.display_name, a.handle, COALESCE(a.email, ''), a.role, a.status, COALESCE(a.avatar_url, ''),
+			COUNT(k.id), a.created_at, a.updated_at, a.last_login_at
+		FROM bouncecast_streamer_accounts a
+		LEFT JOIN bouncecast_streamer_stream_keys k ON k.streamer_id = a.id AND k.enabled = 1 AND k.revoked_at IS NULL
+		GROUP BY a.id
+		ORDER BY a.display_name COLLATE NOCASE ASC
 	`)
 	if err != nil {
 		webutils.InternalErrorHandler(w, err)
@@ -87,6 +111,7 @@ func GetBounceCastStreamers(w http.ResponseWriter, r *http.Request) {
 			&streamer.Role,
 			&streamer.Status,
 			&streamer.AvatarURL,
+			&streamer.StreamKeyCount,
 			&streamer.CreatedAt,
 			&streamer.UpdatedAt,
 			&lastLogin,
@@ -134,6 +159,103 @@ func CreateBounceCastStreamer(w http.ResponseWriter, r *http.Request) {
 
 	id, _ := result.LastInsertId()
 	webutils.WriteResponse(w, map[string]interface{}{"id": id})
+}
+
+// GetBounceCastStreamKeys returns the per-streamer RTMP keys without exposing raw secrets.
+func GetBounceCastStreamKeys(w http.ResponseWriter, r *http.Request) {
+	rows, err := data.GetDatabase().Query(`
+		SELECT id, streamer_id, COALESCE(label, ''), enabled, created_at, last_used_at, revoked_at
+		FROM bouncecast_streamer_stream_keys
+		ORDER BY created_at DESC
+	`)
+	if err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+	defer rows.Close()
+
+	streamKeys := []BounceCastStreamKey{}
+	for rows.Next() {
+		var key BounceCastStreamKey
+		var lastUsedAt sql.NullTime
+		var revokedAt sql.NullTime
+		if err := rows.Scan(&key.ID, &key.StreamerID, &key.Label, &key.Enabled, &key.CreatedAt, &lastUsedAt, &revokedAt); err != nil {
+			webutils.InternalErrorHandler(w, err)
+			return
+		}
+		if lastUsedAt.Valid {
+			key.LastUsedAt = &lastUsedAt.Time
+		}
+		if revokedAt.Valid {
+			key.RevokedAt = &revokedAt.Time
+		}
+		streamKeys = append(streamKeys, key)
+	}
+
+	webutils.WriteResponse(w, streamKeys)
+}
+
+// CreateBounceCastStreamKey creates a per-streamer RTMP key and returns the raw key once.
+func CreateBounceCastStreamKey(w http.ResponseWriter, r *http.Request) {
+	var request createStreamKeyRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+	if request.StreamerID == 0 {
+		webutils.BadRequestHandler(w, errors.New("streamerId is required"))
+		return
+	}
+
+	rawKey, err := utils.GenerateAccessToken()
+	if err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+	hashedKey, err := utils.HashPassword(rawKey)
+	if err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+
+	result, err := data.GetDatabase().Exec(`
+		INSERT INTO bouncecast_streamer_stream_keys(streamer_id, key_hash, label)
+		VALUES(?, ?, NULLIF(?, ''))
+	`, request.StreamerID, hashedKey, strings.TrimSpace(request.Label))
+	if err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+
+	id, _ := result.LastInsertId()
+	webutils.WriteResponse(w, map[string]interface{}{
+		"id":        id,
+		"streamKey": rawKey,
+	})
+}
+
+// RevokeBounceCastStreamKey disables a per-streamer RTMP key.
+func RevokeBounceCastStreamKey(w http.ResponseWriter, r *http.Request) {
+	var request revokeStreamKeyRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+	if request.ID == 0 {
+		webutils.BadRequestHandler(w, errors.New("id is required"))
+		return
+	}
+
+	if _, err := data.GetDatabase().Exec(`
+		UPDATE bouncecast_streamer_stream_keys
+		SET enabled = 0, revoked_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, request.ID); err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+
+	webutils.WriteSimpleResponse(w, true, "revoked stream key")
 }
 
 // GetBounceCastSchedule returns upcoming BounceCast schedule rows.

@@ -91,10 +91,13 @@ func HandleConn(c *rtmp.Conn, nc net.Conn) {
 		validStreamingKeys = []generated.StreamKey{{Key: &config.TemporaryStreamKey}}
 	}
 
-	for _, key := range validStreamingKeys {
-		if key.Key != nil && secretMatch(*key.Key, c.URL.Path) {
-			accessGranted = true
-			break
+	accessGranted = validateBounceCastStreamerKey(c.URL.Path)
+	if !accessGranted {
+		for _, key := range validStreamingKeys {
+			if key.Key != nil && secretMatch(*key.Key, c.URL.Path) {
+				accessGranted = true
+				break
+			}
 		}
 	}
 

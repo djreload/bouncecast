@@ -160,6 +160,22 @@
   color: rgb(255 255 255 / 64%);
 }
 
+.studio-table-actions {
+  margin-bottom: 0.75rem;
+}
+
+.studio-nested-table {
+  padding: 0.5rem 0;
+}
+
+.studio-secret-box {
+  width: 100%;
+}
+
+.studio-secret-box textarea.ant-input {
+  font-family: monospace;
+}
+
 @keyframes studio-page-in {
   from {
     opacity: 0;

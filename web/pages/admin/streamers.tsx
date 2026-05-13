@@ -17,11 +17,17 @@ import {
   Typography,
 } from 'antd';
 import { AdminLayout } from '../../components/layouts/AdminLayout';
-import { BOUNCECAST_STREAMERS, fetchData } from '../../utils/apis';
+import {
+  BOUNCECAST_STREAMERS,
+  BOUNCECAST_STREAM_KEYS,
+  BOUNCECAST_STREAM_KEY_REVOKE,
+  fetchData,
+} from '../../utils/apis';
 
 const UserAddOutlined = dynamic(() => import('@ant-design/icons/UserAddOutlined'), { ssr: false });
 const KeyOutlined = dynamic(() => import('@ant-design/icons/KeyOutlined'), { ssr: false });
 const MailOutlined = dynamic(() => import('@ant-design/icons/MailOutlined'), { ssr: false });
+const CopyOutlined = dynamic(() => import('@ant-design/icons/CopyOutlined'), { ssr: false });
 const CustomerServiceOutlined = dynamic(() => import('@ant-design/icons/CustomerServiceOutlined'), {
   ssr: false,
 });
@@ -35,6 +41,17 @@ type Streamer = {
   email: string;
   role: string;
   status: string;
+  streamKeyCount: number;
+};
+
+type StreamKey = {
+  id: number;
+  streamerId: number;
+  label: string;
+  enabled: boolean;
+  createdAt: string;
+  lastUsedAt?: string;
+  revokedAt?: string;
 };
 
 const columns = [
@@ -56,10 +73,12 @@ const columns = [
     render: role => <Tag color={role === 'owner' ? 'gold' : 'blue'}>{role}</Tag>,
   },
   {
-    title: 'Status',
-    dataIndex: 'status',
-    key: 'status',
-    render: status => <Tag color={status === 'active' ? 'green' : 'default'}>{status}</Tag>,
+    title: 'Stream Keys',
+    dataIndex: 'streamKeyCount',
+    key: 'streamKeyCount',
+    render: streamKeyCount => (
+      <Tag color={streamKeyCount > 0 ? 'green' : 'default'}>{streamKeyCount}</Tag>
+    ),
   },
   {
     title: 'Email',
@@ -69,23 +88,141 @@ const columns = [
   },
 ];
 
+const streamKeyColumns = (revokeStreamKey: (id: number) => void) => [
+  {
+    title: 'Label',
+    dataIndex: 'label',
+    key: 'label',
+    render: label => label || 'OBS key',
+  },
+  {
+    title: 'Created',
+    dataIndex: 'createdAt',
+    key: 'createdAt',
+    render: createdAt => new Date(createdAt).toLocaleString(),
+  },
+  {
+    title: 'Last used',
+    dataIndex: 'lastUsedAt',
+    key: 'lastUsedAt',
+    render: lastUsedAt => (lastUsedAt ? new Date(lastUsedAt).toLocaleString() : 'Never'),
+  },
+  {
+    title: 'Status',
+    key: 'status',
+    render: (_, key) => (
+      <Tag color={key.enabled && !key.revokedAt ? 'green' : 'default'}>
+        {key.enabled && !key.revokedAt ? 'active' : 'revoked'}
+      </Tag>
+    ),
+  },
+  {
+    title: 'Action',
+    key: 'action',
+    render: (_, key) =>
+      key.enabled && !key.revokedAt ? (
+        <Button size="small" danger onClick={() => revokeStreamKey(key.id)}>
+          Revoke
+        </Button>
+      ) : null,
+  },
+];
+
+type StreamerKeysTableProps = {
+  streamer: Streamer;
+  streamKeys: StreamKey[];
+  openKeyModal: (streamer: Streamer) => void;
+  revokeStreamKey: (id: number) => void;
+};
+
+const StreamerKeysTable = ({
+  streamer,
+  streamKeys,
+  openKeyModal,
+  revokeStreamKey,
+}: StreamerKeysTableProps) => {
+  const keys = streamKeys.filter(key => key.streamerId === streamer.id);
+  return (
+    <div className="studio-nested-table">
+      <Space className="studio-table-actions">
+        <Button size="small" icon={<KeyOutlined />} onClick={() => openKeyModal(streamer)}>
+          Create stream key
+        </Button>
+      </Space>
+      <Table
+        columns={streamKeyColumns(revokeStreamKey)}
+        dataSource={keys}
+        rowKey="id"
+        pagination={false}
+        size="small"
+      />
+    </div>
+  );
+};
+
 export default function Streamers() {
   const [streamers, setStreamers] = useState<Streamer[]>([]);
+  const [streamKeys, setStreamKeys] = useState<StreamKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [keyModalOpen, setKeyModalOpen] = useState(false);
+  const [selectedStreamer, setSelectedStreamer] = useState<Streamer | null>(null);
+  const [newStreamKey, setNewStreamKey] = useState('');
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
+  const [keyForm] = Form.useForm();
 
   const loadStreamers = async () => {
     setLoading(true);
     try {
-      const result = await fetchData(BOUNCECAST_STREAMERS);
-      setStreamers(result || []);
+      const [streamerResult, keyResult] = await Promise.all([
+        fetchData(BOUNCECAST_STREAMERS),
+        fetchData(BOUNCECAST_STREAM_KEYS),
+      ]);
+      setStreamers(streamerResult || []);
+      setStreamKeys(keyResult || []);
     } catch (error) {
       console.error(error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const createStreamKey = async () => {
+    const values = await keyForm.validateFields();
+    setSaving(true);
+    try {
+      const result = await fetchData(BOUNCECAST_STREAM_KEYS, {
+        method: 'POST',
+        data: {
+          streamerId: values.streamerId,
+          label: values.label,
+        },
+      });
+      setNewStreamKey(result.streamKey);
+      await loadStreamers();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const revokeStreamKey = async (id: number) => {
+    await fetchData(BOUNCECAST_STREAM_KEY_REVOKE, {
+      method: 'POST',
+      data: { id },
+    });
+    await loadStreamers();
+  };
+
+  const openKeyModal = (streamer?: Streamer) => {
+    setSelectedStreamer(streamer || null);
+    setNewStreamKey('');
+    keyForm.resetFields();
+    keyForm.setFieldsValue({
+      streamerId: streamer?.id,
+      label: streamer ? `${streamer.displayName} OBS key` : '',
+    });
+    setKeyModalOpen(true);
   };
 
   useEffect(() => {
@@ -119,9 +256,14 @@ export default function Streamers() {
             access, and go-live notification ownership.
           </Text>
         </div>
-        <Button type="primary" icon={<UserAddOutlined />} onClick={() => setModalOpen(true)}>
-          Add streamer
-        </Button>
+        <Space>
+          <Button icon={<KeyOutlined />} onClick={() => openKeyModal()}>
+            New key
+          </Button>
+          <Button type="primary" icon={<UserAddOutlined />} onClick={() => setModalOpen(true)}>
+            Add streamer
+          </Button>
+        </Space>
       </div>
 
       <Row gutter={[16, 16]} className="studio-stat-row">
@@ -136,7 +278,11 @@ export default function Streamers() {
         </Col>
         <Col xs={24} md={8}>
           <Card>
-            <Statistic title="Per-DJ stream keys" value={0} prefix={<KeyOutlined />} />
+            <Statistic
+              title="Per-DJ stream keys"
+              value={streamKeys.length}
+              prefix={<KeyOutlined />}
+            />
           </Card>
         </Col>
         <Col xs={24} md={8}>
@@ -153,6 +299,18 @@ export default function Streamers() {
           loading={loading}
           rowKey="id"
           pagination={false}
+          expandable={{
+            // Ant Design requires a render callback here so the expanded row can receive the table record.
+            // eslint-disable-next-line react/no-unstable-nested-components
+            expandedRowRender: streamer => (
+              <StreamerKeysTable
+                streamer={streamer}
+                streamKeys={streamKeys}
+                openKeyModal={openKeyModal}
+                revokeStreamKey={revokeStreamKey}
+              />
+            ),
+          }}
         />
       </Card>
 
@@ -200,6 +358,49 @@ export default function Streamers() {
             />
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        title={
+          selectedStreamer ? `New stream key for ${selectedStreamer.displayName}` : 'New stream key'
+        }
+        open={keyModalOpen}
+        onCancel={() => setKeyModalOpen(false)}
+        onOk={newStreamKey ? () => setKeyModalOpen(false) : createStreamKey}
+        confirmLoading={saving}
+        okText={newStreamKey ? 'Done' : 'Create key'}
+      >
+        {newStreamKey ? (
+          <Space direction="vertical" className="studio-secret-box">
+            <Text strong>Copy this RTMP stream key now. It will not be shown again.</Text>
+            <Input.TextArea value={newStreamKey} rows={3} readOnly />
+            <Button
+              icon={<CopyOutlined />}
+              onClick={() => navigator.clipboard?.writeText(newStreamKey)}
+            >
+              Copy key
+            </Button>
+          </Space>
+        ) : (
+          <Form form={keyForm} layout="vertical">
+            <Form.Item
+              name="streamerId"
+              label="Streamer"
+              rules={[{ required: true, message: 'Choose a streamer' }]}
+            >
+              <Select
+                placeholder="Assign to DJ"
+                options={streamers.map(streamer => ({
+                  label: streamer.displayName,
+                  value: streamer.id,
+                }))}
+              />
+            </Form.Item>
+            <Form.Item name="label" label="Label">
+              <Input placeholder="OBS laptop key" />
+            </Form.Item>
+          </Form>
+        )}
       </Modal>
     </div>
   );

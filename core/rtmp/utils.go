@@ -82,15 +82,22 @@ func getVideoCodec(codec interface{}) string {
 }
 
 func secretMatch(configStreamKey string, path string) bool {
+	streamingKey, ok := getStreamKeyFromPath(path)
+	if !ok {
+		return false
+	}
+
+	matches := subtle.ConstantTimeCompare([]byte(streamingKey), []byte(configStreamKey)) == 1
+	return matches
+}
+
+func getStreamKeyFromPath(path string) (string, bool) {
 	prefix := "/live/"
 
 	if !strings.HasPrefix(path, prefix) {
 		log.Debug("RTMP path does not start with " + prefix)
-		return false // We need the path to begin with $prefix
+		return "", false
 	}
 
-	streamingKey := path[len(prefix):] // Remove $prefix
-
-	matches := subtle.ConstantTimeCompare([]byte(streamingKey), []byte(configStreamKey)) == 1
-	return matches
+	return path[len(prefix):], true
 }
