@@ -134,6 +134,22 @@ export const BOUNCECAST_PUSH_SETTINGS = `${API_LOCATION}bouncecast/push-settings
 
 export const BOUNCECAST_SCHEDULE = `${API_LOCATION}bouncecast/schedule`;
 
+const STUDIO_API_LOCATION = `${NEXT_PUBLIC_API_HOST}api/bouncecast/studio/`;
+
+export const BOUNCECAST_STUDIO_LOGIN = `${STUDIO_API_LOCATION}login`;
+
+export const BOUNCECAST_STUDIO_LOGOUT = `${STUDIO_API_LOCATION}logout`;
+
+export const BOUNCECAST_STUDIO_ME = `${STUDIO_API_LOCATION}me`;
+
+export const BOUNCECAST_STUDIO_SCHEDULE = `${STUDIO_API_LOCATION}schedule`;
+
+export const BOUNCECAST_STUDIO_STREAM_KEYS = `${STUDIO_API_LOCATION}streamkeys`;
+
+export const BOUNCECAST_STUDIO_STREAM_KEY_REVOKE = `${STUDIO_API_LOCATION}streamkeys/revoke`;
+
+export const BOUNCECAST_STUDIO_LIVE_EVENTS = `${STUDIO_API_LOCATION}live-events`;
+
 export const API_YP_RESET = `${API_LOCATION}yp/reset`;
 
 const GITHUB_RELEASE_URL = 'https://api.github.com/repos/owncast/owncast/releases/latest';
@@ -185,6 +201,35 @@ export async function getUnauthedData(url: string, options?: FetchOptions) {
     ...options,
   };
   return fetchData(url, opts);
+}
+
+export async function fetchStudioData(url: string, token?: string, options?: FetchOptions) {
+  const { data, method = 'GET' } = options || {};
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+  };
+  // eslint-disable-next-line no-undef
+  const requestOptions: RequestInit = {
+    method,
+    headers,
+  };
+
+  if (data !== undefined) {
+    requestOptions.body = JSON.stringify(data);
+    headers['Content-Type'] = 'application/json';
+  }
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(url, requestOptions);
+  const json = await response.json();
+  if (!response.ok) {
+    const message = json.message || json.error || `An error has occurred: ${response.status}`;
+    throw new Error(message);
+  }
+  return json;
 }
 
 export async function fetchExternalData(url: string) {

@@ -85,6 +85,15 @@ func Start(enableVerboseLogging bool) error {
 	r.Get("/api/bouncecast/studio/me", handlers.BounceCastStudioMe)
 	r.Options("/api/bouncecast/studio/logout", handlers.BounceCastStudioOptions)
 	r.Post("/api/bouncecast/studio/logout", handlers.BounceCastStudioLogout)
+	r.Options("/api/bouncecast/studio/schedule", handlers.BounceCastStudioOptions)
+	r.Get("/api/bouncecast/studio/schedule", handlers.BounceCastStudioSchedule)
+	r.Options("/api/bouncecast/studio/streamkeys", handlers.BounceCastStudioOptions)
+	r.Get("/api/bouncecast/studio/streamkeys", handlers.BounceCastStudioStreamKeys)
+	r.Post("/api/bouncecast/studio/streamkeys", handlers.BounceCastStudioCreateStreamKey)
+	r.Options("/api/bouncecast/studio/streamkeys/revoke", handlers.BounceCastStudioOptions)
+	r.Post("/api/bouncecast/studio/streamkeys/revoke", handlers.BounceCastStudioRevokeStreamKey)
+	r.Options("/api/bouncecast/studio/live-events", handlers.BounceCastStudioOptions)
+	r.Get("/api/bouncecast/studio/live-events", handlers.BounceCastStudioLiveEvents)
 
 	// Single ActivityPub Actor
 	r.HandleFunc("/federation/user/*", middleware.RequireActivityPubOrRedirect(aphandlers.ActorHandler))

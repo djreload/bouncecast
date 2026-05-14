@@ -44,6 +44,7 @@ Recommended entities:
 - Add roles such as owner, manager, streamer, moderator.
 - Do not reuse chat `users` as dashboard identities.
 - Keep `/api/bouncecast/studio/*` separate from Owncast-compatible `/api/admin/*` endpoints until dashboard contracts are stable.
+- Serve `/studio` as the DJ-facing dashboard for scoped schedule, stream key, and go-live history workflows.
 
 ### Phase 3: Per-Streamer Stream Keys
 
@@ -85,6 +86,7 @@ True simultaneous multi-channel streaming is deeper than multi-DJ operation. It 
 - `web/components/admin/MainLayout.tsx`: admin navigation and layout shell.
 - `web/pages/admin/streamers.tsx`: streamer roster dashboard foundation.
 - `web/pages/admin/schedule.tsx`: schedule and go-live notification dashboard foundation.
+- `web/pages/studio.tsx`: DJ-facing BounceCast Studio dashboard.
 - `web/public/styles/admin/bouncecast-studio.css`: BounceCast admin polish layer.
 - `webserver/router/middleware/auth.go`: future session/role auth boundary.
 - `core/rtmp/rtmp.go`: future stream-key-to-streamer resolution point.

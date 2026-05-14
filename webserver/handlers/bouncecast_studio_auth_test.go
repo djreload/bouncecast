@@ -15,6 +15,10 @@ func resetBounceCastStudioAuthTestTables(t *testing.T) {
 	t.Helper()
 
 	db := data.GetDatabase()
+	_, _ = db.Exec(`DELETE FROM bouncecast_notification_deliveries`)
+	_, _ = db.Exec(`DELETE FROM bouncecast_notification_subscribers`)
+	_, _ = db.Exec(`DELETE FROM bouncecast_go_live_events`)
+	_, _ = db.Exec(`DELETE FROM bouncecast_stream_schedule`)
 	_, _ = db.Exec(`DELETE FROM bouncecast_streamer_sessions`)
 	_, _ = db.Exec(`DELETE FROM bouncecast_streamer_stream_keys`)
 	_, _ = db.Exec(`DELETE FROM bouncecast_streamer_accounts`)
