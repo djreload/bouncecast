@@ -2,12 +2,17 @@ package rtmp
 
 import (
 	"bytes"
+	"crypto/tls"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
+	"net/mail"
+	"net/smtp"
 	"net/url"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/owncast/owncast/core/data"
@@ -21,6 +26,30 @@ type bounceCastStreamerKeyMatch struct {
 	displayName   string
 	goLiveEventID int64
 }
+
+type bounceCastEmailSettings struct {
+	enabled     bool
+	host        string
+	port        int
+	username    string
+	password    string
+	fromAddress string
+	fromName    string
+	startTLS    bool
+	subject     string
+}
+
+const (
+	bounceCastEmailEnabledKey     = "email_enabled"
+	bounceCastEmailHostKey        = "email_host"
+	bounceCastEmailPortKey        = "email_port"
+	bounceCastEmailUsernameKey    = "email_username"
+	bounceCastEmailPasswordKey    = "email_password"
+	bounceCastEmailFromAddressKey = "email_from_address"
+	bounceCastEmailFromNameKey    = "email_from_name"
+	bounceCastEmailStartTLSKey    = "email_start_tls"
+	bounceCastEmailSubjectKey     = "email_subject"
+)
 
 func validateBounceCastStreamerKey(path string) *bounceCastStreamerKeyMatch {
 	streamingKey, ok := getStreamKeyFromPath(path)
@@ -232,6 +261,7 @@ func queueBounceCastGoLiveNotifications(goLiveEventID int64, scheduleID sql.Null
 
 	if queuedCount > 0 {
 		go sendBounceCastWebhookDeliveries(goLiveEventID)
+		go sendBounceCastEmailDeliveries(goLiveEventID)
 	}
 }
 
@@ -368,4 +398,171 @@ func sendBounceCastWebhook(destination string, payload bounceCastWebhookPayload)
 		return fmt.Errorf("webhook returned HTTP %d", response.StatusCode)
 	}
 	return nil
+}
+
+func sendBounceCastEmailDeliveries(goLiveEventID int64) {
+	db := data.GetDatabase()
+	if db == nil {
+		return
+	}
+
+	payload, err := getBounceCastWebhookPayload(goLiveEventID)
+	if err != nil {
+		log.Debugln("unable to build BounceCast email payload", err)
+		return
+	}
+
+	settings := readBounceCastEmailSettings()
+	rows, err := db.Query(`
+		SELECT id, destination
+		FROM bouncecast_notification_deliveries
+		WHERE go_live_event_id = ? AND channel = 'email' AND status = 'queued'
+	`, goLiveEventID)
+	if err != nil {
+		log.Debugln("unable to query BounceCast email deliveries", err)
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var deliveryID int64
+		var destination string
+		if err := rows.Scan(&deliveryID, &destination); err != nil {
+			log.Debugln("unable to scan BounceCast email delivery", err)
+			continue
+		}
+
+		if err := sendBounceCastEmail(settings, destination, payload); err != nil {
+			if _, updateErr := db.Exec(`
+				UPDATE bouncecast_notification_deliveries
+				SET status = 'failed', attempt_count = attempt_count + 1, last_error = ?
+				WHERE id = ?
+			`, err.Error(), deliveryID); updateErr != nil {
+				log.Debugln("unable to mark BounceCast email delivery failed", updateErr)
+			}
+			continue
+		}
+
+		if _, err := db.Exec(`
+			UPDATE bouncecast_notification_deliveries
+			SET status = 'sent', attempt_count = attempt_count + 1, sent_at = CURRENT_TIMESTAMP, last_error = NULL
+			WHERE id = ?
+		`, deliveryID); err != nil {
+			log.Debugln("unable to mark BounceCast email delivery sent", err)
+		}
+	}
+}
+
+func sendBounceCastEmail(settings bounceCastEmailSettings, destination string, payload bounceCastWebhookPayload) error {
+	if !settings.enabled {
+		return fmt.Errorf("SMTP email notifications are not enabled")
+	}
+	if settings.host == "" || settings.fromAddress == "" {
+		return fmt.Errorf("SMTP host and from address are required")
+	}
+
+	from := mail.Address{Name: settings.fromName, Address: settings.fromAddress}
+	to := mail.Address{Address: destination}
+	subject := strings.ReplaceAll(settings.subject, "{{streamer}}", payload.Streamer)
+	body := fmt.Sprintf("%s is live on BounceCast.\n\n", payload.Streamer)
+	if payload.ScheduleTitle != "" {
+		body += fmt.Sprintf("Set: %s\n", payload.ScheduleTitle)
+	}
+	body += fmt.Sprintf("Started: %s\n", payload.StartedAt)
+
+	var message strings.Builder
+	message.WriteString(fmt.Sprintf("From: %s\r\n", from.String()))
+	message.WriteString(fmt.Sprintf("To: %s\r\n", to.String()))
+	message.WriteString(fmt.Sprintf("Subject: %s\r\n", subject))
+	message.WriteString("MIME-Version: 1.0\r\n")
+	message.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
+	message.WriteString("\r\n")
+	message.WriteString(body)
+
+	address := net.JoinHostPort(settings.host, strconv.Itoa(settings.port))
+	client, err := smtp.Dial(address)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	if settings.startTLS {
+		if ok, _ := client.Extension("STARTTLS"); ok {
+			if err := client.StartTLS(&tls.Config{ServerName: settings.host, MinVersion: tls.VersionTLS12}); err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("SMTP server does not support STARTTLS")
+		}
+	}
+
+	if settings.username != "" {
+		if err := client.Auth(smtp.PlainAuth("", settings.username, settings.password, settings.host)); err != nil {
+			return err
+		}
+	}
+	if err := client.Mail(settings.fromAddress); err != nil {
+		return err
+	}
+	if err := client.Rcpt(destination); err != nil {
+		return err
+	}
+
+	writer, err := client.Data()
+	if err != nil {
+		return err
+	}
+	if _, err := writer.Write([]byte(message.String())); err != nil {
+		_ = writer.Close()
+		return err
+	}
+	if err := writer.Close(); err != nil {
+		return err
+	}
+
+	return client.Quit()
+}
+
+func readBounceCastEmailSettings() bounceCastEmailSettings {
+	port, err := strconv.Atoi(getBounceCastNotificationSetting(bounceCastEmailPortKey))
+	if err != nil || port == 0 {
+		port = 587
+	}
+
+	fromName := getBounceCastNotificationSetting(bounceCastEmailFromNameKey)
+	if fromName == "" {
+		fromName = "BounceCast"
+	}
+	subject := getBounceCastNotificationSetting(bounceCastEmailSubjectKey)
+	if subject == "" {
+		subject = "{{streamer}} is live on BounceCast"
+	}
+
+	return bounceCastEmailSettings{
+		enabled:     getBounceCastNotificationSetting(bounceCastEmailEnabledKey) == "true",
+		host:        getBounceCastNotificationSetting(bounceCastEmailHostKey),
+		port:        port,
+		username:    getBounceCastNotificationSetting(bounceCastEmailUsernameKey),
+		password:    getBounceCastNotificationSetting(bounceCastEmailPasswordKey),
+		fromAddress: getBounceCastNotificationSetting(bounceCastEmailFromAddressKey),
+		fromName:    fromName,
+		startTLS:    getBounceCastNotificationSetting(bounceCastEmailStartTLSKey) == "true",
+		subject:     subject,
+	}
+}
+
+func getBounceCastNotificationSetting(key string) string {
+	db := data.GetDatabase()
+	if db == nil {
+		return ""
+	}
+
+	var value sql.NullString
+	if err := db.QueryRow(`SELECT value FROM bouncecast_notification_settings WHERE key = ?`, key).Scan(&value); err != nil {
+		return ""
+	}
+	if !value.Valid {
+		return ""
+	}
+	return value.String
 }

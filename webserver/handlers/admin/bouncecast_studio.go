@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -91,6 +92,19 @@ type BounceCastNotificationDelivery struct {
 	SentAt        *time.Time `json:"sentAt,omitempty"`
 }
 
+type BounceCastEmailSettings struct {
+	Enabled     bool   `json:"enabled"`
+	Host        string `json:"host"`
+	Port        int    `json:"port"`
+	Username    string `json:"username"`
+	Password    string `json:"password,omitempty"`
+	PasswordSet bool   `json:"passwordSet"`
+	FromAddress string `json:"fromAddress"`
+	FromName    string `json:"fromName"`
+	StartTLS    bool   `json:"startTls"`
+	Subject     string `json:"subject"`
+}
+
 type createStreamerRequest struct {
 	DisplayName string `json:"displayName"`
 	Handle      string `json:"handle"`
@@ -128,6 +142,18 @@ type createNotificationSubscriberRequest struct {
 type disableNotificationSubscriberRequest struct {
 	ID int64 `json:"id"`
 }
+
+const (
+	bounceCastEmailEnabledKey     = "email_enabled"
+	bounceCastEmailHostKey        = "email_host"
+	bounceCastEmailPortKey        = "email_port"
+	bounceCastEmailUsernameKey    = "email_username"
+	bounceCastEmailPasswordKey    = "email_password"
+	bounceCastEmailFromAddressKey = "email_from_address"
+	bounceCastEmailFromNameKey    = "email_from_name"
+	bounceCastEmailStartTLSKey    = "email_start_tls"
+	bounceCastEmailSubjectKey     = "email_subject"
+)
 
 // GetBounceCastStreamers returns BounceCast dashboard streamer accounts.
 func GetBounceCastStreamers(w http.ResponseWriter, r *http.Request) {
@@ -505,6 +531,118 @@ func GetBounceCastNotificationDeliveries(w http.ResponseWriter, r *http.Request)
 	}
 
 	webutils.WriteResponse(w, deliveries)
+}
+
+// GetBounceCastEmailSettings returns SMTP delivery settings without exposing the saved password.
+func GetBounceCastEmailSettings(w http.ResponseWriter, r *http.Request) {
+	settings := readBounceCastEmailSettings()
+	settings.Password = ""
+	webutils.WriteResponse(w, settings)
+}
+
+// SetBounceCastEmailSettings saves SMTP delivery settings.
+func SetBounceCastEmailSettings(w http.ResponseWriter, r *http.Request) {
+	var request BounceCastEmailSettings
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+
+	if request.Enabled {
+		if strings.TrimSpace(request.Host) == "" {
+			webutils.BadRequestHandler(w, errors.New("host is required when email is enabled"))
+			return
+		}
+		if strings.TrimSpace(request.FromAddress) == "" {
+			webutils.BadRequestHandler(w, errors.New("fromAddress is required when email is enabled"))
+			return
+		}
+	}
+	if request.Port == 0 {
+		request.Port = 587
+	}
+	if strings.TrimSpace(request.FromName) == "" {
+		request.FromName = "BounceCast"
+	}
+	if strings.TrimSpace(request.Subject) == "" {
+		request.Subject = "{{streamer}} is live on BounceCast"
+	}
+
+	settings := map[string]string{
+		bounceCastEmailEnabledKey:     strconv.FormatBool(request.Enabled),
+		bounceCastEmailHostKey:        strings.TrimSpace(request.Host),
+		bounceCastEmailPortKey:        strconv.Itoa(request.Port),
+		bounceCastEmailUsernameKey:    strings.TrimSpace(request.Username),
+		bounceCastEmailFromAddressKey: strings.TrimSpace(request.FromAddress),
+		bounceCastEmailFromNameKey:    strings.TrimSpace(request.FromName),
+		bounceCastEmailStartTLSKey:    strconv.FormatBool(request.StartTLS),
+		bounceCastEmailSubjectKey:     strings.TrimSpace(request.Subject),
+	}
+	if strings.TrimSpace(request.Password) != "" {
+		settings[bounceCastEmailPasswordKey] = request.Password
+	}
+
+	for key, value := range settings {
+		if err := setBounceCastNotificationSetting(key, value); err != nil {
+			webutils.InternalErrorHandler(w, err)
+			return
+		}
+	}
+
+	savedSettings := readBounceCastEmailSettings()
+	savedSettings.Password = ""
+	webutils.WriteResponse(w, savedSettings)
+}
+
+func readBounceCastEmailSettings() BounceCastEmailSettings {
+	port, err := strconv.Atoi(getBounceCastNotificationSetting(bounceCastEmailPortKey))
+	if err != nil || port == 0 {
+		port = 587
+	}
+
+	fromName := getBounceCastNotificationSetting(bounceCastEmailFromNameKey)
+	if fromName == "" {
+		fromName = "BounceCast"
+	}
+	subject := getBounceCastNotificationSetting(bounceCastEmailSubjectKey)
+	if subject == "" {
+		subject = "{{streamer}} is live on BounceCast"
+	}
+
+	password := getBounceCastNotificationSetting(bounceCastEmailPasswordKey)
+	return BounceCastEmailSettings{
+		Enabled:     getBounceCastNotificationSetting(bounceCastEmailEnabledKey) == "true",
+		Host:        getBounceCastNotificationSetting(bounceCastEmailHostKey),
+		Port:        port,
+		Username:    getBounceCastNotificationSetting(bounceCastEmailUsernameKey),
+		PasswordSet: password != "",
+		FromAddress: getBounceCastNotificationSetting(bounceCastEmailFromAddressKey),
+		FromName:    fromName,
+		StartTLS:    getBounceCastNotificationSetting(bounceCastEmailStartTLSKey) == "true",
+		Subject:     subject,
+	}
+}
+
+func getBounceCastNotificationSetting(key string) string {
+	var value sql.NullString
+	if err := data.GetDatabase().QueryRow(`SELECT value FROM bouncecast_notification_settings WHERE key = ?`, key).Scan(&value); err != nil {
+		return ""
+	}
+	if !value.Valid {
+		return ""
+	}
+	return value.String
+}
+
+func setBounceCastNotificationSetting(key string, value string) error {
+	_, err := data.GetDatabase().Exec(`
+		INSERT INTO bouncecast_notification_settings("key", "value", updated_at)
+		VALUES(?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT("key") DO UPDATE SET
+			"value" = excluded."value",
+			updated_at = CURRENT_TIMESTAMP
+	`, key, value)
+	return err
 }
 
 // GetBounceCastSchedule returns upcoming BounceCast schedule rows.

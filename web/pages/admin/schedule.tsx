@@ -20,6 +20,7 @@ import {
 } from 'antd';
 import { AdminLayout } from '../../components/layouts/AdminLayout';
 import {
+  BOUNCECAST_EMAIL_SETTINGS,
   BOUNCECAST_LIVE_EVENTS,
   BOUNCECAST_NOTIFICATION_DELIVERIES,
   BOUNCECAST_NOTIFICATION_SUBSCRIBERS,
@@ -89,6 +90,18 @@ type NotificationDelivery = {
   sentAt?: string;
 };
 
+type EmailSettings = {
+  enabled: boolean;
+  host: string;
+  port: number;
+  username: string;
+  passwordSet: boolean;
+  fromAddress: string;
+  fromName: string;
+  startTls: boolean;
+  subject: string;
+};
+
 const columns = [
   {
     title: 'Set',
@@ -140,29 +153,41 @@ export default function Schedule() {
   const [liveEvents, setLiveEvents] = useState<GoLiveEvent[]>([]);
   const [subscribers, setSubscribers] = useState<NotificationSubscriber[]>([]);
   const [deliveries, setDeliveries] = useState<NotificationDelivery[]>([]);
+  const [emailSettings, setEmailSettings] = useState<EmailSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [subscriberModalOpen, setSubscriberModalOpen] = useState(false);
+  const [emailSettingsModalOpen, setEmailSettingsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
   const [subscriberForm] = Form.useForm();
+  const [emailSettingsForm] = Form.useForm();
 
   const loadStudioData = async () => {
     setLoading(true);
     try {
-      const [scheduleResult, streamerResult, liveEventsResult, subscriberResult, deliveryResult] =
-        await Promise.all([
-          fetchData(BOUNCECAST_SCHEDULE),
-          fetchData(BOUNCECAST_STREAMERS),
-          fetchData(BOUNCECAST_LIVE_EVENTS),
-          fetchData(BOUNCECAST_NOTIFICATION_SUBSCRIBERS),
-          fetchData(BOUNCECAST_NOTIFICATION_DELIVERIES),
-        ]);
+      const [
+        scheduleResult,
+        streamerResult,
+        liveEventsResult,
+        subscriberResult,
+        deliveryResult,
+        emailSettingsResult,
+      ] = await Promise.all([
+        fetchData(BOUNCECAST_SCHEDULE),
+        fetchData(BOUNCECAST_STREAMERS),
+        fetchData(BOUNCECAST_LIVE_EVENTS),
+        fetchData(BOUNCECAST_NOTIFICATION_SUBSCRIBERS),
+        fetchData(BOUNCECAST_NOTIFICATION_DELIVERIES),
+        fetchData(BOUNCECAST_EMAIL_SETTINGS),
+      ]);
       setSchedule(scheduleResult || []);
       setStreamers(streamerResult || []);
       setLiveEvents(liveEventsResult || []);
       setSubscribers(subscriberResult || []);
       setDeliveries(deliveryResult || []);
+      setEmailSettings(emailSettingsResult || null);
+      emailSettingsForm.setFieldsValue(emailSettingsResult || {});
     } catch (error) {
       console.error(error);
     } finally {
@@ -220,6 +245,25 @@ export default function Schedule() {
     await loadStudioData();
   };
 
+  const saveEmailSettings = async () => {
+    const values = await emailSettingsForm.validateFields();
+    setSaving(true);
+    try {
+      await fetchData(BOUNCECAST_EMAIL_SETTINGS, {
+        method: 'POST',
+        data: {
+          ...values,
+          port: Number(values.port),
+        },
+      });
+      setEmailSettingsModalOpen(false);
+      emailSettingsForm.resetFields(['password']);
+      await loadStudioData();
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="bouncecast-admin-page">
       <div className="studio-hero">
@@ -248,7 +292,11 @@ export default function Schedule() {
         </Col>
         <Col xs={24} md={8}>
           <Card>
-            <Statistic title="Go-live automations" value={0} prefix={<ThunderboltOutlined />} />
+            <Statistic
+              title="Go-live automations"
+              value={emailSettings?.enabled ? 'Email on' : 'Email off'}
+              prefix={<ThunderboltOutlined />}
+            />
           </Card>
         </Col>
         <Col xs={24} md={8}>
@@ -332,9 +380,18 @@ export default function Schedule() {
         title="Notification subscribers"
         className="studio-panel"
         extra={
-          <Button size="small" icon={<BellOutlined />} onClick={() => setSubscriberModalOpen(true)}>
-            Add subscriber
-          </Button>
+          <Space>
+            <Button size="small" onClick={() => setEmailSettingsModalOpen(true)}>
+              Email settings
+            </Button>
+            <Button
+              size="small"
+              icon={<BellOutlined />}
+              onClick={() => setSubscriberModalOpen(true)}
+            >
+              Add subscriber
+            </Button>
+          </Space>
         }
       >
         <Table
@@ -534,6 +591,65 @@ export default function Schedule() {
             rules={[{ required: true, message: 'Add a destination' }]}
           >
             <Input placeholder="email@example.com or endpoint URL" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="Email settings"
+        open={emailSettingsModalOpen}
+        onCancel={() => setEmailSettingsModalOpen(false)}
+        onOk={saveEmailSettings}
+        confirmLoading={saving}
+      >
+        <Form
+          form={emailSettingsForm}
+          layout="vertical"
+          initialValues={{
+            enabled: false,
+            port: 587,
+            fromName: 'BounceCast',
+            startTls: true,
+            subject: '{{streamer}} is live on BounceCast',
+          }}
+        >
+          <Form.Item name="enabled" valuePropName="checked">
+            <Checkbox>Enable SMTP email delivery</Checkbox>
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={16}>
+              <Form.Item name="host" label="SMTP host">
+                <Input placeholder="smtp.example.com" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="port" label="Port">
+                <Input type="number" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item name="username" label="Username">
+            <Input />
+          </Form.Item>
+          <Form.Item
+            name="password"
+            label={emailSettings?.passwordSet ? 'Password (saved)' : 'Password'}
+          >
+            <Input.Password
+              placeholder={emailSettings?.passwordSet ? 'Leave blank to keep saved password' : ''}
+            />
+          </Form.Item>
+          <Form.Item name="fromAddress" label="From address">
+            <Input placeholder="alerts@example.com" />
+          </Form.Item>
+          <Form.Item name="fromName" label="From name">
+            <Input />
+          </Form.Item>
+          <Form.Item name="subject" label="Subject">
+            <Input />
+          </Form.Item>
+          <Form.Item name="startTls" valuePropName="checked">
+            <Checkbox>Use STARTTLS</Checkbox>
           </Form.Item>
         </Form>
       </Modal>
