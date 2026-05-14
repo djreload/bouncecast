@@ -1,0 +1,18 @@
+.viewerInfoPage {
+  :global(.ant-table-thead > tr > th),
+  :global(.ant-table-column-title),
+  :global(.ant-table-column-sorter),
+  :global(.ant-table-tbody > tr > td),
+  :global(.ant-empty-description),
+  :global(.viewer-window-button) {
+    color: #f8fbff !important;
+  }
+
+  :global(.ant-empty-normal) {
+    color: #c8d5f5 !important;
+  }
+
+  :global(.ant-table-thead > tr > th) {
+    background: rgb(255 255 255 / 9%) !important;
+  }
+}

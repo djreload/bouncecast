@@ -93,6 +93,7 @@ type NotificationDelivery = {
 
 type EmailSettings = {
   enabled: boolean;
+  provider: string;
   host: string;
   port: number;
   username: string;
@@ -274,6 +275,16 @@ export default function Schedule() {
       await loadStudioData();
     } finally {
       setSaving(false);
+    }
+  };
+
+  const applyEmailProviderPreset = (provider: string) => {
+    if (provider === 'brevo') {
+      emailSettingsForm.setFieldsValue({
+        host: 'smtp-relay.brevo.com',
+        port: 587,
+        startTls: true,
+      });
     }
   };
 
@@ -632,6 +643,7 @@ export default function Schedule() {
           layout="vertical"
           initialValues={{
             enabled: false,
+            provider: 'custom',
             port: 587,
             fromName: 'BounceCast',
             startTls: true,
@@ -640,6 +652,15 @@ export default function Schedule() {
         >
           <Form.Item name="enabled" valuePropName="checked">
             <Checkbox>Enable SMTP email delivery</Checkbox>
+          </Form.Item>
+          <Form.Item name="provider" label="Provider">
+            <Select
+              onChange={applyEmailProviderPreset}
+              options={[
+                { label: 'Custom SMTP', value: 'custom' },
+                { label: 'Brevo SMTP relay', value: 'brevo' },
+              ]}
+            />
           </Form.Item>
           <Row gutter={12}>
             <Col span={16}>
@@ -654,14 +675,18 @@ export default function Schedule() {
             </Col>
           </Row>
           <Form.Item name="username" label="Username">
-            <Input />
+            <Input placeholder="Brevo login email or SMTP username" />
           </Form.Item>
           <Form.Item
             name="password"
             label={emailSettings?.passwordSet ? 'Password (saved)' : 'Password'}
           >
             <Input.Password
-              placeholder={emailSettings?.passwordSet ? 'Leave blank to keep saved password' : ''}
+              placeholder={
+                emailSettings?.passwordSet
+                  ? 'Leave blank to keep saved password'
+                  : 'Brevo SMTP key or SMTP password'
+              }
             />
           </Form.Item>
           <Form.Item name="fromAddress" label="From address">

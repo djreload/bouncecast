@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -117,6 +118,14 @@ func TestNormalizeBounceCastStreamerRoleAndStatus(t *testing.T) {
 		t.Fatalf("status = %q, want active", status)
 	}
 
+	status, err = normalizeBounceCastStreamerStatus("inactive")
+	if err != nil {
+		t.Fatalf("unexpected inactive status error: %v", err)
+	}
+	if status != "inactive" {
+		t.Fatalf("status = %q, want inactive", status)
+	}
+
 	if _, err := normalizeBounceCastStreamerRole("super-admin"); err == nil {
 		t.Fatal("expected invalid role error")
 	}
@@ -180,5 +189,70 @@ func TestSetBounceCastStreamerPasswordStoresHash(t *testing.T) {
 	}
 	if status != "active" {
 		t.Fatalf("status = %q, want active after password set", status)
+	}
+}
+
+func TestNormalizeBounceCastEmailProvider(t *testing.T) {
+	t.Parallel()
+
+	provider, err := normalizeBounceCastEmailProvider("")
+	if err != nil {
+		t.Fatalf("unexpected default provider error: %v", err)
+	}
+	if provider != "custom" {
+		t.Fatalf("provider = %q, want custom", provider)
+	}
+
+	provider, err = normalizeBounceCastEmailProvider("BREVO")
+	if err != nil {
+		t.Fatalf("unexpected Brevo provider error: %v", err)
+	}
+	if provider != "brevo" {
+		t.Fatalf("provider = %q, want brevo", provider)
+	}
+
+	if _, err := normalizeBounceCastEmailProvider("unknown"); err == nil {
+		t.Fatal("expected invalid provider error")
+	}
+}
+
+func TestSetBounceCastEmailSettingsAppliesBrevoPreset(t *testing.T) {
+	db := data.GetDatabase()
+	_, _ = db.Exec(`DELETE FROM bouncecast_notification_settings WHERE "key" LIKE 'email_%'`)
+
+	request := httptest.NewRequest(http.MethodPost, "/api/admin/bouncecast/email-settings", strings.NewReader(`{
+		"enabled": true,
+		"provider": "brevo",
+		"username": "alerts@example.com",
+		"password": "smtp-key",
+		"fromAddress": "alerts@example.com",
+		"fromName": "BounceCast",
+		"subject": "{{streamer}} is live on BounceCast"
+	}`))
+	recorder := httptest.NewRecorder()
+
+	SetBounceCastEmailSettings(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", recorder.Code, recorder.Body.String())
+	}
+
+	var response BounceCastEmailSettings
+	if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.Provider != "brevo" {
+		t.Fatalf("provider = %q, want brevo", response.Provider)
+	}
+	if response.Host != "smtp-relay.brevo.com" {
+		t.Fatalf("host = %q, want smtp-relay.brevo.com", response.Host)
+	}
+	if response.Port != 587 {
+		t.Fatalf("port = %d, want 587", response.Port)
+	}
+	if !response.StartTLS {
+		t.Fatal("expected STARTTLS to be enabled")
+	}
+	if response.Password != "" || !response.PasswordSet {
+		t.Fatal("expected password to be hidden and marked saved")
 	}
 }

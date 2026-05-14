@@ -81,6 +81,8 @@ func Start(enableVerboseLogging bool) error {
 	// the existing Owncast admin authentication path.
 	r.Options("/api/bouncecast/studio/login", handlers.BounceCastStudioOptions)
 	r.Post("/api/bouncecast/studio/login", handlers.BounceCastStudioLogin)
+	r.Options("/api/bouncecast/studio/register", handlers.BounceCastStudioOptions)
+	r.Post("/api/bouncecast/studio/register", handlers.BounceCastStudioRegister)
 	r.Options("/api/bouncecast/studio/me", handlers.BounceCastStudioOptions)
 	r.Get("/api/bouncecast/studio/me", handlers.BounceCastStudioMe)
 	r.Options("/api/bouncecast/studio/logout", handlers.BounceCastStudioOptions)

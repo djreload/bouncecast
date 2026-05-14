@@ -101,6 +101,7 @@ type BounceCastNotificationDelivery struct {
 
 type BounceCastEmailSettings struct {
 	Enabled     bool   `json:"enabled"`
+	Provider    string `json:"provider"`
 	Host        string `json:"host"`
 	Port        int    `json:"port"`
 	Username    string `json:"username"`
@@ -175,6 +176,7 @@ type disableNotificationSubscriberRequest struct {
 }
 
 const (
+	bounceCastEmailProviderKey    = "email_provider"
 	bounceCastEmailEnabledKey     = "email_enabled"
 	bounceCastEmailHostKey        = "email_host"
 	bounceCastEmailPortKey        = "email_port"
@@ -184,6 +186,10 @@ const (
 	bounceCastEmailFromNameKey    = "email_from_name"
 	bounceCastEmailStartTLSKey    = "email_start_tls"
 	bounceCastEmailSubjectKey     = "email_subject"
+	bounceCastEmailProviderBrevo  = "brevo"
+	bounceCastEmailProviderCustom = "custom"
+	bounceCastBrevoSMTPHost       = "smtp-relay.brevo.com"
+	bounceCastBrevoSMTPPort       = 587
 )
 
 var bounceCastHandlePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$`)
@@ -196,6 +202,7 @@ var bounceCastAllowedStreamerRoles = map[string]bool{
 }
 
 var bounceCastAllowedStreamerStatuses = map[string]bool{
+	"inactive": true,
 	"active":   true,
 	"invited":  true,
 	"disabled": true,
@@ -738,6 +745,19 @@ func SetBounceCastEmailSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	provider, err := normalizeBounceCastEmailProvider(request.Provider)
+	if err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+	if provider == bounceCastEmailProviderBrevo {
+		request.Host = bounceCastBrevoSMTPHost
+		if request.Port == 0 {
+			request.Port = bounceCastBrevoSMTPPort
+		}
+		request.StartTLS = true
+	}
+
 	if request.Enabled {
 		if strings.TrimSpace(request.Host) == "" {
 			webutils.BadRequestHandler(w, errors.New("host is required when email is enabled"))
@@ -746,6 +766,17 @@ func SetBounceCastEmailSettings(w http.ResponseWriter, r *http.Request) {
 		if strings.TrimSpace(request.FromAddress) == "" {
 			webutils.BadRequestHandler(w, errors.New("fromAddress is required when email is enabled"))
 			return
+		}
+		if provider == bounceCastEmailProviderBrevo {
+			if strings.TrimSpace(request.Username) == "" {
+				webutils.BadRequestHandler(w, errors.New("Brevo SMTP login email is required when Brevo email is enabled"))
+				return
+			}
+			savedPassword := getBounceCastNotificationSetting(bounceCastEmailPasswordKey)
+			if strings.TrimSpace(request.Password) == "" && savedPassword == "" {
+				webutils.BadRequestHandler(w, errors.New("Brevo SMTP key is required when Brevo email is enabled"))
+				return
+			}
 		}
 	}
 	if request.Port == 0 {
@@ -781,6 +812,7 @@ func SetBounceCastEmailSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	settings := map[string]string{
+		bounceCastEmailProviderKey:    provider,
 		bounceCastEmailEnabledKey:     strconv.FormatBool(request.Enabled),
 		bounceCastEmailHostKey:        strings.TrimSpace(request.Host),
 		bounceCastEmailPortKey:        strconv.Itoa(request.Port),
@@ -869,7 +901,7 @@ func normalizeBounceCastStreamerStatus(status string) (string, error) {
 		normalizedStatus = "active"
 	}
 	if !bounceCastAllowedStreamerStatuses[normalizedStatus] {
-		return "", errors.New("status must be active, invited, or disabled")
+		return "", errors.New("status must be inactive, active, invited, or disabled")
 	}
 	return normalizedStatus, nil
 }
@@ -912,9 +944,19 @@ func GetBounceCastPushSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func readBounceCastEmailSettings() BounceCastEmailSettings {
+	provider, _ := normalizeBounceCastEmailProvider(getBounceCastNotificationSetting(bounceCastEmailProviderKey))
 	port, err := strconv.Atoi(getBounceCastNotificationSetting(bounceCastEmailPortKey))
 	if err != nil || port == 0 {
 		port = 587
+	}
+	host := getBounceCastNotificationSetting(bounceCastEmailHostKey)
+	startTLS := getBounceCastNotificationSetting(bounceCastEmailStartTLSKey) == "true"
+	if provider == bounceCastEmailProviderBrevo {
+		host = bounceCastBrevoSMTPHost
+		if port == 0 {
+			port = bounceCastBrevoSMTPPort
+		}
+		startTLS = true
 	}
 
 	fromName := getBounceCastNotificationSetting(bounceCastEmailFromNameKey)
@@ -929,14 +971,28 @@ func readBounceCastEmailSettings() BounceCastEmailSettings {
 	password := getBounceCastNotificationSetting(bounceCastEmailPasswordKey)
 	return BounceCastEmailSettings{
 		Enabled:     getBounceCastNotificationSetting(bounceCastEmailEnabledKey) == "true",
-		Host:        getBounceCastNotificationSetting(bounceCastEmailHostKey),
+		Provider:    provider,
+		Host:        host,
 		Port:        port,
 		Username:    getBounceCastNotificationSetting(bounceCastEmailUsernameKey),
 		PasswordSet: password != "",
 		FromAddress: getBounceCastNotificationSetting(bounceCastEmailFromAddressKey),
 		FromName:    fromName,
-		StartTLS:    getBounceCastNotificationSetting(bounceCastEmailStartTLSKey) == "true",
+		StartTLS:    startTLS,
 		Subject:     subject,
+	}
+}
+
+func normalizeBounceCastEmailProvider(provider string) (string, error) {
+	normalizedProvider := strings.ToLower(strings.TrimSpace(provider))
+	if normalizedProvider == "" {
+		normalizedProvider = bounceCastEmailProviderCustom
+	}
+	switch normalizedProvider {
+	case bounceCastEmailProviderCustom, bounceCastEmailProviderBrevo:
+		return normalizedProvider, nil
+	default:
+		return "", errors.New("email provider must be custom or brevo")
 	}
 }
 

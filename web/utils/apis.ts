@@ -138,6 +138,8 @@ const STUDIO_API_LOCATION = `${NEXT_PUBLIC_API_HOST}api/bouncecast/studio/`;
 
 export const BOUNCECAST_STUDIO_LOGIN = `${STUDIO_API_LOCATION}login`;
 
+export const BOUNCECAST_STUDIO_REGISTER = `${STUDIO_API_LOCATION}register`;
+
 export const BOUNCECAST_STUDIO_LOGOUT = `${STUDIO_API_LOCATION}logout`;
 
 export const BOUNCECAST_STUDIO_ME = `${STUDIO_API_LOCATION}me`;

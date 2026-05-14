@@ -139,11 +139,32 @@ export const Chart: FC<ChartProps> = ({
   const options = {
     responsive: true,
     clip: false,
+    plugins: {
+      legend: {
+        labels: {
+          color: 'rgba(245, 249, 255, 0.88)',
+        },
+      },
+      title: {
+        color: 'rgba(245, 249, 255, 0.92)',
+      },
+      tooltip: {
+        backgroundColor: 'rgba(8, 10, 22, 0.94)',
+        borderColor: 'rgba(32, 228, 255, 0.28)',
+        borderWidth: 1,
+        bodyColor: 'rgba(245, 249, 255, 0.92)',
+        titleColor: 'rgba(245, 249, 255, 0.98)',
+      },
+    },
     scales: {
       x: {
         title: { display: false },
+        grid: {
+          color: 'rgba(255, 255, 255, 0.08)',
+        },
         ticks: {
           autoSkip: true,
+          color: 'rgba(245, 249, 255, 0.68)',
           maxTicksLimit: 10,
         },
       },
@@ -152,11 +173,16 @@ export const Chart: FC<ChartProps> = ({
         reverse: yFlipped,
         min: minYValue,
         ticks: {
+          color: 'rgba(245, 249, 255, 0.68)',
           stepSize: yStepSize,
+        },
+        grid: {
+          color: 'rgba(255, 255, 255, 0.08)',
         },
         title: {
           display: true,
           text: unit,
+          color: 'rgba(245, 249, 255, 0.78)',
         },
       },
     },

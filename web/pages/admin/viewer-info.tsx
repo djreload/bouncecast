@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext, ReactElement } from 'react';
-import { Row, Col, Typography, MenuProps, Dropdown, Spin, Alert } from 'antd';
+import { Row, Col, Typography, MenuProps, Dropdown, Spin, Alert, Card } from 'antd';
 import { getUnixTime, sub } from 'date-fns';
 import dynamic from 'next/dynamic';
 import { useTranslation } from 'next-export-i18n';
@@ -13,6 +13,7 @@ import { VIEWERS_OVER_TIME, ACTIVE_VIEWER_DETAILS, fetchData } from '../../utils
 
 import { AdminLayout } from '../../components/layouts/AdminLayout';
 import { Localization } from '../../types/localization';
+import styles from './viewer-info.module.scss';
 
 // Lazy loaded components
 
@@ -98,10 +99,18 @@ export default function ViewersOverTime() {
   }));
 
   return (
-    <>
-      <Typography.Title>{t(Localization.Admin.ViewerInfo.title)}</Typography.Title>
-      <br />
-      <Row gutter={[16, 16]} justify="space-around">
+    <div className={`bouncecast-admin-page viewer-info-page ${styles.viewerInfoPage}`}>
+      <div className="studio-hero">
+        <div>
+          <Typography.Text className="studio-eyebrow">Audience signal</Typography.Text>
+          <Typography.Title level={1}>{t(Localization.Admin.ViewerInfo.title)}</Typography.Title>
+          <Typography.Text>
+            Live viewer activity, audience peaks, and connection details.
+          </Typography.Text>
+        </div>
+      </div>
+
+      <Row gutter={[16, 16]} justify="space-around" className="studio-stat-row viewer-stat-row">
         {online && (
           <Col span={8} md={8}>
             <StatisticItem
@@ -140,36 +149,29 @@ export default function ViewersOverTime() {
         />
       )}
 
-      <Spin spinning={!viewerInfo.length || loadingChart}>
+      <Card className="studio-panel viewer-chart-panel">
         {viewerInfo.length > 0 && (
-          <Chart
-            title={t(Localization.Admin.ViewerInfo.viewers)}
-            data={viewerInfo}
-            color="#2087E2"
-            unit="viewers"
-            minYValue={0}
-            yStepSize={1}
-            timeWindowKey={timeWindowKey}
-          />
+          <Spin spinning={loadingChart}>
+            <Chart
+              title={t(Localization.Admin.ViewerInfo.viewers)}
+              data={viewerInfo}
+              color="#20e4ff"
+              unit="viewers"
+              minYValue={0}
+              yStepSize={1}
+              timeWindowKey={timeWindowKey}
+            />
+          </Spin>
         )}
 
         <Dropdown menu={{ items }} trigger={['click']}>
-          <button
-            type="button"
-            style={{
-              position: 'absolute',
-              top: '5px',
-              right: '35px',
-              background: 'transparent',
-              border: 'unset',
-            }}
-          >
+          <button type="button" className="viewer-window-button">
             {timeWindowStart.title} <DownOutlined />
           </button>
         </Dropdown>
         <ViewerTable data={viewerDetails} />
-      </Spin>
-    </>
+      </Card>
+    </div>
   );
 }
 

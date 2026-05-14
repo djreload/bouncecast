@@ -46,8 +46,7 @@
   border: 1px solid var(--studio-border);
   border-radius: 8px;
   background:
-    linear-gradient(145deg, rgb(255 255 255 / 9%), rgb(255 255 255 / 3%)),
-    var(--studio-panel);
+    linear-gradient(145deg, rgb(255 255 255 / 9%), rgb(255 255 255 / 3%)), var(--studio-panel);
   box-shadow:
     0 24px 64px rgb(0 0 0 / 38%),
     inset 0 1px 0 rgb(255 255 255 / 8%);
@@ -105,8 +104,7 @@
   background:
     linear-gradient(180deg, rgb(0 0 0 / 8%), rgb(0 0 0 / 62%)),
     linear-gradient(120deg, rgb(255 138 0 / 24%), transparent 32%),
-    linear-gradient(250deg, rgb(32 228 255 / 24%), transparent 34%),
-    #090d1f;
+    linear-gradient(250deg, rgb(32 228 255 / 24%), transparent 34%), #090d1f;
   overflow: hidden;
   position: relative;
 }
@@ -201,7 +199,9 @@
 .bouncecast-studio-dashboard .ant-btn-default,
 .bouncecast-studio-dashboard .ant-table,
 .bouncecast-studio-dashboard .ant-table-thead > tr > th,
-.bouncecast-studio-dashboard .ant-table-tbody > tr > td {
+.bouncecast-studio-dashboard .ant-table-tbody > tr > td,
+.bouncecast-studio-dashboard .ant-tabs-tab,
+.bouncecast-studio-dashboard .ant-tabs-tab-btn {
   color: var(--studio-text);
 }
 
@@ -228,21 +228,15 @@
   min-height: 112px;
   border: 1px solid var(--studio-border);
   border-radius: 8px;
-  background:
-    linear-gradient(135deg, rgb(32 228 255 / 14%), transparent),
-    var(--studio-panel);
+  background: linear-gradient(135deg, rgb(32 228 255 / 14%), transparent), var(--studio-panel);
 }
 
 .studio-stat-accent:nth-child(2) {
-  background:
-    linear-gradient(135deg, rgb(85 247 194 / 16%), transparent),
-    var(--studio-panel);
+  background: linear-gradient(135deg, rgb(85 247 194 / 16%), transparent), var(--studio-panel);
 }
 
 .studio-stat-accent:nth-child(3) {
-  background:
-    linear-gradient(135deg, rgb(255 212 41 / 16%), transparent),
-    var(--studio-panel);
+  background: linear-gradient(135deg, rgb(255 212 41 / 16%), transparent), var(--studio-panel);
 }
 
 .studio-secret-box {
@@ -251,6 +245,26 @@
 
 .studio-secret-box textarea.ant-input {
   font-family: monospace;
+}
+
+.studio-register-alert {
+  margin-bottom: 16px;
+  color: var(--studio-text);
+  background: rgb(14 18 34 / 92%);
+  border-color: rgb(32 228 255 / 30%);
+}
+
+.studio-register-alert .ant-alert-message,
+.studio-register-alert .ant-alert-description {
+  color: var(--studio-text);
+}
+
+.bouncecast-studio-dashboard .ant-tabs-nav::before {
+  border-bottom-color: rgb(255 255 255 / 10%);
+}
+
+.bouncecast-studio-dashboard .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--studio-cyan);
 }
 
 .studio-form-grid {

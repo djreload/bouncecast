@@ -6,7 +6,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"net/mail"
+	"regexp"
 	"strings"
 	"time"
 
@@ -17,9 +20,18 @@ import (
 
 const bounceCastStudioSessionDuration = 30 * 24 * time.Hour
 
+var bounceCastStudioHandlePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$`)
+
 type bounceCastStudioLoginRequest struct {
 	Login    string `json:"login"`
 	Password string `json:"password"`
+}
+
+type bounceCastStudioRegisterRequest struct {
+	DisplayName string `json:"displayName"`
+	Handle      string `json:"handle"`
+	Email       string `json:"email"`
+	Password    string `json:"password"`
 }
 
 type bounceCastStudioStreamer struct {
@@ -103,6 +115,69 @@ func BounceCastStudioLogin(w http.ResponseWriter, r *http.Request) {
 		Token:     token,
 		ExpiresAt: expiresAt,
 		Streamer:  streamer,
+	})
+}
+
+// BounceCastStudioRegister creates an inactive DJ dashboard account for admin approval.
+func BounceCastStudioRegister(w http.ResponseWriter, r *http.Request) {
+	setBounceCastStudioAPIHeaders(w)
+
+	var request bounceCastStudioRegisterRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+
+	displayName := strings.TrimSpace(request.DisplayName)
+	handle := normalizeBounceCastStudioHandle(request.Handle)
+	if displayName == "" || handle == "" {
+		webutils.BadRequestHandler(w, errors.New("displayName and handle are required"))
+		return
+	}
+	if !bounceCastStudioHandlePattern.MatchString(handle) {
+		webutils.BadRequestHandler(w, errors.New("handle must be 1-32 letters, numbers, underscores, or hyphens"))
+		return
+	}
+
+	email := strings.TrimSpace(request.Email)
+	if email == "" {
+		webutils.BadRequestHandler(w, errors.New("email is required"))
+		return
+	}
+	parsedEmail, err := mail.ParseAddress(email)
+	if err != nil {
+		webutils.BadRequestHandler(w, errors.New("email must be a valid email address"))
+		return
+	}
+
+	if err := validateBounceCastStudioPassword(request.Password); err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+	hashedPassword, err := utils.HashPassword(strings.TrimSpace(request.Password))
+	if err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+
+	result, err := data.GetDatabase().Exec(`
+		INSERT INTO bouncecast_streamer_accounts(display_name, handle, email, password_hash, role, status)
+		VALUES(?, ?, ?, ?, 'streamer', 'inactive')
+	`, displayName, handle, parsedEmail.Address, hashedPassword)
+	if err != nil {
+		if isBounceCastStudioDuplicateAccountError(err) {
+			webutils.BadRequestHandler(w, errors.New("handle or email is already registered"))
+			return
+		}
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+
+	id, _ := result.LastInsertId()
+	webutils.WriteResponse(w, map[string]interface{}{
+		"id":      id,
+		"status":  "inactive",
+		"message": "Registration received. An admin must activate this DJ account before Studio login is available.",
 	})
 }
 
@@ -228,6 +303,24 @@ func hashBounceCastStudioToken(token string) string {
 func normalizeBounceCastStudioLogin(login string) string {
 	login = strings.TrimSpace(strings.TrimPrefix(login, "@"))
 	return strings.ToLower(login)
+}
+
+func normalizeBounceCastStudioHandle(handle string) string {
+	return strings.TrimSpace(strings.TrimPrefix(handle, "@"))
+}
+
+func validateBounceCastStudioPassword(password string) error {
+	if strings.ContainsAny(password, "\r\n") {
+		return errors.New("password cannot contain line breaks")
+	}
+	if len(strings.TrimSpace(password)) < 8 {
+		return errors.New("password must be at least 8 characters")
+	}
+	return nil
+}
+
+func isBounceCastStudioDuplicateAccountError(err error) bool {
+	return err != nil && strings.Contains(strings.ToLower(fmt.Sprint(err)), "unique constraint failed")
 }
 
 func setBounceCastStudioAPIHeaders(w http.ResponseWriter) {

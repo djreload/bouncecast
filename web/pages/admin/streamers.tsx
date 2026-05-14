@@ -62,6 +62,7 @@ type StreamKey = {
 };
 
 const statusColor = {
+  inactive: 'gold',
   active: 'green',
   invited: 'gold',
   disabled: 'default',
@@ -445,7 +446,11 @@ export default function Streamers() {
         onOk={createStreamer}
         confirmLoading={saving}
       >
-        <Form form={form} layout="vertical" initialValues={{ role: 'streamer' }}>
+        <Form
+          form={form}
+          layout="vertical"
+          initialValues={{ role: 'streamer', status: 'inactive' }}
+        >
           <Form.Item
             name="displayName"
             label="Display name"
@@ -469,6 +474,16 @@ export default function Streamers() {
                 { label: 'Streamer', value: 'streamer' },
                 { label: 'Manager', value: 'manager' },
                 { label: 'Owner', value: 'owner' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item name="status" label="Status">
+            <Select
+              options={[
+                { label: 'Inactive', value: 'inactive' },
+                { label: 'Active', value: 'active' },
+                { label: 'Invited', value: 'invited' },
+                { label: 'Disabled', value: 'disabled' },
               ]}
             />
           </Form.Item>

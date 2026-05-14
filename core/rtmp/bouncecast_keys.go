@@ -32,6 +32,7 @@ type bounceCastStreamerKeyMatch struct {
 
 type bounceCastEmailSettings struct {
 	enabled     bool
+	provider    string
 	host        string
 	port        int
 	username    string
@@ -54,6 +55,7 @@ type bounceCastQueuedDelivery struct {
 }
 
 const (
+	bounceCastEmailProviderKey    = "email_provider"
 	bounceCastEmailEnabledKey     = "email_enabled"
 	bounceCastEmailHostKey        = "email_host"
 	bounceCastEmailPortKey        = "email_port"
@@ -64,6 +66,10 @@ const (
 	bounceCastEmailStartTLSKey    = "email_start_tls"
 	bounceCastEmailSubjectKey     = "email_subject"
 	bounceCastPushDeliveryChannel = "push"
+	bounceCastEmailProviderBrevo  = "brevo"
+	bounceCastEmailProviderCustom = "custom"
+	bounceCastBrevoSMTPHost       = "smtp-relay.brevo.com"
+	bounceCastBrevoSMTPPort       = 587
 )
 
 var sendBounceCastQueuedDeliveries = func(goLiveEventID int64) {
@@ -720,9 +726,15 @@ func sendBounceCastEmail(settings bounceCastEmailSettings, destination string, p
 
 	address := net.JoinHostPort(settings.host, strconv.Itoa(settings.port))
 	dialer := net.Dialer{Timeout: 10 * time.Second}
-	connection, err := dialer.Dial("tcp", address)
-	if err != nil {
-		return err
+	var connection net.Conn
+	var connectionErr error
+	if settings.port == 465 {
+		connection, connectionErr = tls.DialWithDialer(&dialer, "tcp", address, &tls.Config{ServerName: settings.host, MinVersion: tls.VersionTLS12})
+	} else {
+		connection, connectionErr = dialer.Dial("tcp", address)
+	}
+	if connectionErr != nil {
+		return connectionErr
 	}
 	defer connection.Close()
 
@@ -732,7 +744,7 @@ func sendBounceCastEmail(settings bounceCastEmailSettings, destination string, p
 	}
 	defer client.Close()
 
-	if settings.startTLS {
+	if settings.startTLS && settings.port != 465 {
 		if ok, _ := client.Extension("STARTTLS"); ok {
 			if err := client.StartTLS(&tls.Config{ServerName: settings.host, MinVersion: tls.VersionTLS12}); err != nil {
 				return err
@@ -776,9 +788,19 @@ func sanitizeBounceCastEmailHeader(value string) string {
 }
 
 func readBounceCastEmailSettings() bounceCastEmailSettings {
+	provider := normalizeBounceCastEmailProvider(getBounceCastNotificationSetting(bounceCastEmailProviderKey))
 	port, err := strconv.Atoi(getBounceCastNotificationSetting(bounceCastEmailPortKey))
 	if err != nil || port == 0 {
 		port = 587
+	}
+	host := getBounceCastNotificationSetting(bounceCastEmailHostKey)
+	startTLS := getBounceCastNotificationSetting(bounceCastEmailStartTLSKey) == "true"
+	if provider == bounceCastEmailProviderBrevo {
+		host = bounceCastBrevoSMTPHost
+		if port == 0 {
+			port = bounceCastBrevoSMTPPort
+		}
+		startTLS = true
 	}
 
 	fromName := getBounceCastNotificationSetting(bounceCastEmailFromNameKey)
@@ -792,14 +814,24 @@ func readBounceCastEmailSettings() bounceCastEmailSettings {
 
 	return bounceCastEmailSettings{
 		enabled:     getBounceCastNotificationSetting(bounceCastEmailEnabledKey) == "true",
-		host:        getBounceCastNotificationSetting(bounceCastEmailHostKey),
+		provider:    provider,
+		host:        host,
 		port:        port,
 		username:    getBounceCastNotificationSetting(bounceCastEmailUsernameKey),
 		password:    getBounceCastNotificationSetting(bounceCastEmailPasswordKey),
 		fromAddress: getBounceCastNotificationSetting(bounceCastEmailFromAddressKey),
 		fromName:    fromName,
-		startTLS:    getBounceCastNotificationSetting(bounceCastEmailStartTLSKey) == "true",
+		startTLS:    startTLS,
 		subject:     subject,
+	}
+}
+
+func normalizeBounceCastEmailProvider(provider string) string {
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case bounceCastEmailProviderBrevo:
+		return bounceCastEmailProviderBrevo
+	default:
+		return bounceCastEmailProviderCustom
 	}
 }
 

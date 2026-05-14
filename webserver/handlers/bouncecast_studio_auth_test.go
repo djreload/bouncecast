@@ -65,6 +65,49 @@ func loginBounceCastStudioStreamer(t *testing.T, body string) (*httptest.Respons
 	return recorder, response
 }
 
+func TestBounceCastStudioRegisterCreatesInactiveStreamer(t *testing.T) {
+	resetBounceCastStudioAuthTestTables(t)
+
+	request := httptest.NewRequest(http.MethodPost, "/api/bouncecast/studio/register", strings.NewReader(`{
+		"displayName":"DJ Pending",
+		"handle":"@dj-pending",
+		"email":"DJ Pending <pending@example.com>",
+		"password":"pending-password"
+	}`))
+	request.Header.Set("Content-Type", "application/json")
+	recorder := httptest.NewRecorder()
+
+	BounceCastStudioRegister(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("register status = %d, want 200: %s", recorder.Code, recorder.Body.String())
+	}
+
+	var status string
+	var passwordHash string
+	var email string
+	if err := data.GetDatabase().QueryRow(`
+		SELECT status, password_hash, email
+		FROM bouncecast_streamer_accounts
+		WHERE handle = 'dj-pending'
+	`).Scan(&status, &passwordHash, &email); err != nil {
+		t.Fatalf("read registered streamer: %v", err)
+	}
+	if status != "inactive" {
+		t.Fatalf("status = %q, want inactive", status)
+	}
+	if email != "pending@example.com" {
+		t.Fatalf("email = %q, want pending@example.com", email)
+	}
+	if err := utils.CompareHash(passwordHash, "pending-password"); err != nil {
+		t.Fatalf("password hash did not match: %v", err)
+	}
+
+	loginRecorder, _ := loginBounceCastStudioStreamer(t, `{"login":"dj-pending","password":"pending-password"}`)
+	if loginRecorder.Code != http.StatusUnauthorized {
+		t.Fatalf("inactive login status = %d, want 401", loginRecorder.Code)
+	}
+}
+
 func TestBounceCastStudioLoginMeAndLogout(t *testing.T) {
 	resetBounceCastStudioAuthTestTables(t)
 	streamerID := insertBounceCastStudioAuthStreamer(t, "dj-login", "dj-login@example.com", "active", "correct-password")

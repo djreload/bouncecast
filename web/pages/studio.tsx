@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import {
+  Alert,
   Button,
   Card,
   Checkbox,
@@ -11,6 +12,7 @@ import {
   Space,
   Statistic,
   Table,
+  Tabs,
   Tag,
   Typography,
   message,
@@ -20,6 +22,7 @@ import {
   BOUNCECAST_STUDIO_LOGIN,
   BOUNCECAST_STUDIO_LOGOUT,
   BOUNCECAST_STUDIO_ME,
+  BOUNCECAST_STUDIO_REGISTER,
   BOUNCECAST_STUDIO_SCHEDULE,
   BOUNCECAST_STUDIO_SCHEDULE_CANCEL,
   BOUNCECAST_STUDIO_SCHEDULE_UPDATE,
@@ -41,6 +44,7 @@ const PlayCircleOutlined = dynamic(() => import('@ant-design/icons/PlayCircleOut
 const PlusOutlined = dynamic(() => import('@ant-design/icons/PlusOutlined'), { ssr: false });
 const ReloadOutlined = dynamic(() => import('@ant-design/icons/ReloadOutlined'), { ssr: false });
 const StopOutlined = dynamic(() => import('@ant-design/icons/StopOutlined'), { ssr: false });
+const UserAddOutlined = dynamic(() => import('@ant-design/icons/UserAddOutlined'), { ssr: false });
 
 const { Text } = Typography;
 
@@ -158,7 +162,9 @@ export default function Studio() {
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<ScheduleItem | null>(null);
   const [newStreamKey, setNewStreamKey] = useState('');
+  const [registrationSubmitted, setRegistrationSubmitted] = useState(false);
   const [loginForm] = Form.useForm();
+  const [registerForm] = Form.useForm();
   const [keyForm] = Form.useForm();
   const [scheduleForm] = Form.useForm<ScheduleFormValues>();
 
@@ -213,6 +219,24 @@ export default function Studio() {
       loginForm.resetFields();
     } catch (error) {
       message.error(error instanceof Error ? error.message : 'Unable to log in');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const register = async () => {
+    const values = await registerForm.validateFields();
+    setSaving(true);
+    try {
+      const result = await fetchStudioData(BOUNCECAST_STUDIO_REGISTER, undefined, {
+        method: 'POST',
+        data: values,
+      });
+      registerForm.resetFields();
+      setRegistrationSubmitted(true);
+      message.success(result.message || 'Registration received');
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : 'Unable to register');
     } finally {
       setSaving(false);
     }
@@ -359,25 +383,101 @@ export default function Studio() {
               </div>
             </div>
             <Card className="studio-login-card">
-              <Form form={loginForm} layout="vertical">
-                <Form.Item
-                  name="login"
-                  label="Handle or email"
-                  rules={[{ required: true, message: 'Enter your handle or email' }]}
-                >
-                  <Input autoComplete="username" placeholder="@dj-name" />
-                </Form.Item>
-                <Form.Item
-                  name="password"
-                  label="Password"
-                  rules={[{ required: true, message: 'Enter your password' }]}
-                >
-                  <Input.Password autoComplete="current-password" />
-                </Form.Item>
-                <Button type="primary" block loading={saving} onClick={login}>
-                  Log in
-                </Button>
-              </Form>
+              {registrationSubmitted && (
+                <Alert
+                  className="studio-register-alert"
+                  type="info"
+                  showIcon
+                  message="Registration pending"
+                  description="Your DJ account is inactive until an admin activates it."
+                />
+              )}
+              <Tabs
+                defaultActiveKey="login"
+                items={[
+                  {
+                    key: 'login',
+                    label: 'Log in',
+                    children: (
+                      <Form form={loginForm} layout="vertical">
+                        <Form.Item
+                          name="login"
+                          label="Handle or email"
+                          rules={[{ required: true, message: 'Enter your handle or email' }]}
+                        >
+                          <Input autoComplete="username" placeholder="@dj-name" />
+                        </Form.Item>
+                        <Form.Item
+                          name="password"
+                          label="Password"
+                          rules={[{ required: true, message: 'Enter your password' }]}
+                        >
+                          <Input.Password autoComplete="current-password" />
+                        </Form.Item>
+                        <Button type="primary" block loading={saving} onClick={login}>
+                          Log in
+                        </Button>
+                      </Form>
+                    ),
+                  },
+                  {
+                    key: 'register',
+                    label: 'Register',
+                    children: (
+                      <Form form={registerForm} layout="vertical">
+                        <Form.Item
+                          name="displayName"
+                          label="DJ name"
+                          rules={[{ required: true, message: 'Add your DJ name' }]}
+                        >
+                          <Input maxLength={80} autoComplete="name" placeholder="DJ name" />
+                        </Form.Item>
+                        <Form.Item
+                          name="handle"
+                          label="Handle"
+                          rules={[{ required: true, message: 'Choose a handle' }]}
+                        >
+                          <Input
+                            maxLength={32}
+                            autoComplete="username"
+                            placeholder="dj-name"
+                            prefix="@"
+                          />
+                        </Form.Item>
+                        <Form.Item
+                          name="email"
+                          label="Email"
+                          rules={[
+                            { required: true, message: 'Add your email' },
+                            { type: 'email', message: 'Use a valid email address' },
+                          ]}
+                        >
+                          <Input autoComplete="email" placeholder="dj@example.com" />
+                        </Form.Item>
+                        <Form.Item
+                          name="password"
+                          label="Password"
+                          rules={[
+                            { required: true, message: 'Choose a password' },
+                            { min: 8, message: 'Use at least 8 characters' },
+                          ]}
+                        >
+                          <Input.Password autoComplete="new-password" />
+                        </Form.Item>
+                        <Button
+                          type="primary"
+                          block
+                          icon={<UserAddOutlined />}
+                          loading={saving}
+                          onClick={register}
+                        >
+                          Request DJ access
+                        </Button>
+                      </Form>
+                    ),
+                  },
+                ]}
+              />
             </Card>
           </section>
         </div>
