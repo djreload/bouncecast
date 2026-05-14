@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/owncast/owncast/core/data"
+	"github.com/owncast/owncast/persistence/configrepository"
+	"github.com/owncast/owncast/persistence/notificationsrepository"
 	"github.com/owncast/owncast/utils"
 	webutils "github.com/owncast/owncast/webserver/utils"
 )
@@ -103,6 +105,14 @@ type BounceCastEmailSettings struct {
 	FromName    string `json:"fromName"`
 	StartTLS    bool   `json:"startTls"`
 	Subject     string `json:"subject"`
+}
+
+type BounceCastPushSettings struct {
+	Enabled         bool   `json:"enabled"`
+	SubscriberCount int64  `json:"subscriberCount"`
+	PublicKeySet    bool   `json:"publicKeySet"`
+	PrivateKeySet   bool   `json:"privateKeySet"`
+	GoLiveMessage   string `json:"goLiveMessage"`
 }
 
 type createStreamerRequest struct {
@@ -592,6 +602,32 @@ func SetBounceCastEmailSettings(w http.ResponseWriter, r *http.Request) {
 	savedSettings := readBounceCastEmailSettings()
 	savedSettings.Password = ""
 	webutils.WriteResponse(w, savedSettings)
+}
+
+// GetBounceCastPushSettings returns the current browser push status for BounceCast go-live alerts.
+func GetBounceCastPushSettings(w http.ResponseWriter, r *http.Request) {
+	configRepository := configrepository.Get()
+	browserConfig := configRepository.GetBrowserPushConfig()
+	publicKey, _ := configRepository.GetBrowserPushPublicKey()
+	privateKey, _ := configRepository.GetBrowserPushPrivateKey()
+
+	var subscriberCount int64
+	if err := data.GetDatabase().QueryRow(`
+		SELECT COUNT(*)
+		FROM notifications
+		WHERE channel = ?
+	`, notificationsrepository.BrowserPushNotification).Scan(&subscriberCount); err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+
+	webutils.WriteResponse(w, BounceCastPushSettings{
+		Enabled:         browserConfig.Enabled,
+		SubscriberCount: subscriberCount,
+		PublicKeySet:    publicKey != "",
+		PrivateKeySet:   privateKey != "",
+		GoLiveMessage:   browserConfig.GoLiveMessage,
+	})
 }
 
 func readBounceCastEmailSettings() BounceCastEmailSettings {

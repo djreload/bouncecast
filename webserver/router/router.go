@@ -69,6 +69,8 @@ func Start(enableVerboseLogging bool) error {
 	r.Options("/api/admin/bouncecast/email-settings", middleware.RequireAdminAuth(adminhandlers.GetBounceCastEmailSettings))
 	r.Get("/api/admin/bouncecast/email-settings", middleware.RequireAdminAuth(adminhandlers.GetBounceCastEmailSettings))
 	r.Post("/api/admin/bouncecast/email-settings", middleware.RequireAdminAuth(adminhandlers.SetBounceCastEmailSettings))
+	r.Options("/api/admin/bouncecast/push-settings", middleware.RequireAdminAuth(adminhandlers.GetBounceCastPushSettings))
+	r.Get("/api/admin/bouncecast/push-settings", middleware.RequireAdminAuth(adminhandlers.GetBounceCastPushSettings))
 	r.Options("/api/admin/bouncecast/schedule", middleware.RequireAdminAuth(adminhandlers.GetBounceCastSchedule))
 	r.Get("/api/admin/bouncecast/schedule", middleware.RequireAdminAuth(adminhandlers.GetBounceCastSchedule))
 	r.Post("/api/admin/bouncecast/schedule", middleware.RequireAdminAuth(adminhandlers.CreateBounceCastSchedule))

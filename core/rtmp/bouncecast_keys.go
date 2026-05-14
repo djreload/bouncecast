@@ -16,6 +16,9 @@ import (
 	"time"
 
 	"github.com/owncast/owncast/core/data"
+	"github.com/owncast/owncast/notifications/browser"
+	"github.com/owncast/owncast/persistence/configrepository"
+	"github.com/owncast/owncast/persistence/notificationsrepository"
 	"github.com/owncast/owncast/utils"
 	log "github.com/sirupsen/logrus"
 )
@@ -49,6 +52,7 @@ const (
 	bounceCastEmailFromNameKey    = "email_from_name"
 	bounceCastEmailStartTLSKey    = "email_start_tls"
 	bounceCastEmailSubjectKey     = "email_subject"
+	bounceCastPushDeliveryChannel = "push"
 )
 
 func validateBounceCastStreamerKey(path string) *bounceCastStreamerKeyMatch {
@@ -251,6 +255,10 @@ func queueBounceCastGoLiveNotifications(goLiveEventID int64, scheduleID sql.Null
 		queuedCount++
 	}
 
+	if enabledChannels[bounceCastPushDeliveryChannel] {
+		queuedCount += queueBounceCastBrowserPushDeliveries(db, goLiveEventID)
+	}
+
 	state := "none"
 	if queuedCount > 0 {
 		state = "queued"
@@ -262,7 +270,44 @@ func queueBounceCastGoLiveNotifications(goLiveEventID int64, scheduleID sql.Null
 	if queuedCount > 0 {
 		go sendBounceCastWebhookDeliveries(goLiveEventID)
 		go sendBounceCastEmailDeliveries(goLiveEventID)
+		go sendBounceCastBrowserPushDeliveries(goLiveEventID)
 	}
+}
+
+func queueBounceCastBrowserPushDeliveries(db *sql.DB, goLiveEventID int64) int {
+	rows, err := db.Query(`
+		SELECT destination
+		FROM notifications
+		WHERE channel = ?
+	`, notificationsrepository.BrowserPushNotification)
+	if err != nil {
+		log.Debugln("unable to query BounceCast browser push subscribers", err)
+		return 0
+	}
+	defer rows.Close()
+
+	queuedCount := 0
+	for rows.Next() {
+		var destination string
+		if err := rows.Scan(&destination); err != nil {
+			log.Debugln("unable to scan BounceCast browser push subscriber", err)
+			continue
+		}
+		if strings.TrimSpace(destination) == "" {
+			continue
+		}
+
+		if _, err := db.Exec(`
+			INSERT INTO bouncecast_notification_deliveries(go_live_event_id, channel, destination)
+			VALUES(?, ?, ?)
+		`, goLiveEventID, bounceCastPushDeliveryChannel, destination); err != nil {
+			log.Debugln("unable to queue BounceCast browser push delivery", err)
+			continue
+		}
+		queuedCount++
+	}
+
+	return queuedCount
 }
 
 type bounceCastWebhookPayload struct {
@@ -398,6 +443,124 @@ func sendBounceCastWebhook(destination string, payload bounceCastWebhookPayload)
 		return fmt.Errorf("webhook returned HTTP %d", response.StatusCode)
 	}
 	return nil
+}
+
+func sendBounceCastBrowserPushDeliveries(goLiveEventID int64) {
+	db := data.GetDatabase()
+	if db == nil {
+		return
+	}
+
+	payload, err := getBounceCastWebhookPayload(goLiveEventID)
+	if err != nil {
+		log.Debugln("unable to build BounceCast browser push payload", err)
+		return
+	}
+
+	notifier, err := newBounceCastBrowserNotifier()
+	if err != nil {
+		markQueuedBounceCastDeliveriesFailed(db, goLiveEventID, bounceCastPushDeliveryChannel, err)
+		return
+	}
+
+	rows, err := db.Query(`
+		SELECT id, destination
+		FROM bouncecast_notification_deliveries
+		WHERE go_live_event_id = ? AND channel = ? AND status = 'queued'
+	`, goLiveEventID, bounceCastPushDeliveryChannel)
+	if err != nil {
+		log.Debugln("unable to query BounceCast browser push deliveries", err)
+		return
+	}
+	defer rows.Close()
+
+	title, body := buildBounceCastBrowserPushMessage(payload)
+	for rows.Next() {
+		var deliveryID int64
+		var destination string
+		if err := rows.Scan(&deliveryID, &destination); err != nil {
+			log.Debugln("unable to scan BounceCast browser push delivery", err)
+			continue
+		}
+
+		unsubscribed, err := notifier.Send(destination, title, body)
+		if unsubscribed {
+			if removeErr := notificationsrepository.Get().RemoveNotificationForChannel(notificationsrepository.BrowserPushNotification, destination); removeErr != nil {
+				log.Debugln("unable to remove expired BounceCast browser push subscriber", removeErr)
+			}
+			err = fmt.Errorf("browser push subscription expired")
+		}
+		if err != nil {
+			if _, updateErr := db.Exec(`
+				UPDATE bouncecast_notification_deliveries
+				SET status = 'failed', attempt_count = attempt_count + 1, last_error = ?
+				WHERE id = ?
+			`, err.Error(), deliveryID); updateErr != nil {
+				log.Debugln("unable to mark BounceCast browser push delivery failed", updateErr)
+			}
+			continue
+		}
+
+		if _, err := db.Exec(`
+			UPDATE bouncecast_notification_deliveries
+			SET status = 'sent', attempt_count = attempt_count + 1, sent_at = CURRENT_TIMESTAMP, last_error = NULL
+			WHERE id = ?
+		`, deliveryID); err != nil {
+			log.Debugln("unable to mark BounceCast browser push delivery sent", err)
+		}
+	}
+}
+
+func newBounceCastBrowserNotifier() (*browser.Browser, error) {
+	configRepository := configrepository.Get()
+	if !configRepository.GetBrowserPushConfig().Enabled {
+		return nil, fmt.Errorf("browser push notifications are disabled")
+	}
+
+	publicKey, err := configRepository.GetBrowserPushPublicKey()
+	if err != nil {
+		return nil, fmt.Errorf("unable to read browser push public key: %w", err)
+	}
+	if publicKey == "" {
+		return nil, fmt.Errorf("browser push public key is not configured")
+	}
+
+	privateKey, err := configRepository.GetBrowserPushPrivateKey()
+	if err != nil {
+		return nil, fmt.Errorf("unable to read browser push private key: %w", err)
+	}
+	if privateKey == "" {
+		return nil, fmt.Errorf("browser push private key is not configured")
+	}
+
+	return browser.New(data.GetDatastore(), publicKey, privateKey)
+}
+
+func buildBounceCastBrowserPushMessage(payload bounceCastWebhookPayload) (string, string) {
+	streamer := payload.Streamer
+	if streamer == "" {
+		streamer = "A DJ"
+	}
+
+	title := fmt.Sprintf("%s is live on BounceCast", streamer)
+	body := "Tune in now for the live DJ stream."
+	if payload.ScheduleTitle != "" {
+		body = payload.ScheduleTitle
+	}
+	return title, body
+}
+
+func markQueuedBounceCastDeliveriesFailed(db *sql.DB, goLiveEventID int64, channel string, deliveryErr error) {
+	if deliveryErr == nil {
+		return
+	}
+	if _, err := db.Exec(`
+		UPDATE bouncecast_notification_deliveries
+		SET status = 'failed', attempt_count = attempt_count + 1, last_error = ?
+		WHERE go_live_event_id = ? AND channel = ? AND status = 'queued'
+	`, deliveryErr.Error(), goLiveEventID, channel); err != nil {
+		log.Debugln("unable to mark BounceCast notification deliveries failed", err)
+	}
 }
 
 func sendBounceCastEmailDeliveries(goLiveEventID int64) {

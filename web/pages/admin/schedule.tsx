@@ -25,6 +25,7 @@ import {
   BOUNCECAST_NOTIFICATION_DELIVERIES,
   BOUNCECAST_NOTIFICATION_SUBSCRIBERS,
   BOUNCECAST_NOTIFICATION_SUBSCRIBER_DISABLE,
+  BOUNCECAST_PUSH_SETTINGS,
   BOUNCECAST_SCHEDULE,
   BOUNCECAST_STREAMERS,
   fetchData,
@@ -102,6 +103,14 @@ type EmailSettings = {
   subject: string;
 };
 
+type PushSettings = {
+  enabled: boolean;
+  subscriberCount: number;
+  publicKeySet: boolean;
+  privateKeySet: boolean;
+  goLiveMessage: string;
+};
+
 const columns = [
   {
     title: 'Set',
@@ -154,6 +163,7 @@ export default function Schedule() {
   const [subscribers, setSubscribers] = useState<NotificationSubscriber[]>([]);
   const [deliveries, setDeliveries] = useState<NotificationDelivery[]>([]);
   const [emailSettings, setEmailSettings] = useState<EmailSettings | null>(null);
+  const [pushSettings, setPushSettings] = useState<PushSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [subscriberModalOpen, setSubscriberModalOpen] = useState(false);
@@ -173,6 +183,7 @@ export default function Schedule() {
         subscriberResult,
         deliveryResult,
         emailSettingsResult,
+        pushSettingsResult,
       ] = await Promise.all([
         fetchData(BOUNCECAST_SCHEDULE),
         fetchData(BOUNCECAST_STREAMERS),
@@ -180,6 +191,7 @@ export default function Schedule() {
         fetchData(BOUNCECAST_NOTIFICATION_SUBSCRIBERS),
         fetchData(BOUNCECAST_NOTIFICATION_DELIVERIES),
         fetchData(BOUNCECAST_EMAIL_SETTINGS),
+        fetchData(BOUNCECAST_PUSH_SETTINGS),
       ]);
       setSchedule(scheduleResult || []);
       setStreamers(streamerResult || []);
@@ -187,6 +199,7 @@ export default function Schedule() {
       setSubscribers(subscriberResult || []);
       setDeliveries(deliveryResult || []);
       setEmailSettings(emailSettingsResult || null);
+      setPushSettings(pushSettingsResult || null);
       emailSettingsForm.setFieldsValue(emailSettingsResult || {});
     } catch (error) {
       console.error(error);
@@ -264,6 +277,14 @@ export default function Schedule() {
     }
   };
 
+  const pushReady = Boolean(
+    pushSettings?.enabled && pushSettings.publicKeySet && pushSettings.privateKeySet,
+  );
+  const activeAutomationCount = [emailSettings?.enabled, pushReady].filter(Boolean).length;
+  const activeSubscriberCount =
+    subscribers.filter(subscriber => !subscriber.disabledAt).length +
+    (pushSettings?.subscriberCount || 0);
+
   return (
     <div className="bouncecast-admin-page">
       <div className="studio-hero">
@@ -293,8 +314,9 @@ export default function Schedule() {
         <Col xs={24} md={8}>
           <Card>
             <Statistic
-              title="Go-live automations"
-              value={emailSettings?.enabled ? 'Email on' : 'Email off'}
+              title="Automation channels"
+              value={activeAutomationCount}
+              suffix="/ 2"
               prefix={<ThunderboltOutlined />}
             />
           </Card>
@@ -303,7 +325,7 @@ export default function Schedule() {
           <Card>
             <Statistic
               title="Subscriber channels"
-              value={subscribers.filter(subscriber => !subscriber.disabledAt).length}
+              value={activeSubscriberCount}
               prefix={<BellOutlined />}
             />
           </Card>
@@ -330,7 +352,7 @@ export default function Schedule() {
                 Assigned stream key connects through RTMP
               </Timeline.Item>
               <Timeline.Item color="green">
-                Push, email, webhook, and federation alerts are queued
+                Browser push, email, webhook, and federation alerts are queued
               </Timeline.Item>
             </Timeline>
           </Card>
@@ -381,6 +403,9 @@ export default function Schedule() {
         className="studio-panel"
         extra={
           <Space>
+            <Tag color={pushReady ? 'green' : 'default'}>
+              Browser push {pushReady ? 'ready' : 'off'}: {pushSettings?.subscriberCount || 0}
+            </Tag>
             <Button size="small" onClick={() => setEmailSettingsModalOpen(true)}>
               Email settings
             </Button>

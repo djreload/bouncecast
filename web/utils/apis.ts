@@ -126,6 +126,8 @@ export const BOUNCECAST_NOTIFICATION_DELIVERIES = `${API_LOCATION}bouncecast/not
 
 export const BOUNCECAST_EMAIL_SETTINGS = `${API_LOCATION}bouncecast/email-settings`;
 
+export const BOUNCECAST_PUSH_SETTINGS = `${API_LOCATION}bouncecast/push-settings`;
+
 export const BOUNCECAST_SCHEDULE = `${API_LOCATION}bouncecast/schedule`;
 
 export const API_YP_RESET = `${API_LOCATION}yp/reset`;
