@@ -230,6 +230,20 @@
   font-family: monospace;
 }
 
+.studio-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.studio-checkbox-stack {
+  width: 100%;
+}
+
+.studio-checkbox-stack .ant-form-item {
+  margin-bottom: 8px;
+}
+
 @keyframes studio-view-in {
   from {
     opacity: 0;
@@ -264,5 +278,9 @@
   .studio-dashboard-header {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .studio-form-grid {
+    grid-template-columns: 1fr;
   }
 }

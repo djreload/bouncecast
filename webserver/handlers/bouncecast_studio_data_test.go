@@ -2,11 +2,13 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/owncast/owncast/core/data"
 )
@@ -140,5 +142,136 @@ func TestBounceCastStudioCannotRevokeAnotherStreamerKey(t *testing.T) {
 	}
 	if !enabled {
 		t.Fatal("other streamer's key should remain enabled")
+	}
+}
+
+func TestBounceCastStudioCanCreateUpdateAndCancelOwnSchedule(t *testing.T) {
+	resetBounceCastStudioAuthTestTables(t)
+	streamerID := insertBounceCastStudioAuthStreamer(t, "schedule-dj", "schedule@example.com", "active", "correct-password")
+	otherStreamerID := insertBounceCastStudioAuthStreamer(t, "other-schedule-dj", "other-schedule@example.com", "active", "correct-password")
+
+	recorder, loginResponse := loginBounceCastStudioStreamer(t, `{"login":"schedule-dj","password":"correct-password"}`)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("login status = %d, want 200: %s", recorder.Code, recorder.Body.String())
+	}
+
+	startsAt := time.Now().UTC().Add(2 * time.Hour).Truncate(time.Second)
+	endsAt := startsAt.Add(2 * time.Hour)
+	createBody := fmt.Sprintf(
+		`{"title":"Opening Set","description":"Warmup hour","startsAt":%q,"endsAt":%q,"timezone":"Europe/London","notifyEmail":true,"notifyPush":true,"notifyWebhook":false}`,
+		startsAt.Format(time.RFC3339),
+		endsAt.Format(time.RFC3339),
+	)
+
+	createRecorder, createRequest := authenticatedStudioRequest(http.MethodPost, "/api/bouncecast/studio/schedule", loginResponse.Token, createBody)
+	BounceCastStudioCreateSchedule(createRecorder, createRequest)
+	if createRecorder.Code != http.StatusOK {
+		t.Fatalf("create schedule status = %d, want 200: %s", createRecorder.Code, createRecorder.Body.String())
+	}
+	var createResponse struct {
+		ID int64 `json:"id"`
+	}
+	if err := json.NewDecoder(createRecorder.Body).Decode(&createResponse); err != nil {
+		t.Fatalf("decode create response: %v", err)
+	}
+	if createResponse.ID == 0 {
+		t.Fatal("expected created schedule id")
+	}
+
+	db := data.GetDatabase()
+	if db == nil {
+		t.Fatal("expected test database")
+	}
+	var createdStreamerID int64
+	var createdTitle string
+	var createdStatus string
+	var notifyEmail bool
+	var notifyPush bool
+	var notifyWebhook bool
+	if err := db.QueryRow(`
+		SELECT streamer_id, title, status, notify_email, notify_push, notify_webhook
+		FROM bouncecast_stream_schedule
+		WHERE id = ?
+	`, createResponse.ID).Scan(&createdStreamerID, &createdTitle, &createdStatus, &notifyEmail, &notifyPush, &notifyWebhook); err != nil {
+		t.Fatalf("read created schedule: %v", err)
+	}
+	if createdStreamerID != streamerID || createdTitle != "Opening Set" || createdStatus != "planned" || !notifyEmail || !notifyPush || notifyWebhook {
+		t.Fatalf("created schedule has unexpected values: streamerID=%d title=%q status=%q email=%t push=%t webhook=%t", createdStreamerID, createdTitle, createdStatus, notifyEmail, notifyPush, notifyWebhook)
+	}
+
+	updatedStartsAt := startsAt.Add(24 * time.Hour)
+	updatedEndsAt := updatedStartsAt.Add(90 * time.Minute)
+	updateBody := fmt.Sprintf(
+		`{"id":%d,"title":"Peak Time Set","description":"Main room","startsAt":%q,"endsAt":%q,"timezone":"UTC","notifyEmail":false,"notifyPush":true,"notifyWebhook":true}`,
+		createResponse.ID,
+		updatedStartsAt.Format(time.RFC3339),
+		updatedEndsAt.Format(time.RFC3339),
+	)
+	updateRecorder, updateRequest := authenticatedStudioRequest(http.MethodPost, "/api/bouncecast/studio/schedule/update", loginResponse.Token, updateBody)
+	BounceCastStudioUpdateSchedule(updateRecorder, updateRequest)
+	if updateRecorder.Code != http.StatusOK {
+		t.Fatalf("update schedule status = %d, want 200: %s", updateRecorder.Code, updateRecorder.Body.String())
+	}
+
+	if err := db.QueryRow(`
+		SELECT title, status, notify_email, notify_push, notify_webhook
+		FROM bouncecast_stream_schedule
+		WHERE id = ?
+	`, createResponse.ID).Scan(&createdTitle, &createdStatus, &notifyEmail, &notifyPush, &notifyWebhook); err != nil {
+		t.Fatalf("read updated schedule: %v", err)
+	}
+	if createdTitle != "Peak Time Set" || createdStatus != "planned" || notifyEmail || !notifyPush || !notifyWebhook {
+		t.Fatalf("updated schedule has unexpected values: title=%q status=%q email=%t push=%t webhook=%t", createdTitle, createdStatus, notifyEmail, notifyPush, notifyWebhook)
+	}
+
+	result, err := db.Exec(`
+		INSERT INTO bouncecast_stream_schedule(streamer_id, title, starts_at, notify_email, notify_push, notify_webhook)
+		VALUES(?, 'Other DJ Set', ?, 1, 1, 1)
+	`, otherStreamerID, startsAt)
+	if err != nil {
+		t.Fatalf("insert other schedule: %v", err)
+	}
+	otherScheduleID, err := result.LastInsertId()
+	if err != nil {
+		t.Fatalf("read other schedule id: %v", err)
+	}
+
+	otherUpdateBody := fmt.Sprintf(
+		`{"id":%d,"title":"Hijacked Set","startsAt":%q,"timezone":"UTC","notifyEmail":false,"notifyPush":false,"notifyWebhook":false}`,
+		otherScheduleID,
+		updatedStartsAt.Format(time.RFC3339),
+	)
+	otherUpdateRecorder, otherUpdateRequest := authenticatedStudioRequest(http.MethodPost, "/api/bouncecast/studio/schedule/update", loginResponse.Token, otherUpdateBody)
+	BounceCastStudioUpdateSchedule(otherUpdateRecorder, otherUpdateRequest)
+	if otherUpdateRecorder.Code != http.StatusBadRequest {
+		t.Fatalf("other update status = %d, want 400", otherUpdateRecorder.Code)
+	}
+
+	cancelRecorder, cancelRequest := authenticatedStudioRequest(http.MethodPost, "/api/bouncecast/studio/schedule/cancel", loginResponse.Token, fmt.Sprintf(`{"id":%d}`, createResponse.ID))
+	BounceCastStudioCancelSchedule(cancelRecorder, cancelRequest)
+	if cancelRecorder.Code != http.StatusOK {
+		t.Fatalf("cancel schedule status = %d, want 200: %s", cancelRecorder.Code, cancelRecorder.Body.String())
+	}
+
+	if err := db.QueryRow(`SELECT status FROM bouncecast_stream_schedule WHERE id = ?`, createResponse.ID).Scan(&createdStatus); err != nil {
+		t.Fatalf("read cancelled schedule: %v", err)
+	}
+	if createdStatus != "cancelled" {
+		t.Fatalf("cancelled schedule status = %q, want cancelled", createdStatus)
+	}
+
+	otherCancelRecorder, otherCancelRequest := authenticatedStudioRequest(http.MethodPost, "/api/bouncecast/studio/schedule/cancel", loginResponse.Token, fmt.Sprintf(`{"id":%d}`, otherScheduleID))
+	BounceCastStudioCancelSchedule(otherCancelRecorder, otherCancelRequest)
+	if otherCancelRecorder.Code != http.StatusBadRequest {
+		t.Fatalf("other cancel status = %d, want 400", otherCancelRecorder.Code)
+	}
+
+	var otherStatus string
+	var otherTitle string
+	if err := db.QueryRow(`SELECT title, status FROM bouncecast_stream_schedule WHERE id = ?`, otherScheduleID).Scan(&otherTitle, &otherStatus); err != nil {
+		t.Fatalf("read other schedule: %v", err)
+	}
+	if otherTitle != "Other DJ Set" || otherStatus != "planned" {
+		t.Fatalf("other schedule was changed: title=%q status=%q", otherTitle, otherStatus)
 	}
 }

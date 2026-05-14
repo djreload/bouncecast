@@ -48,6 +48,33 @@ type bounceCastStudioGoLiveEvent struct {
 	NotificationState string     `json:"notificationState"`
 }
 
+type saveBounceCastStudioScheduleRequest struct {
+	ID            int64  `json:"id"`
+	Title         string `json:"title"`
+	Description   string `json:"description"`
+	StartsAt      string `json:"startsAt"`
+	EndsAt        string `json:"endsAt"`
+	Timezone      string `json:"timezone"`
+	NotifyEmail   bool   `json:"notifyEmail"`
+	NotifyPush    bool   `json:"notifyPush"`
+	NotifyWebhook bool   `json:"notifyWebhook"`
+}
+
+type normalizedBounceCastStudioSchedule struct {
+	title         string
+	description   string
+	startsAt      time.Time
+	endsAt        interface{}
+	timezone      string
+	notifyEmail   bool
+	notifyPush    bool
+	notifyWebhook bool
+}
+
+type cancelBounceCastStudioScheduleRequest struct {
+	ID int64 `json:"id"`
+}
+
 type createBounceCastStudioStreamKeyRequest struct {
 	Label string `json:"label"`
 }
@@ -109,6 +136,122 @@ func BounceCastStudioSchedule(w http.ResponseWriter, r *http.Request) {
 	}
 
 	webutils.WriteResponse(w, schedule)
+}
+
+// BounceCastStudioCreateSchedule creates a scheduled set owned by the current DJ.
+func BounceCastStudioCreateSchedule(w http.ResponseWriter, r *http.Request) {
+	setBounceCastStudioAPIHeaders(w)
+
+	session, err := authenticateBounceCastStudioRequest(r)
+	if err != nil {
+		writeBounceCastStudioUnauthorized(w)
+		return
+	}
+
+	var request saveBounceCastStudioScheduleRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+
+	schedule, err := normalizeBounceCastStudioScheduleRequest(request)
+	if err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+
+	result, err := data.GetDatabase().Exec(`
+		INSERT INTO bouncecast_stream_schedule(streamer_id, title, description, starts_at, ends_at, timezone, notify_email, notify_push, notify_webhook)
+		VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, session.streamer.ID, schedule.title, schedule.description, schedule.startsAt, schedule.endsAt, schedule.timezone, schedule.notifyEmail, schedule.notifyPush, schedule.notifyWebhook)
+	if err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+
+	id, _ := result.LastInsertId()
+	webutils.WriteResponse(w, map[string]interface{}{"id": id})
+}
+
+// BounceCastStudioUpdateSchedule updates one planned scheduled set owned by the current DJ.
+func BounceCastStudioUpdateSchedule(w http.ResponseWriter, r *http.Request) {
+	setBounceCastStudioAPIHeaders(w)
+
+	session, err := authenticateBounceCastStudioRequest(r)
+	if err != nil {
+		writeBounceCastStudioUnauthorized(w)
+		return
+	}
+
+	var request saveBounceCastStudioScheduleRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+	if request.ID == 0 {
+		webutils.BadRequestHandler(w, errors.New("id is required"))
+		return
+	}
+
+	schedule, err := normalizeBounceCastStudioScheduleRequest(request)
+	if err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+
+	result, err := data.GetDatabase().Exec(`
+		UPDATE bouncecast_stream_schedule
+		SET title = ?, description = ?, starts_at = ?, ends_at = ?, timezone = ?,
+			notify_email = ?, notify_push = ?, notify_webhook = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ? AND streamer_id = ? AND status = 'planned'
+	`, schedule.title, schedule.description, schedule.startsAt, schedule.endsAt, schedule.timezone, schedule.notifyEmail, schedule.notifyPush, schedule.notifyWebhook, request.ID, session.streamer.ID)
+	if err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+	if rowsAffected, _ := result.RowsAffected(); rowsAffected == 0 {
+		webutils.BadRequestHandler(w, errors.New("schedule item not found or cannot be updated"))
+		return
+	}
+
+	webutils.WriteSimpleResponse(w, true, "updated schedule item")
+}
+
+// BounceCastStudioCancelSchedule cancels one planned scheduled set owned by the current DJ.
+func BounceCastStudioCancelSchedule(w http.ResponseWriter, r *http.Request) {
+	setBounceCastStudioAPIHeaders(w)
+
+	session, err := authenticateBounceCastStudioRequest(r)
+	if err != nil {
+		writeBounceCastStudioUnauthorized(w)
+		return
+	}
+
+	var request cancelBounceCastStudioScheduleRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+	if request.ID == 0 {
+		webutils.BadRequestHandler(w, errors.New("id is required"))
+		return
+	}
+
+	result, err := data.GetDatabase().Exec(`
+		UPDATE bouncecast_stream_schedule
+		SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
+		WHERE id = ? AND streamer_id = ? AND status = 'planned'
+	`, request.ID, session.streamer.ID)
+	if err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+	if rowsAffected, _ := result.RowsAffected(); rowsAffected == 0 {
+		webutils.BadRequestHandler(w, errors.New("schedule item not found or cannot be cancelled"))
+		return
+	}
+
+	webutils.WriteSimpleResponse(w, true, "cancelled schedule item")
 }
 
 // BounceCastStudioStreamKeys returns masked metadata for the current DJ's stream keys.
@@ -290,4 +433,55 @@ func BounceCastStudioLiveEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	webutils.WriteResponse(w, events)
+}
+
+func normalizeBounceCastStudioScheduleRequest(request saveBounceCastStudioScheduleRequest) (normalizedBounceCastStudioSchedule, error) {
+	title := strings.TrimSpace(request.Title)
+	if title == "" {
+		return normalizedBounceCastStudioSchedule{}, errors.New("title is required")
+	}
+	if len(title) > 120 {
+		return normalizedBounceCastStudioSchedule{}, errors.New("title must be 120 characters or fewer")
+	}
+
+	description := strings.TrimSpace(request.Description)
+	if len(description) > 2000 {
+		return normalizedBounceCastStudioSchedule{}, errors.New("description must be 2000 characters or fewer")
+	}
+
+	startsAt, err := time.Parse(time.RFC3339, strings.TrimSpace(request.StartsAt))
+	if err != nil {
+		return normalizedBounceCastStudioSchedule{}, errors.New("startsAt must be RFC3339")
+	}
+
+	var endsAt interface{}
+	if strings.TrimSpace(request.EndsAt) != "" {
+		parsedEndsAt, err := time.Parse(time.RFC3339, strings.TrimSpace(request.EndsAt))
+		if err != nil {
+			return normalizedBounceCastStudioSchedule{}, errors.New("endsAt must be RFC3339")
+		}
+		if !parsedEndsAt.After(startsAt) {
+			return normalizedBounceCastStudioSchedule{}, errors.New("endsAt must be after startsAt")
+		}
+		endsAt = parsedEndsAt
+	}
+
+	timezone := strings.TrimSpace(request.Timezone)
+	if timezone == "" {
+		timezone = "UTC"
+	}
+	if len(timezone) > 64 {
+		return normalizedBounceCastStudioSchedule{}, errors.New("timezone must be 64 characters or fewer")
+	}
+
+	return normalizedBounceCastStudioSchedule{
+		title:         title,
+		description:   description,
+		startsAt:      startsAt,
+		endsAt:        endsAt,
+		timezone:      timezone,
+		notifyEmail:   request.NotifyEmail,
+		notifyPush:    request.NotifyPush,
+		notifyWebhook: request.NotifyWebhook,
+	}, nil
 }

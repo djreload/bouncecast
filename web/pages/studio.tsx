@@ -3,6 +3,7 @@ import dynamic from 'next/dynamic';
 import {
   Button,
   Card,
+  Checkbox,
   Empty,
   Form,
   Input,
@@ -20,6 +21,8 @@ import {
   BOUNCECAST_STUDIO_LOGOUT,
   BOUNCECAST_STUDIO_ME,
   BOUNCECAST_STUDIO_SCHEDULE,
+  BOUNCECAST_STUDIO_SCHEDULE_CANCEL,
+  BOUNCECAST_STUDIO_SCHEDULE_UPDATE,
   BOUNCECAST_STUDIO_STREAM_KEYS,
   BOUNCECAST_STUDIO_STREAM_KEY_REVOKE,
   fetchStudioData,
@@ -29,12 +32,15 @@ const CalendarOutlined = dynamic(() => import('@ant-design/icons/CalendarOutline
   ssr: false,
 });
 const CopyOutlined = dynamic(() => import('@ant-design/icons/CopyOutlined'), { ssr: false });
+const EditOutlined = dynamic(() => import('@ant-design/icons/EditOutlined'), { ssr: false });
 const KeyOutlined = dynamic(() => import('@ant-design/icons/KeyOutlined'), { ssr: false });
 const LogoutOutlined = dynamic(() => import('@ant-design/icons/LogoutOutlined'), { ssr: false });
 const PlayCircleOutlined = dynamic(() => import('@ant-design/icons/PlayCircleOutlined'), {
   ssr: false,
 });
+const PlusOutlined = dynamic(() => import('@ant-design/icons/PlusOutlined'), { ssr: false });
 const ReloadOutlined = dynamic(() => import('@ant-design/icons/ReloadOutlined'), { ssr: false });
+const StopOutlined = dynamic(() => import('@ant-design/icons/StopOutlined'), { ssr: false });
 
 const { Text } = Typography;
 
@@ -86,11 +92,45 @@ type LiveEvent = {
   notificationState: string;
 };
 
+type ScheduleFormValues = {
+  title: string;
+  description?: string;
+  startsAt: string;
+  endsAt?: string;
+  timezone?: string;
+  notifyEmail?: boolean;
+  notifyPush?: boolean;
+  notifyWebhook?: boolean;
+};
+
 function formatDate(value?: string) {
   if (!value) {
     return 'Not set';
   }
   return new Date(value).toLocaleString();
+}
+
+function formatDateTimeLocal(date: Date) {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return localDate.toISOString().slice(0, 16);
+}
+
+function toDateTimeLocal(value?: string) {
+  if (!value) {
+    return '';
+  }
+  return formatDateTimeLocal(new Date(value));
+}
+
+function defaultScheduleStart() {
+  const date = new Date();
+  date.setHours(date.getHours() + 1);
+  date.setMinutes(0, 0, 0);
+  return formatDateTimeLocal(date);
+}
+
+function getLocalTimezone() {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 }
 
 function statusColor(status: string) {
@@ -115,9 +155,12 @@ export default function Studio() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [keyModalOpen, setKeyModalOpen] = useState(false);
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState<ScheduleItem | null>(null);
   const [newStreamKey, setNewStreamKey] = useState('');
   const [loginForm] = Form.useForm();
   const [keyForm] = Form.useForm();
+  const [scheduleForm] = Form.useForm<ScheduleFormValues>();
 
   const loadStudio = async (activeToken: string) => {
     setLoading(true);
@@ -218,6 +261,78 @@ export default function Studio() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const openScheduleModal = (item?: ScheduleItem) => {
+    setEditingSchedule(item || null);
+    scheduleForm.setFieldsValue({
+      title: item?.title || '',
+      description: item?.description || '',
+      startsAt: item ? toDateTimeLocal(item.startsAt) : defaultScheduleStart(),
+      endsAt: item ? toDateTimeLocal(item.endsAt) : '',
+      timezone: item?.timezone || getLocalTimezone(),
+      notifyEmail: item?.notifyEmail ?? false,
+      notifyPush: item?.notifyPush ?? true,
+      notifyWebhook: item?.notifyWebhook ?? true,
+    });
+    setScheduleModalOpen(true);
+  };
+
+  const saveScheduleItem = async () => {
+    const values = await scheduleForm.validateFields();
+    const payload = {
+      ...values,
+      startsAt: new Date(values.startsAt).toISOString(),
+      endsAt: values.endsAt ? new Date(values.endsAt).toISOString() : '',
+      timezone: values.timezone || getLocalTimezone(),
+      notifyEmail: Boolean(values.notifyEmail),
+      notifyPush: Boolean(values.notifyPush),
+      notifyWebhook: Boolean(values.notifyWebhook),
+    };
+
+    setSaving(true);
+    try {
+      await fetchStudioData(
+        editingSchedule ? BOUNCECAST_STUDIO_SCHEDULE_UPDATE : BOUNCECAST_STUDIO_SCHEDULE,
+        token,
+        {
+          method: 'POST',
+          data: editingSchedule ? { ...payload, id: editingSchedule.id } : payload,
+        },
+      );
+      setScheduleModalOpen(false);
+      setEditingSchedule(null);
+      scheduleForm.resetFields();
+      await loadStudio(token);
+      message.success(editingSchedule ? 'Set updated' : 'Set scheduled');
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : 'Unable to save scheduled set');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const cancelScheduleItem = (id: number) => {
+    Modal.confirm({
+      title: 'Cancel scheduled set?',
+      okText: 'Cancel set',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setSaving(true);
+        try {
+          await fetchStudioData(BOUNCECAST_STUDIO_SCHEDULE_CANCEL, token, {
+            method: 'POST',
+            data: { id },
+          });
+          await loadStudio(token);
+          message.success('Set cancelled');
+        } catch (error) {
+          message.error(error instanceof Error ? error.message : 'Unable to cancel scheduled set');
+        } finally {
+          setSaving(false);
+        }
+      },
+    });
   };
 
   const activeKeys = streamKeys.filter(key => key.enabled && !key.revokedAt);
@@ -321,7 +436,20 @@ export default function Studio() {
         </section>
 
         <section className="studio-section-grid">
-          <Card className="studio-section-card" title="Schedule">
+          <Card
+            className="studio-section-card"
+            title="Schedule"
+            extra={
+              <Button
+                size="small"
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => openScheduleModal()}
+              >
+                New set
+              </Button>
+            }
+          >
             {schedule.length === 0 ? (
               <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No scheduled sets" />
             ) : (
@@ -329,6 +457,7 @@ export default function Studio() {
                 dataSource={schedule}
                 rowKey="id"
                 pagination={false}
+                scroll={{ x: true }}
                 columns={[
                   {
                     title: 'Set',
@@ -366,6 +495,31 @@ export default function Studio() {
                       </Space>
                     ),
                   },
+                  {
+                    title: '',
+                    key: 'actions',
+                    render: (_, record) =>
+                      record.status === 'planned' ? (
+                        <Space>
+                          <Button
+                            size="small"
+                            icon={<EditOutlined />}
+                            onClick={() => openScheduleModal(record)}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            size="small"
+                            danger
+                            icon={<StopOutlined />}
+                            loading={saving}
+                            onClick={() => cancelScheduleItem(record.id)}
+                          >
+                            Cancel
+                          </Button>
+                        </Space>
+                      ) : null,
+                  },
                 ]}
               />
             )}
@@ -384,6 +538,7 @@ export default function Studio() {
               dataSource={streamKeys}
               rowKey="id"
               pagination={false}
+              scroll={{ x: true }}
               columns={[
                 {
                   title: 'Label',
@@ -431,6 +586,7 @@ export default function Studio() {
             dataSource={liveEvents}
             rowKey="id"
             pagination={false}
+            scroll={{ x: true }}
             columns={[
               {
                 title: 'Set',
@@ -489,6 +645,58 @@ export default function Studio() {
               </Form.Item>
             </Form>
           )}
+        </Modal>
+
+        <Modal
+          title={editingSchedule ? 'Edit scheduled set' : 'New scheduled set'}
+          open={scheduleModalOpen}
+          onCancel={() => {
+            setScheduleModalOpen(false);
+            setEditingSchedule(null);
+            scheduleForm.resetFields();
+          }}
+          onOk={saveScheduleItem}
+          confirmLoading={saving}
+          okText={editingSchedule ? 'Save changes' : 'Schedule set'}
+        >
+          <Form form={scheduleForm} layout="vertical">
+            <Form.Item
+              name="title"
+              label="Set title"
+              rules={[{ required: true, message: 'Enter a set title' }]}
+            >
+              <Input maxLength={120} placeholder="Friday night live mix" />
+            </Form.Item>
+            <Form.Item name="description" label="Description">
+              <Input.TextArea rows={3} maxLength={2000} placeholder="Genre, guests, or set notes" />
+            </Form.Item>
+            <div className="studio-form-grid">
+              <Form.Item
+                name="startsAt"
+                label="Starts"
+                rules={[{ required: true, message: 'Choose a start time' }]}
+              >
+                <Input type="datetime-local" />
+              </Form.Item>
+              <Form.Item name="endsAt" label="Ends">
+                <Input type="datetime-local" />
+              </Form.Item>
+            </div>
+            <Form.Item name="timezone" label="Timezone">
+              <Input maxLength={64} placeholder="Europe/London" />
+            </Form.Item>
+            <Space direction="vertical" className="studio-checkbox-stack">
+              <Form.Item name="notifyPush" valuePropName="checked">
+                <Checkbox>Push alerts</Checkbox>
+              </Form.Item>
+              <Form.Item name="notifyEmail" valuePropName="checked">
+                <Checkbox>Email alerts</Checkbox>
+              </Form.Item>
+              <Form.Item name="notifyWebhook" valuePropName="checked">
+                <Checkbox>Webhook alerts</Checkbox>
+              </Form.Item>
+            </Space>
+          </Form>
         </Modal>
       </div>
     </main>
