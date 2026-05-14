@@ -4,12 +4,22 @@
   font-size: 1rem;
   font-weight: 300;
   line-height: 1.6em;
-  color: var(--theme-color-components-text-on-light);
+  color: var(--rave-text-soft);
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: var(--rave-text);
+  }
 
   hr {
     margin: 1.35em 0;
     border: 0;
-    border-top: solid 1px var(--theme-color-palette-6);
+    border-top: solid 1px rgb(32 228 255 / 45%);
+    box-shadow: 0 0 16px rgb(32 228 255 / 22%);
   }
 
   div.summary {
@@ -21,6 +31,6 @@
   }
 
   a:hover {
-    color: var(--color-owncast-palette-7);
+    color: var(--rave-magenta);
   }
 }

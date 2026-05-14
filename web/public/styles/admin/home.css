@@ -3,7 +3,7 @@
 }
 
 .home-container .online-status-section .online-details-card {
-  border-color: var(--theme-color-palette-15);
+  border-color: var(--rave-line);
 }
 
 .home-container .stream-details-item-container {
@@ -19,26 +19,33 @@
 }
 
 .home-container .ant-card-small > .ant-card-head {
-  background-color: var(--primary-3);
+  color: var(--rave-text);
+  background:
+    linear-gradient(90deg, rgb(255 54 188 / 18%), rgb(32 228 255 / 14%)),
+    var(--rave-panel);
 }
 
 #admin-page .ant-card-body {
-  background-color: var(--theme-color-palette-15);
+  color: var(--rave-text);
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 7%), rgb(255 255 255 / 3%)),
+    var(--rave-panel);
   border-radius: var(--theme-rounded-corners);
 }
 
 #admin-page .line-chart-container {
-  background-color: var(--theme-color-palette-15);
+  background-color: var(--rave-panel);
   border-radius: var(--theme-rounded-corners);
   margin: 10px 0px 10px 0px;
 }
 
 #admin-page th {
-  background-color: var(--theme-color-palette-15);
+  color: var(--rave-text);
+  background-color: rgb(255 255 255 / 7%);
 }
 
 #admin-page .ant-btn-default {
-  background-color: var(--theme-color-palette-14);
+  background-color: var(--rave-panel-soft);
 }
 
 .home-container .outbound-details {
@@ -46,7 +53,8 @@
 }
 
 .offline-content .list-section {
-  background-color: var(--theme-color-palette-15);
+  color: var(--rave-text);
+  background-color: var(--rave-panel);
   border-radius: var(--theme-rounded-corners);
   padding: 1em;
 }
@@ -71,22 +79,22 @@
 .news-feed {
   margin-top: 0;
   padding: 1.5em;
-  border: 1px solid var(--theme-color-palette-15);
-  background-color: var(--theme-color-palette-15);
+  border: 1px solid var(--rave-line);
+  background-color: var(--rave-panel);
   border-radius: var(--theme-rounded-corners);
 }
 
 .news-feed h2 {
   font-size: 1.2em;
   margin-top: 0;
-  color: var(--theme-color-palette-1);
+  color: var(--rave-text);
 }
 
 .news-feed article {
   padding: 1em 0.25em;
   font-size: 0.9rem;
-  color: var(--white-75);
-  border-bottom: 1px solid var(--theme-color-palette-15);
+  color: var(--rave-text-soft);
+  border-bottom: 1px solid var(--rave-line);
 }
 
 .news-feed article h3 {
@@ -105,11 +113,11 @@
 
 .ant-collapse > .ant-collapse-item:last-child,
 .ant-collapse > .ant-collapse-item:last-child > .ant-collapse-header {
-  background-color: var(--theme-color-background-main);
+  background-color: var(--rave-panel);
   border-radius: var(--theme-rounded-corners);
 }
 
 .ant-card-body {
   /* background-color: var(--theme-color-palette-5); */
-  border: 1px solid var(--theme-color-palette-15);
+  border: 1px solid var(--rave-line);
 }

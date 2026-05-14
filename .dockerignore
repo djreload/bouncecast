@@ -1,0 +1,16 @@
+.git
+.github
+.next
+.vscode
+coverage
+data
+dist
+node_modules
+tmp
+web/.next
+web/node_modules
+web/out
+web/coverage
+web/storybook-static
+*.log
+*.tmp

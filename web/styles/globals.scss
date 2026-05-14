@@ -32,19 +32,146 @@
   }
 }
 
+/* BounceCast rave theme, inspired by neon waveforms and liquid chrome reference art. */
+:root {
+  --rave-void: #050712;
+  --rave-ink: #080b19;
+  --rave-panel: #11162a;
+  --rave-panel-strong: #171d34;
+  --rave-panel-soft: #202746;
+  --rave-line: rgb(255 255 255 / 14%);
+  --rave-line-hot: rgb(255 54 188 / 50%);
+  --rave-cyan: #20e4ff;
+  --rave-blue: #1677ff;
+  --rave-violet: #7c3cff;
+  --rave-magenta: #ff36bc;
+  --rave-orange: #ff8a00;
+  --rave-yellow: #ffd429;
+  --rave-mint: #55f7c2;
+  --rave-text: #f7fbff;
+  --rave-text-muted: #aeb8d6;
+  --rave-text-soft: #d8def3;
+  --rave-danger: #ff4b6e;
+  --rave-warning: #ffd15a;
+  --rave-glow-cyan: 0 0 28px rgb(32 228 255 / 28%);
+  --rave-glow-magenta: 0 0 30px rgb(255 54 188 / 26%);
+  --theme-rounded-corners: 8px;
+  --theme-color-background-main: var(--rave-void);
+  --theme-color-background-light: var(--rave-panel);
+  --theme-color-background-header: var(--rave-ink);
+  --theme-color-action: var(--rave-cyan);
+  --theme-color-action-hover: var(--rave-magenta);
+  --theme-color-action-disabled: #6e748b;
+  --theme-color-error: var(--rave-danger);
+  --theme-color-warning: var(--rave-warning);
+  --theme-color-components-text-on-light: var(--rave-text);
+  --theme-color-components-text-on-dark: var(--rave-text);
+  --theme-color-components-primary-button-background: var(--rave-violet);
+  --theme-color-components-primary-button-background-disabled: #32384e;
+  --theme-color-components-primary-button-text: #ffffff;
+  --theme-color-components-primary-button-text-disabled: #9ca3bd;
+  --theme-color-components-primary-button-border: var(--rave-cyan);
+  --theme-color-components-primary-button-border-disabled: #3d455d;
+  --theme-color-components-secondary-button-background: var(--rave-panel-soft);
+  --theme-color-components-secondary-button-background-disabled: transparent;
+  --theme-color-components-secondary-button-text: var(--rave-text);
+  --theme-color-components-secondary-button-text-disabled: #81889e;
+  --theme-color-components-secondary-button-border: rgb(32 228 255 / 55%);
+  --theme-color-components-secondary-button-border-disabled: #32384e;
+  --theme-color-components-chat-background: #080b17;
+  --theme-color-components-chat-text: var(--rave-text-soft);
+  --theme-color-components-content-background: rgb(14 18 34 / 92%);
+  --theme-color-components-modal-header-background: #0b1022;
+  --theme-color-components-modal-header-text: var(--rave-text);
+  --theme-color-components-modal-content-background: var(--rave-panel);
+  --theme-color-components-modal-content-text: var(--rave-text);
+  --theme-color-components-menu-background: #10162b;
+  --theme-color-components-menu-item-text: var(--rave-text-soft);
+  --theme-color-components-menu-item-bg: transparent;
+  --theme-color-components-menu-item-hover-bg: rgb(32 228 255 / 12%);
+  --theme-color-components-menu-item-focus-bg: rgb(255 54 188 / 14%);
+  --theme-color-components-form-field-background: #090d1f;
+  --theme-color-components-form-field-placeholder: #828aa9;
+  --theme-color-components-form-field-text: var(--rave-text);
+  --theme-color-components-form-field-border: rgb(32 228 255 / 42%);
+  --theme-color-components-video-background: #00020a;
+  --theme-color-components-video-live-indicator: var(--rave-magenta);
+  --theme-color-components-video-status-bar-background: #0b1020;
+  --theme-color-components-video-status-bar-foreground: var(--rave-text);
+  --color-owncast-user-0: #ff4b6e;
+  --color-owncast-user-1: #ffd429;
+  --color-owncast-user-2: #ff8a00;
+  --color-owncast-user-3: #55f7c2;
+  --color-owncast-user-4: #20e4ff;
+  --color-owncast-user-5: #1677ff;
+  --color-owncast-user-6: #9a6cff;
+  --color-owncast-user-7: #ff36bc;
+  --color-owncast-palette-0: var(--rave-void);
+  --color-owncast-palette-1: var(--rave-ink);
+  --color-owncast-palette-2: #00020a;
+  --color-owncast-palette-3: var(--rave-panel);
+  --color-owncast-palette-4: var(--rave-text);
+  --color-owncast-palette-5: var(--rave-panel-soft);
+  --color-owncast-palette-6: var(--rave-cyan);
+  --color-owncast-palette-7: var(--rave-magenta);
+  --color-owncast-palette-8: #767e99;
+  --color-owncast-palette-9: #050712;
+  --color-owncast-palette-10: var(--rave-text-muted);
+  --color-owncast-palette-11: var(--rave-blue);
+  --color-owncast-palette-12: var(--rave-magenta);
+  --color-owncast-palette-13: var(--rave-mint);
+  --color-owncast-palette-14: var(--rave-panel);
+  --color-owncast-palette-15: var(--rave-panel-strong);
+  --color-owncast-palette-error: var(--rave-danger);
+  --color-owncast-palette-warning: var(--rave-warning);
+}
+
 ::selection {
-  background-color: var(--theme-color-palette-12);
+  color: var(--rave-void);
+  background-color: var(--rave-yellow);
 }
 
 html {
-  font-size: clamp(15px, 1.35vw, 16px);
+  font-size: 16px;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+@include screen(mobile) {
+  html {
+    font-size: 15px;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 body {
   font-family: var(--theme-text-body-font-family);
   font-weight: 300;
   margin: 0;
-  background-color: var(--theme-color-background-main);
+  color: var(--rave-text);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  background:
+    linear-gradient(115deg, rgb(255 54 188 / 22%) 0%, transparent 28%),
+    linear-gradient(245deg, rgb(32 228 255 / 20%) 0%, transparent 32%),
+    repeating-linear-gradient(
+      135deg,
+      rgb(255 255 255 / 3%) 0,
+      rgb(255 255 255 / 3%) 1px,
+      transparent 1px,
+      transparent 24px
+    ),
+    radial-gradient(ellipse at 50% -20%, rgb(124 60 255 / 32%), transparent 58%),
+    var(--theme-color-background-main);
+  background-attachment: fixed;
 
   div,
   h1,
@@ -111,9 +238,11 @@ body {
   a {
     color: var(--theme-color-action);
     overflow-wrap: break-word;
+    text-shadow: 0 0 14px rgb(32 228 255 / 24%);
 
     &:hover {
       color: var(--theme-color-action-hover);
+      text-shadow: 0 0 16px rgb(255 54 188 / 30%);
     }
   }
 
@@ -121,6 +250,12 @@ body {
   b {
     font-weight: 600;
   }
+}
+
+#__next {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .emoji {

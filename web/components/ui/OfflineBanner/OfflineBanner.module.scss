@@ -4,14 +4,38 @@
   display: flex;
   justify-content: center;
   align-items: center;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  background:
+    linear-gradient(110deg, rgb(255 138 0 / 18%) 0%, transparent 28%),
+    linear-gradient(250deg, rgb(32 228 255 / 16%) 0%, transparent 32%),
+    repeating-linear-gradient(
+      120deg,
+      transparent 0,
+      transparent 18px,
+      rgb(255 255 255 / 4%) 18px,
+      rgb(255 255 255 / 4%) 19px
+    ),
+    #050712;
 }
 
 .innerContainer {
   width: clamp(00px, 100%, 600px);
+  max-width: calc(100% - 0.4rem);
   display: flex;
   flex-direction: column;
   margin: 5vh auto;
   padding: 2.4em;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: var(--theme-rounded-corners);
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 10%), rgb(255 255 255 / 3%)),
+    rgb(8 11 25 / 86%);
+  box-shadow:
+    0 24px 58px rgb(0 0 0 / 36%),
+    inset 0 1px 0 rgb(255 255 255 / 8%);
+  overflow-wrap: anywhere;
 
   @include screen(tablet) {
     font-size: 1.2rem;
@@ -29,6 +53,7 @@
   margin-top: 2rem;
   font-size: 0.8rem;
   opacity: 0.7;
+  color: var(--rave-text-muted);
   font-family: var(--theme-text-body-font-family);
   font-weight: 300;
 
@@ -39,8 +64,10 @@
 
 .header {
   font-family: var(--theme-text-display-font-family);
-  font-weight: 600;
+  font-weight: 800;
   font-size: 1.4rem;
+  color: var(--rave-text);
+  text-shadow: 0 0 20px rgb(32 228 255 / 24%);
 }
 
 .footer {
@@ -53,7 +80,7 @@
   cursor: pointer;
 
   &:hover {
-    color: var(--color-owncast-palette-7);
+    color: var(--rave-magenta);
   }
 }
 
@@ -66,10 +93,11 @@
     cursor: pointer;
 
     &:hover {
-      color: var(--color-owncast-palette-7);
+      color: var(--rave-magenta);
     }
   }
 
+  color: var(--rave-text-soft);
   line-height: 2rem;
   font-size: 1.2rem;
 }

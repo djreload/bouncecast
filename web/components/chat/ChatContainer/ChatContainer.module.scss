@@ -28,7 +28,10 @@
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  background-color: var(--theme-color-components-chat-background);
+  background:
+    linear-gradient(180deg, rgb(255 54 188 / 8%), transparent 22%),
+    var(--theme-color-components-chat-background);
+  border-left: 1px solid rgb(32 228 255 / 16%);
   height: 100%;
   font-size: var(--chat-message-text-size);
 }
@@ -73,7 +76,7 @@
 }
 
 .chatTextField {
-  border-top: 1px solid lightgray;
+  border-top: 1px solid rgb(32 228 255 / 20%);
 }
 
 @keyframes show {

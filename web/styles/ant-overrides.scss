@@ -13,6 +13,17 @@ BUTTONS
 
 .ant-btn {
   font-size: 0.85rem;
+  font-weight: 700;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease,
+    background-color 180ms ease;
+}
+
+.ant-btn:hover,
+.ant-btn:focus {
+  transform: translateY(-1px);
 }
 
 .ant-btn[disabled] {
@@ -29,17 +40,19 @@ BUTTONS
 }
 
 .ant-btn-default {
-  color: currentcolor;
+  color: var(--theme-color-components-secondary-button-text);
   border-width: 2px;
   border-color: var(--theme-color-components-primary-button-border);
   border-radius: var(--theme-rounded-corners);
-  background-color: rgb(0 0 0 / 10%);
+  background-color: rgb(14 20 42 / 78%);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 5%);
 
   &:hover,
   &:focus {
-    color: currentcolor;
-    border-color: rgb(0 0 0 / 55%);
-    background-color: var(--theme-color-components-secondary-button-background);
+    color: var(--rave-text);
+    border-color: var(--rave-magenta);
+    background-color: rgb(255 54 188 / 14%);
+    box-shadow: var(--rave-glow-magenta);
   }
 }
 
@@ -52,19 +65,27 @@ BUTTONS
     animation: 0s !important;
   }
 
-  background-color: var(--theme-color-components-primary-button-background);
+  background:
+    linear-gradient(90deg, var(--rave-magenta), var(--rave-violet) 48%, var(--rave-cyan)),
+    var(--theme-color-components-primary-button-background);
   color: var(--theme-color-components-primary-button-text);
+  box-shadow: 0 10px 28px rgb(124 60 255 / 26%);
 
   &:hover {
-    background-color: var(--theme-color-action-hover);
+    background:
+      linear-gradient(90deg, var(--rave-orange), var(--rave-magenta) 48%, var(--rave-cyan)),
+      var(--theme-color-action-hover);
     color: var(--theme-color-components-primary-button-text);
-    border-color: var(--theme-color-action-hover);
+    border-color: var(--rave-yellow);
+    box-shadow: 0 0 30px rgb(255 54 188 / 38%);
   }
 
   &:focus {
-    background-color: var(--theme-color-action-hover);
+    background:
+      linear-gradient(90deg, var(--rave-orange), var(--rave-magenta) 48%, var(--rave-cyan)),
+      var(--theme-color-action-hover);
     color: var(--theme-color-components-primary-button-text);
-    border-color: var(--theme-color-components-primary-button-text);
+    border-color: var(--rave-yellow);
   }
 }
 
@@ -98,6 +119,8 @@ DROPDOWN
 .ant-dropdown-menu {
   border-radius: var(--theme-rounded-corners);
   background-color: var(--theme-color-components-menu-background);
+  border: 1px solid var(--rave-line);
+  box-shadow: 0 18px 42px rgb(0 0 0 / 38%);
 }
 
 .ant-dropdown-menu-item {
@@ -120,16 +143,94 @@ DROPDOWN
 
 .ant-input-affix-wrapper {
   background-color: var(--theme-color-components-form-field-background);
+  border-color: var(--theme-color-components-form-field-border);
+  color: var(--theme-color-components-form-field-text);
 }
 
 .ant-input,
-.ant-input-number-input {
+.ant-input-number,
+.ant-input-number-input,
+.ant-select:not(.ant-select-customize-input) .ant-select-selector {
   background-color: var(--theme-color-components-form-field-background);
   color: var(--theme-color-components-form-field-text);
+  border-color: var(--theme-color-components-form-field-border);
 
   &::placeholder {
     color: var(--theme-color-components-form-field-placeholder);
   }
+}
+
+.ant-input:hover,
+.ant-input:focus,
+.ant-input-focused,
+.ant-input-affix-wrapper:hover,
+.ant-input-affix-wrapper-focused,
+.ant-select-focused:not(.ant-select-disabled).ant-select:not(.ant-select-customize-input)
+  .ant-select-selector {
+  border-color: var(--rave-magenta);
+  box-shadow: 0 0 0 2px rgb(255 54 188 / 18%);
+}
+
+.ant-card {
+  color: var(--rave-text);
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 7%), rgb(255 255 255 / 3%)),
+    var(--rave-panel);
+  border-color: var(--rave-line);
+}
+
+.ant-card-head {
+  color: var(--rave-text);
+  border-bottom-color: var(--rave-line);
+}
+
+.ant-card-head-title,
+.ant-card-extra,
+.ant-statistic-title,
+.ant-statistic-content,
+.ant-typography,
+.ant-form-item-label > label,
+.ant-checkbox-wrapper,
+.ant-radio-wrapper {
+  color: var(--rave-text);
+}
+
+.ant-typography-secondary,
+.ant-form-item-extra,
+.ant-form-item-explain {
+  color: var(--rave-text-muted);
+}
+
+.ant-table {
+  color: var(--rave-text);
+  background: transparent;
+}
+
+.ant-table-thead > tr > th {
+  color: var(--rave-text);
+  background: rgb(255 255 255 / 7%);
+  border-bottom-color: var(--rave-line);
+}
+
+.ant-table-tbody > tr > td {
+  color: var(--rave-text-soft);
+  border-bottom-color: rgb(255 255 255 / 8%);
+}
+
+.ant-table-tbody > tr.ant-table-row:hover > td {
+  background: rgb(32 228 255 / 8%);
+}
+
+.ant-empty-description,
+.ant-list-item,
+.ant-descriptions-item-label,
+.ant-descriptions-item-content {
+  color: var(--rave-text-soft);
+}
+
+.ant-tag {
+  border-color: rgb(255 255 255 / 16%);
+  background: rgb(255 255 255 / 8%);
 }
 
 .ant-alert-error {
@@ -153,10 +254,10 @@ DROPDOWN
   }
 
   &.ant-tabs-tab-active {
-    background-color: var(--theme-color-palette-4);
+    background-color: rgb(255 255 255 / 10%);
 
     .ant-tabs-tab-btn {
-      color: var(--theme-color-action);
+      color: var(--rave-cyan);
 
       &:hover {
         color: var(--theme-color-action-hover);
@@ -187,6 +288,34 @@ DROPDOWN
 
 .ant-tabs-nav::before {
   border-bottom-color: var(--theme-color-components-menu-item-focus-bg) !important;
+}
+
+.ant-tabs-tab-btn {
+  color: var(--rave-text-muted);
+}
+
+.ant-tabs-tab:hover .ant-tabs-tab-btn {
+  color: var(--rave-magenta);
+}
+
+.ant-modal-content {
+  color: var(--rave-text);
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 8%), rgb(255 255 255 / 3%)),
+    var(--theme-color-components-modal-content-background);
+  border: 1px solid var(--rave-line);
+  box-shadow: 0 28px 80px rgb(0 0 0 / 55%);
+}
+
+.ant-modal-header {
+  background: var(--theme-color-components-modal-header-background);
+  border-bottom-color: var(--rave-line);
+}
+
+.ant-modal-body,
+.ant-modal-confirm-title,
+.ant-modal-confirm-content {
+  color: var(--rave-text);
 }
 
 .ant-modal-close:hover {
@@ -246,5 +375,6 @@ th {
 }
 
 .ant-collapse > .ant-collapse-item {
-  background: var(--theme-color-palette-14);
+  background: rgb(255 255 255 / 7%);
+  border-color: var(--rave-line);
 }

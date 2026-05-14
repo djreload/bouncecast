@@ -5,13 +5,23 @@
   height: 100vh;
   overflow: auto;
   z-index: 10;
-  background-color: var(--theme-color-palette-1);
+  background:
+    linear-gradient(180deg, rgb(255 54 188 / 10%), transparent 34%),
+    linear-gradient(0deg, rgb(32 228 255 / 10%), transparent 34%),
+    #070a16;
+  border-right: 1px solid rgb(32 228 255 / 16%);
+  box-shadow: 18px 0 46px rgb(0 0 0 / 24%);
+}
+
+.app-container .side-nav,
+.app-container .side-nav .ant-layout-sider-children {
+  min-height: 100vh;
 }
 
 .app-container .menu-container {
   border-color: transparent;
   background-color: unset;
-  color: var(--theme-color-components-text-on-dark);
+  color: var(--rave-text-soft);
 }
 
 .app-container .menu-container .ant-menu-item-selected:not(.ant-menu-item-only-child),
@@ -31,24 +41,30 @@
 }
 
 .app-container h1.owncast-title .logo-container {
-  background-color: var(--theme-color-palette-4);
+  background:
+    linear-gradient(145deg, rgb(255 54 188 / 18%), rgb(32 228 255 / 18%)),
+    var(--theme-color-palette-4);
   padding-top: 4px;
   padding-right: 6px;
   padding-left: 6px;
   border-radius: 9999px;
   width: 60px;
   height: 60px;
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 16%),
+    0 0 28px rgb(32 228 255 / 24%);
 }
 
 .app-container h1.owncast-title .title-label {
   display: inline-block;
   margin-left: 1rem;
-  color: var(--theme-color-palette-4);
+  color: var(--rave-text);
   font-size: 1.15rem;
-  font-weight: 200;
+  font-weight: 800;
   text-transform: uppercase;
   line-height: normal;
   letter-spacing: 0.05em;
+  text-shadow: 0 0 18px rgb(255 54 188 / 24%);
 }
 
 .app-container .layout-main {
@@ -61,17 +77,78 @@
   justify-content: flex-end;
   padding-right: 1rem;
   padding-left: 1rem;
-  background-color: var(--theme-color-background-main);
+  background:
+    linear-gradient(90deg, rgb(255 54 188 / 12%), transparent 28%),
+    linear-gradient(270deg, rgb(32 228 255 / 12%), transparent 28%),
+    #090d1f;
+  border-bottom: 1px solid rgb(255 255 255 / 10%);
 }
 
 .app-container .main-content-container {
-  background-color: var(--theme-color-palette-3);
+  color: var(--rave-text);
+  background:
+    linear-gradient(125deg, rgb(255 54 188 / 12%), transparent 30%),
+    linear-gradient(245deg, rgb(32 228 255 / 11%), transparent 32%),
+    repeating-linear-gradient(
+      135deg,
+      rgb(255 255 255 / 3%) 0,
+      rgb(255 255 255 / 3%) 1px,
+      transparent 1px,
+      transparent 26px
+    ),
+    #050712;
   padding: 2em 3em 3em;
   min-width: 50vw;
 }
 
+#admin-page,
+#admin-page h1,
+#admin-page h2,
+#admin-page h3,
+#admin-page h4,
+#admin-page h5,
+#admin-page h6,
+#admin-page p,
+#admin-page li,
+#admin-page label,
+#admin-page .ant-card,
+#admin-page .ant-card-body,
+#admin-page .ant-card-head-title,
+#admin-page .ant-statistic-content,
+#admin-page .ant-typography,
+#admin-page .ant-table,
+#admin-page .ant-table-thead > tr > th,
+#admin-page .ant-table-tbody > tr > td {
+  color: var(--rave-text);
+}
+
+#admin-page .ant-typography-secondary,
+#admin-page .ant-card-meta-description,
+#admin-page .field-tip,
+#admin-page .description,
+#admin-page .read-more-subtext,
+#admin-page .ant-empty-description {
+  color: var(--rave-text-muted);
+}
+
+#admin-page .ant-card,
+#admin-page .ant-alert,
+#admin-page .ant-collapse,
+#admin-page .ant-collapse-content,
+#admin-page .ant-table,
+#admin-page .ant-table-container {
+  background-color: transparent;
+}
+
+#admin-page .ant-alert {
+  border-color: var(--rave-line);
+}
+
 .app-container .footer-container {
   text-align: center;
+  color: var(--rave-text-muted);
+  background: #050712;
+  border-top: 1px solid rgb(32 228 255 / 14%);
 }
 
 .app-container .online-status-indicator {
@@ -90,7 +167,7 @@
   font-size: 0.75rem;
   display: inline-block;
   margin-right: 0.5rem;
-  color: var(--offline-color);
+  color: var(--rave-warning);
 }
 
 .app-container .online-status-indicator .status-icon {
@@ -120,13 +197,11 @@
   align-items: center;
   width: 100%;
   padding-top: 1em;
-  box-shadow:
-    0 1px 3px 0 rgb(0 0 0 / 10%),
-    0 1px 2px -1px rgb(0 0 0 / 10%);
+  box-shadow: none;
 }
 
 .global-stream-title-container ::placeholder {
-  color: #696767;
+  color: var(--theme-color-components-form-field-placeholder);
 }
 
 .global-stream-title-container .textfield-with-submit-container {
@@ -138,8 +213,11 @@
 
 .global-stream-title-container .textfield-with-submit-container .input-side {
   width: 400px;
-  border: 1px solid rgb(120 113 255 / 50%);
-  border-radius: 0.75rem;
+  color: var(--rave-text);
+  background: rgb(9 13 31 / 82%);
+  border: 1px solid rgb(32 228 255 / 38%);
+  border-radius: var(--theme-rounded-corners);
+  box-shadow: 0 12px 30px rgb(0 0 0 / 20%);
 }
 
 @media (width <= 800px) {

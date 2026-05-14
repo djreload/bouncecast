@@ -5,13 +5,24 @@
   flex-direction: row;
   overflow: hidden;
   height: 100%;
+  color: var(--rave-text);
+  min-width: 0;
+  width: 100%;
 }
 
 .mainColumn {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
   overflow: auto;
+}
+
+.mainColumn :global(.ant-row) {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
 }
 
 .mainColumn::-webkit-scrollbar,
@@ -21,6 +32,7 @@
 
 .lowerSection {
   padding: var(--content-padding);
+  color: var(--rave-text);
 }
 
 .lowerSectionMobileTabbed {
@@ -45,7 +57,9 @@
 }
 
 .topSectionElement {
-  background-color: var(--theme-color-components-video-background);
+  background:
+    linear-gradient(135deg, rgb(32 228 255 / 9%), rgb(255 54 188 / 7%)),
+    var(--theme-color-components-video-background);
 
   @include screen(tablet) {
     // "sticks" the stream to the top of the page
@@ -55,7 +69,7 @@
 }
 
 .offlineBanner {
-  color: var(--theme-color-palette-4);
+  color: var(--rave-text);
 }
 
 .actionButtonsContainer {
@@ -107,11 +121,19 @@
 }
 
 .bottomPageContentContainer {
-  background-color: var(--theme-color-components-content-background);
+  color: var(--rave-text);
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 8%), rgb(255 255 255 / 3%)),
+    var(--theme-color-components-content-background);
   padding: calc(2 * var(--content-padding));
   border-radius: var(--theme-rounded-corners);
+  border: 1px solid var(--rave-line);
   width: 100%;
   margin-bottom: 20px;
+  box-shadow:
+    0 18px 48px rgb(0 0 0 / 30%),
+    inset 0 1px 0 rgb(255 255 255 / 7%);
+  overflow-wrap: anywhere;
 
   h1,
   h2,
@@ -135,9 +157,12 @@
   font-weight: 600;
   font-size: 1em;
   z-index: 99;
-  background-color: var(--theme-color-components-chat-background);
+  color: var(--rave-text);
+  background:
+    linear-gradient(90deg, var(--rave-magenta), var(--rave-violet), var(--rave-cyan)),
+    var(--theme-color-components-chat-background);
   border-width: 0;
-  box-shadow: 0 1px 3px 1px rgb(0 0 0 / 20%);
+  box-shadow: 0 12px 30px rgb(32 228 255 / 22%);
 }
 
 .centerSpinner {

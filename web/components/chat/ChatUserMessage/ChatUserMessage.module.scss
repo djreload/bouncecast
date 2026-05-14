@@ -93,7 +93,7 @@ $p-v-size: 2px;
     display: none;
     top: 5px;
     right: 10px;
-    color: black;
+    color: var(--rave-text);
 
     & button:focus,
     & button:active {
@@ -101,7 +101,7 @@ $p-v-size: 2px;
     }
 
     button {
-      background-color: white;
+      background-color: var(--rave-panel);
       border-radius: var(--theme-rounded-corners);
       border-width: 0;
       opacity: 0.8;

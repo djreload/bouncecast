@@ -5,22 +5,30 @@
   align-items: center;
   flex-flow: row wrap;
   justify-content: space-between;
-  background-color: var(--theme-color-background-header);
-  color: var(--theme-color-components-text-on-dark);
+  background:
+    linear-gradient(90deg, rgb(255 138 0 / 16%), transparent 24%),
+    linear-gradient(270deg, rgb(32 228 255 / 15%), transparent 24%),
+    #050712;
+  color: var(--rave-text);
   font-family: var(--theme-text-body-font-family);
   padding: 0.6rem var(--footer-padding-x);
   font-size: 0.75rem;
   font-weight: 400;
-  border-top: 1px solid rgb(214 211 211 / 50%);
+  border-top: 1px solid rgb(32 228 255 / 18%);
   width: 100%;
+  box-shadow: 0 -12px 32px rgb(0 0 0 / 30%);
 
   @include screen(tablet) {
     font-size: 10px;
   }
 
   a {
-    color: var(--theme-color-components-text-on-dark);
+    color: var(--rave-text);
     text-decoration: none;
+  }
+
+  a:hover {
+    color: var(--rave-yellow);
   }
 
   .links {

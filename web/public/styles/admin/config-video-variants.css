@@ -59,7 +59,7 @@
   flex-direction: row;
 }
 .advanced-description-wrapper {
-  color: black;
+  color: var(--rave-text-soft);
   display: flex;
   align-items: center;
   margin-top: 16px;

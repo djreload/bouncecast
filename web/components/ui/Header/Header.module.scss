@@ -6,8 +6,14 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.7rem var(--content-padding);
-  box-shadow: 0 1px 3px 1px rgb(0 0 0 / 10%);
-  background-color: var(--theme-color-background-header);
+  box-shadow:
+    0 14px 36px rgb(0 0 0 / 35%),
+    0 1px 0 rgb(255 255 255 / 10%);
+  background:
+    linear-gradient(90deg, rgb(255 54 188 / 18%), transparent 28%),
+    linear-gradient(270deg, rgb(32 228 255 / 18%), transparent 30%),
+    linear-gradient(180deg, #080b19 0%, #050712 100%);
+  border-bottom: 1px solid rgb(32 228 255 / 20%);
   position: fixed;
   top: 0;
   width: 100%;
@@ -42,19 +48,26 @@
 }
 
 .title {
-  color: var(--theme-color-components-text-on-dark);
+  color: var(--rave-text);
   font-family: var(--theme-text-display-font-family);
   margin-bottom: 0;
-  font-size: clamp(1rem, 4vw, 1.6rem);
-  font-weight: 600;
+  font-size: 1.6rem;
+  font-weight: 800;
   white-space: nowrap;
   text-overflow: ellipsis;
+  text-shadow:
+    0 0 18px rgb(32 228 255 / 28%),
+    0 0 28px rgb(255 54 188 / 18%);
 
   // 6rem is an overapproximation of the width of
   // the user menu
   max-width: min(70vw, calc(100vw - 6rem));
   overflow: hidden;
   line-height: 1.4;
+
+  @include screen(tablet) {
+    font-size: 1.1rem;
+  }
 }
 
 .skipLink {
@@ -84,13 +97,16 @@
 }
 
 .avatar {
-  background-color: var(--theme-color-background-header);
+  background-color: #10162b;
   box-sizing: content-box;
-  outline: #ffffff26 solid 2px;
+  outline: rgb(32 228 255 / 45%) solid 2px;
+  box-shadow:
+    0 0 24px rgb(32 228 255 / 22%),
+    0 0 30px rgb(255 54 188 / 16%);
 }
 
 .chatOfflineText {
-  color: var(--theme-color-palette-8);
+  color: var(--rave-text-muted);
   font-size: 0.75rem;
 }
 

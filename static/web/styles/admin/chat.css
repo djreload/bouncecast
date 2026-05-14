@@ -27,7 +27,7 @@
 .chat-messages .bulk-editor {
   margin: 0.5rem 0;
   padding: 0.5rem;
-  border: 1px solid var(--theme-color-palette-8);
+  border: 1px solid var(--rave-line);
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -37,7 +37,7 @@
 
 .chat-messages .bulk-editor .label {
   font-size: 0.75rem;
-  color: var(--theme-color-palette-10);
+  color: var(--rave-text-muted);
   margin-right: 0.5rem;
 }
 
@@ -97,16 +97,16 @@
 }
 
 .user-item-container .display-name {
-  color: var(--theme-color-palette-2);
-  border-bottom: 1px dotted var(--theme-color-palette-10);
+  color: var(--rave-text);
+  border-bottom: 1px dotted var(--rave-text-muted);
 }
 
 .user-item-container:hover .display-name {
-  border-color: var(--theme-color-palette-4);
+  border-color: var(--rave-cyan);
 }
 
 .user-details h5 {
-  color: var(--theme-color-palette-0);
+  color: var(--rave-text);
 }
 
 .user-details .created-at {
@@ -142,5 +142,5 @@
 
 .ant-dropdown-menu-item-selected,
 .ant-dropdown-menu-submenu-title-selected {
-  background-color: #f5f0ff;
+  background-color: rgb(255 54 188 / 12%);
 }
