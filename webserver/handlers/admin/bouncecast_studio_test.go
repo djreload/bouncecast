@@ -43,9 +43,15 @@ func TestNormalizeBounceCastSubscriberDestination(t *testing.T) {
 			wantErr:     true,
 		},
 		{
-			name:        "invalid push",
+			name:        "invalid push endpoint",
 			channel:     "push",
 			destination: `{"keys":{"p256dh":"key"}}`,
+			wantErr:     true,
+		},
+		{
+			name:        "invalid push keys",
+			channel:     "push",
+			destination: `{"endpoint":"https://push.example.com/subscription","keys":{"p256dh":"key"}}`,
 			wantErr:     true,
 		},
 	}

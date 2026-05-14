@@ -668,9 +668,21 @@ func normalizeBounceCastSubscriberDestination(channel string, destination string
 	case "push":
 		var subscription struct {
 			Endpoint string `json:"endpoint"`
+			Keys     struct {
+				P256DH string `json:"p256dh"`
+				Auth   string `json:"auth"`
+			} `json:"keys"`
 		}
-		if err := json.Unmarshal([]byte(destination), &subscription); err != nil || strings.TrimSpace(subscription.Endpoint) == "" {
+		if err := json.Unmarshal([]byte(destination), &subscription); err != nil {
 			return "", errors.New("push destination must be a browser push subscription JSON payload")
+		}
+		endpoint := strings.TrimSpace(subscription.Endpoint)
+		parsedEndpoint, err := url.Parse(endpoint)
+		if err != nil || parsedEndpoint.Scheme != "https" || parsedEndpoint.Host == "" {
+			return "", errors.New("push destination endpoint must be a valid https URL")
+		}
+		if strings.TrimSpace(subscription.Keys.P256DH) == "" || strings.TrimSpace(subscription.Keys.Auth) == "" {
+			return "", errors.New("push destination must include browser push keys")
 		}
 		return destination, nil
 	default:

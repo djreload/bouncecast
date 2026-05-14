@@ -42,6 +42,17 @@ type bounceCastEmailSettings struct {
 	subject     string
 }
 
+type bounceCastNotificationSubscriberTarget struct {
+	id          int64
+	channel     string
+	destination string
+}
+
+type bounceCastQueuedDelivery struct {
+	id          int64
+	destination string
+}
+
 const (
 	bounceCastEmailEnabledKey     = "email_enabled"
 	bounceCastEmailHostKey        = "email_host"
@@ -54,6 +65,12 @@ const (
 	bounceCastEmailSubjectKey     = "email_subject"
 	bounceCastPushDeliveryChannel = "push"
 )
+
+var sendBounceCastQueuedDeliveries = func(goLiveEventID int64) {
+	go sendBounceCastWebhookDeliveries(goLiveEventID)
+	go sendBounceCastEmailDeliveries(goLiveEventID)
+	go sendBounceCastBrowserPushDeliveries(goLiveEventID)
+}
 
 func validateBounceCastStreamerKey(path string) *bounceCastStreamerKeyMatch {
 	streamingKey, ok := getStreamKeyFromPath(path)
@@ -76,8 +93,8 @@ func validateBounceCastStreamerKey(path string) *bounceCastStreamerKeyMatch {
 		log.Debugln("unable to query BounceCast streamer stream keys", err)
 		return nil
 	}
-	defer rows.Close()
 
+	var match *bounceCastStreamerKeyMatch
 	for rows.Next() {
 		var keyID int64
 		var streamerID int64
@@ -89,18 +106,29 @@ func validateBounceCastStreamerKey(path string) *bounceCastStreamerKeyMatch {
 		}
 
 		if utils.CompareHash(keyHash, streamingKey) == nil {
-			if _, err := db.Exec(`UPDATE bouncecast_streamer_stream_keys SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?`, keyID); err != nil {
-				log.Debugln("unable to update BounceCast streamer stream key last_used_at", err)
-			}
-			if displayName.Valid {
-				log.Infoln("Accepted BounceCast streamer key for", displayName.String)
-			}
-			return &bounceCastStreamerKeyMatch{
+			match = &bounceCastStreamerKeyMatch{
 				streamerID:  streamerID,
 				streamKeyID: keyID,
 				displayName: displayName.String,
 			}
+			break
 		}
+	}
+	if err := rows.Close(); err != nil {
+		log.Debugln("unable to close BounceCast streamer stream key rows", err)
+	}
+	if err := rows.Err(); err != nil {
+		log.Debugln("unable to iterate BounceCast streamer stream keys", err)
+	}
+
+	if match != nil {
+		if _, err := db.Exec(`UPDATE bouncecast_streamer_stream_keys SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?`, match.streamKeyID); err != nil {
+			log.Debugln("unable to update BounceCast streamer stream key last_used_at", err)
+		}
+		if match.displayName != "" {
+			log.Infoln("Accepted BounceCast streamer key for", match.displayName)
+		}
+		return match
 	}
 
 	return nil
@@ -231,24 +259,32 @@ func queueBounceCastGoLiveNotifications(goLiveEventID int64, scheduleID sql.Null
 		log.Debugln("unable to query BounceCast notification subscribers", err)
 		return
 	}
-	defer rows.Close()
 
-	queuedCount := 0
+	subscribers := []bounceCastNotificationSubscriberTarget{}
 	for rows.Next() {
-		var subscriberID int64
-		var channel string
-		var destination string
-		if err := rows.Scan(&subscriberID, &channel, &destination); err != nil {
+		var subscriber bounceCastNotificationSubscriberTarget
+		if err := rows.Scan(&subscriber.id, &subscriber.channel, &subscriber.destination); err != nil {
 			log.Debugln("unable to scan BounceCast notification subscriber", err)
 			continue
 		}
-		if !enabledChannels[channel] {
+		if !enabledChannels[subscriber.channel] {
 			continue
 		}
+		subscribers = append(subscribers, subscriber)
+	}
+	if err := rows.Close(); err != nil {
+		log.Debugln("unable to close BounceCast notification subscriber rows", err)
+	}
+	if err := rows.Err(); err != nil {
+		log.Debugln("unable to iterate BounceCast notification subscribers", err)
+	}
+
+	queuedCount := 0
+	for _, subscriber := range subscribers {
 		if _, err := db.Exec(`
 			INSERT INTO bouncecast_notification_deliveries(go_live_event_id, subscriber_id, channel, destination)
 			VALUES(?, ?, ?, ?)
-		`, goLiveEventID, subscriberID, channel, destination); err != nil {
+		`, goLiveEventID, subscriber.id, subscriber.channel, subscriber.destination); err != nil {
 			log.Debugln("unable to queue BounceCast notification delivery", err)
 			continue
 		}
@@ -268,9 +304,7 @@ func queueBounceCastGoLiveNotifications(goLiveEventID int64, scheduleID sql.Null
 	}
 
 	if queuedCount > 0 {
-		go sendBounceCastWebhookDeliveries(goLiveEventID)
-		go sendBounceCastEmailDeliveries(goLiveEventID)
-		go sendBounceCastBrowserPushDeliveries(goLiveEventID)
+		sendBounceCastQueuedDeliveries(goLiveEventID)
 	}
 }
 
@@ -284,9 +318,8 @@ func queueBounceCastBrowserPushDeliveries(db *sql.DB, goLiveEventID int64) int {
 		log.Debugln("unable to query BounceCast browser push subscribers", err)
 		return 0
 	}
-	defer rows.Close()
 
-	queuedCount := 0
+	destinations := []string{}
 	for rows.Next() {
 		var destination string
 		if err := rows.Scan(&destination); err != nil {
@@ -296,7 +329,17 @@ func queueBounceCastBrowserPushDeliveries(db *sql.DB, goLiveEventID int64) int {
 		if strings.TrimSpace(destination) == "" {
 			continue
 		}
+		destinations = append(destinations, destination)
+	}
+	if err := rows.Close(); err != nil {
+		log.Debugln("unable to close BounceCast browser push subscriber rows", err)
+	}
+	if err := rows.Err(); err != nil {
+		log.Debugln("unable to iterate BounceCast browser push subscribers", err)
+	}
 
+	queuedCount := 0
+	for _, destination := range destinations {
 		if _, err := db.Exec(`
 			INSERT INTO bouncecast_notification_deliveries(go_live_event_id, channel, destination)
 			VALUES(?, ?, ?)
@@ -342,21 +385,30 @@ func sendBounceCastWebhookDeliveries(goLiveEventID int64) {
 		log.Debugln("unable to query BounceCast webhook deliveries", err)
 		return
 	}
-	defer rows.Close()
 
+	deliveries := []bounceCastQueuedDelivery{}
 	for rows.Next() {
-		var deliveryID int64
-		var destination string
-		if err := rows.Scan(&deliveryID, &destination); err != nil {
+		var delivery bounceCastQueuedDelivery
+		if err := rows.Scan(&delivery.id, &delivery.destination); err != nil {
 			log.Debugln("unable to scan BounceCast webhook delivery", err)
 			continue
 		}
-		if err := sendBounceCastWebhook(destination, payload); err != nil {
+		deliveries = append(deliveries, delivery)
+	}
+	if err := rows.Close(); err != nil {
+		log.Debugln("unable to close BounceCast webhook delivery rows", err)
+	}
+	if err := rows.Err(); err != nil {
+		log.Debugln("unable to iterate BounceCast webhook deliveries", err)
+	}
+
+	for _, delivery := range deliveries {
+		if err := sendBounceCastWebhook(delivery.destination, payload); err != nil {
 			if _, updateErr := db.Exec(`
 				UPDATE bouncecast_notification_deliveries
 				SET status = 'failed', attempt_count = attempt_count + 1, last_error = ?
 				WHERE id = ?
-			`, err.Error(), deliveryID); updateErr != nil {
+			`, err.Error(), delivery.id); updateErr != nil {
 				log.Debugln("unable to mark BounceCast webhook delivery failed", updateErr)
 			}
 			continue
@@ -365,7 +417,7 @@ func sendBounceCastWebhookDeliveries(goLiveEventID int64) {
 			UPDATE bouncecast_notification_deliveries
 			SET status = 'sent', attempt_count = attempt_count + 1, sent_at = CURRENT_TIMESTAMP, last_error = NULL
 			WHERE id = ?
-		`, deliveryID); err != nil {
+		`, delivery.id); err != nil {
 			log.Debugln("unable to mark BounceCast webhook delivery sent", err)
 		}
 	}
@@ -472,20 +524,28 @@ func sendBounceCastBrowserPushDeliveries(goLiveEventID int64) {
 		log.Debugln("unable to query BounceCast browser push deliveries", err)
 		return
 	}
-	defer rows.Close()
 
-	title, body := buildBounceCastBrowserPushMessage(payload)
+	deliveries := []bounceCastQueuedDelivery{}
 	for rows.Next() {
-		var deliveryID int64
-		var destination string
-		if err := rows.Scan(&deliveryID, &destination); err != nil {
+		var delivery bounceCastQueuedDelivery
+		if err := rows.Scan(&delivery.id, &delivery.destination); err != nil {
 			log.Debugln("unable to scan BounceCast browser push delivery", err)
 			continue
 		}
+		deliveries = append(deliveries, delivery)
+	}
+	if err := rows.Close(); err != nil {
+		log.Debugln("unable to close BounceCast browser push delivery rows", err)
+	}
+	if err := rows.Err(); err != nil {
+		log.Debugln("unable to iterate BounceCast browser push deliveries", err)
+	}
 
-		unsubscribed, err := notifier.Send(destination, title, body)
+	title, body := buildBounceCastBrowserPushMessage(payload)
+	for _, delivery := range deliveries {
+		unsubscribed, err := notifier.Send(delivery.destination, title, body)
 		if unsubscribed {
-			if removeErr := notificationsrepository.Get().RemoveNotificationForChannel(notificationsrepository.BrowserPushNotification, destination); removeErr != nil {
+			if removeErr := notificationsrepository.Get().RemoveNotificationForChannel(notificationsrepository.BrowserPushNotification, delivery.destination); removeErr != nil {
 				log.Debugln("unable to remove expired BounceCast browser push subscriber", removeErr)
 			}
 			err = fmt.Errorf("browser push subscription expired")
@@ -495,7 +555,7 @@ func sendBounceCastBrowserPushDeliveries(goLiveEventID int64) {
 				UPDATE bouncecast_notification_deliveries
 				SET status = 'failed', attempt_count = attempt_count + 1, last_error = ?
 				WHERE id = ?
-			`, err.Error(), deliveryID); updateErr != nil {
+			`, err.Error(), delivery.id); updateErr != nil {
 				log.Debugln("unable to mark BounceCast browser push delivery failed", updateErr)
 			}
 			continue
@@ -505,7 +565,7 @@ func sendBounceCastBrowserPushDeliveries(goLiveEventID int64) {
 			UPDATE bouncecast_notification_deliveries
 			SET status = 'sent', attempt_count = attempt_count + 1, sent_at = CURRENT_TIMESTAMP, last_error = NULL
 			WHERE id = ?
-		`, deliveryID); err != nil {
+		`, delivery.id); err != nil {
 			log.Debugln("unable to mark BounceCast browser push delivery sent", err)
 		}
 	}
@@ -585,22 +645,30 @@ func sendBounceCastEmailDeliveries(goLiveEventID int64) {
 		log.Debugln("unable to query BounceCast email deliveries", err)
 		return
 	}
-	defer rows.Close()
 
+	deliveries := []bounceCastQueuedDelivery{}
 	for rows.Next() {
-		var deliveryID int64
-		var destination string
-		if err := rows.Scan(&deliveryID, &destination); err != nil {
+		var delivery bounceCastQueuedDelivery
+		if err := rows.Scan(&delivery.id, &delivery.destination); err != nil {
 			log.Debugln("unable to scan BounceCast email delivery", err)
 			continue
 		}
+		deliveries = append(deliveries, delivery)
+	}
+	if err := rows.Close(); err != nil {
+		log.Debugln("unable to close BounceCast email delivery rows", err)
+	}
+	if err := rows.Err(); err != nil {
+		log.Debugln("unable to iterate BounceCast email deliveries", err)
+	}
 
-		if err := sendBounceCastEmail(settings, destination, payload); err != nil {
+	for _, delivery := range deliveries {
+		if err := sendBounceCastEmail(settings, delivery.destination, payload); err != nil {
 			if _, updateErr := db.Exec(`
 				UPDATE bouncecast_notification_deliveries
 				SET status = 'failed', attempt_count = attempt_count + 1, last_error = ?
 				WHERE id = ?
-			`, err.Error(), deliveryID); updateErr != nil {
+			`, err.Error(), delivery.id); updateErr != nil {
 				log.Debugln("unable to mark BounceCast email delivery failed", updateErr)
 			}
 			continue
@@ -610,7 +678,7 @@ func sendBounceCastEmailDeliveries(goLiveEventID int64) {
 			UPDATE bouncecast_notification_deliveries
 			SET status = 'sent', attempt_count = attempt_count + 1, sent_at = CURRENT_TIMESTAMP, last_error = NULL
 			WHERE id = ?
-		`, deliveryID); err != nil {
+		`, delivery.id); err != nil {
 			log.Debugln("unable to mark BounceCast email delivery sent", err)
 		}
 	}
