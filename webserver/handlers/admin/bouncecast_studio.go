@@ -28,6 +28,7 @@ type BounceCastStreamer struct {
 	Role           string     `json:"role"`
 	Status         string     `json:"status"`
 	AvatarURL      string     `json:"avatarUrl"`
+	PasswordSet    bool       `json:"passwordSet"`
 	StreamKeyCount int64      `json:"streamKeyCount"`
 	CreatedAt      time.Time  `json:"createdAt"`
 	UpdatedAt      time.Time  `json:"updatedAt"`
@@ -124,6 +125,22 @@ type createStreamerRequest struct {
 	Handle      string `json:"handle"`
 	Email       string `json:"email"`
 	Role        string `json:"role"`
+	Status      string `json:"status"`
+	Password    string `json:"password"`
+}
+
+type updateStreamerRequest struct {
+	ID          int64  `json:"id"`
+	DisplayName string `json:"displayName"`
+	Handle      string `json:"handle"`
+	Email       string `json:"email"`
+	Role        string `json:"role"`
+	Status      string `json:"status"`
+}
+
+type setStreamerPasswordRequest struct {
+	ID       int64  `json:"id"`
+	Password string `json:"password"`
 }
 
 type createScheduleRequest struct {
@@ -171,10 +188,24 @@ const (
 
 var bounceCastHandlePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$`)
 
+var bounceCastAllowedStreamerRoles = map[string]bool{
+	"owner":     true,
+	"manager":   true,
+	"moderator": true,
+	"streamer":  true,
+}
+
+var bounceCastAllowedStreamerStatuses = map[string]bool{
+	"active":   true,
+	"invited":  true,
+	"disabled": true,
+}
+
 // GetBounceCastStreamers returns BounceCast dashboard streamer accounts.
 func GetBounceCastStreamers(w http.ResponseWriter, r *http.Request) {
 	rows, err := data.GetDatabase().Query(`
 		SELECT a.id, a.display_name, a.handle, COALESCE(a.email, ''), a.role, a.status, COALESCE(a.avatar_url, ''),
+			CASE WHEN COALESCE(a.password_hash, '') != '' THEN 1 ELSE 0 END,
 			COUNT(k.id), a.created_at, a.updated_at, a.last_login_at
 		FROM bouncecast_streamer_accounts a
 		LEFT JOIN bouncecast_streamer_stream_keys k ON k.streamer_id = a.id AND k.enabled = 1 AND k.revoked_at IS NULL
@@ -191,6 +222,7 @@ func GetBounceCastStreamers(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var streamer BounceCastStreamer
 		var lastLogin sql.NullTime
+		var passwordSet bool
 		if err := rows.Scan(
 			&streamer.ID,
 			&streamer.DisplayName,
@@ -199,6 +231,7 @@ func GetBounceCastStreamers(w http.ResponseWriter, r *http.Request) {
 			&streamer.Role,
 			&streamer.Status,
 			&streamer.AvatarURL,
+			&passwordSet,
 			&streamer.StreamKeyCount,
 			&streamer.CreatedAt,
 			&streamer.UpdatedAt,
@@ -210,6 +243,7 @@ func GetBounceCastStreamers(w http.ResponseWriter, r *http.Request) {
 		if lastLogin.Valid {
 			streamer.LastLoginAt = &lastLogin.Time
 		}
+		streamer.PasswordSet = passwordSet
 		streamers = append(streamers, streamer)
 	}
 
@@ -245,15 +279,36 @@ func CreateBounceCastStreamer(w http.ResponseWriter, r *http.Request) {
 		email = parsedEmail.Address
 	}
 
-	role := strings.TrimSpace(request.Role)
-	if role == "" {
-		role = "streamer"
+	role, err := normalizeBounceCastStreamerRole(request.Role)
+	if err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+	status, err := normalizeBounceCastStreamerStatus(request.Status)
+	if err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+
+	password := strings.TrimSpace(request.Password)
+	var passwordHash interface{}
+	if password != "" {
+		if err := validateBounceCastStreamerPassword(password); err != nil {
+			webutils.BadRequestHandler(w, err)
+			return
+		}
+		hashedPassword, err := utils.HashPassword(password)
+		if err != nil {
+			webutils.InternalErrorHandler(w, err)
+			return
+		}
+		passwordHash = hashedPassword
 	}
 
 	result, err := data.GetDatabase().Exec(`
-		INSERT INTO bouncecast_streamer_accounts(display_name, handle, email, role, status)
-		VALUES(?, ?, NULLIF(?, ''), ?, 'active')
-	`, displayName, handle, email, role)
+		INSERT INTO bouncecast_streamer_accounts(display_name, handle, email, password_hash, role, status)
+		VALUES(?, ?, NULLIF(?, ''), ?, ?, ?)
+	`, displayName, handle, email, passwordHash, role, status)
 	if err != nil {
 		webutils.InternalErrorHandler(w, err)
 		return
@@ -261,6 +316,106 @@ func CreateBounceCastStreamer(w http.ResponseWriter, r *http.Request) {
 
 	id, _ := result.LastInsertId()
 	webutils.WriteResponse(w, map[string]interface{}{"id": id})
+}
+
+// UpdateBounceCastStreamer updates visible account metadata and access status.
+func UpdateBounceCastStreamer(w http.ResponseWriter, r *http.Request) {
+	var request updateStreamerRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+	if request.ID == 0 {
+		webutils.BadRequestHandler(w, errors.New("id is required"))
+		return
+	}
+
+	displayName := strings.TrimSpace(request.DisplayName)
+	handle := strings.TrimSpace(strings.TrimPrefix(request.Handle, "@"))
+	if displayName == "" || handle == "" {
+		webutils.BadRequestHandler(w, errors.New("displayName and handle are required"))
+		return
+	}
+	if !bounceCastHandlePattern.MatchString(handle) {
+		webutils.BadRequestHandler(w, errors.New("handle must be 1-32 letters, numbers, underscores, or hyphens"))
+		return
+	}
+
+	email := strings.TrimSpace(request.Email)
+	if email != "" {
+		parsedEmail, err := mail.ParseAddress(email)
+		if err != nil {
+			webutils.BadRequestHandler(w, errors.New("email must be a valid email address"))
+			return
+		}
+		email = parsedEmail.Address
+	}
+
+	role, err := normalizeBounceCastStreamerRole(request.Role)
+	if err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+	status, err := normalizeBounceCastStreamerStatus(request.Status)
+	if err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+
+	result, err := data.GetDatabase().Exec(`
+		UPDATE bouncecast_streamer_accounts
+		SET display_name = ?, handle = ?, email = NULLIF(?, ''), role = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, displayName, handle, email, role, status, request.ID)
+	if err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+	if rowsAffected, _ := result.RowsAffected(); rowsAffected == 0 {
+		webutils.BadRequestHandler(w, errors.New("streamer not found"))
+		return
+	}
+
+	webutils.WriteSimpleResponse(w, true, "updated streamer")
+}
+
+// SetBounceCastStreamerPassword sets or resets a DJ dashboard password.
+func SetBounceCastStreamerPassword(w http.ResponseWriter, r *http.Request) {
+	var request setStreamerPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+	if request.ID == 0 {
+		webutils.BadRequestHandler(w, errors.New("id is required"))
+		return
+	}
+	if err := validateBounceCastStreamerPassword(request.Password); err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+
+	hashedPassword, err := utils.HashPassword(strings.TrimSpace(request.Password))
+	if err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+
+	result, err := data.GetDatabase().Exec(`
+		UPDATE bouncecast_streamer_accounts
+		SET password_hash = ?, status = CASE WHEN status = 'invited' THEN 'active' ELSE status END, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, hashedPassword, request.ID)
+	if err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+	if rowsAffected, _ := result.RowsAffected(); rowsAffected == 0 {
+		webutils.BadRequestHandler(w, errors.New("streamer not found"))
+		return
+	}
+
+	webutils.WriteSimpleResponse(w, true, "updated streamer password")
 }
 
 // GetBounceCastStreamKeys returns the per-streamer RTMP keys without exposing raw secrets.
@@ -693,6 +848,39 @@ func normalizeBounceCastSubscriberDestination(channel string, destination string
 func validateBounceCastEmailHeader(value string, field string) error {
 	if strings.ContainsAny(value, "\r\n") {
 		return fmt.Errorf("%s cannot contain line breaks", field)
+	}
+	return nil
+}
+
+func normalizeBounceCastStreamerRole(role string) (string, error) {
+	normalizedRole := strings.ToLower(strings.TrimSpace(role))
+	if normalizedRole == "" {
+		normalizedRole = "streamer"
+	}
+	if !bounceCastAllowedStreamerRoles[normalizedRole] {
+		return "", errors.New("role must be owner, manager, moderator, or streamer")
+	}
+	return normalizedRole, nil
+}
+
+func normalizeBounceCastStreamerStatus(status string) (string, error) {
+	normalizedStatus := strings.ToLower(strings.TrimSpace(status))
+	if normalizedStatus == "" {
+		normalizedStatus = "active"
+	}
+	if !bounceCastAllowedStreamerStatuses[normalizedStatus] {
+		return "", errors.New("status must be active, invited, or disabled")
+	}
+	return normalizedStatus, nil
+}
+
+func validateBounceCastStreamerPassword(password string) error {
+	if strings.ContainsAny(password, "\r\n") {
+		return errors.New("password cannot contain line breaks")
+	}
+	trimmedPassword := strings.TrimSpace(password)
+	if len(trimmedPassword) < 8 {
+		return errors.New("password must be at least 8 characters")
 	}
 	return nil
 }

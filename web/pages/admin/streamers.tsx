@@ -19,6 +19,8 @@ import {
 import { AdminLayout } from '../../components/layouts/AdminLayout';
 import {
   BOUNCECAST_STREAMERS,
+  BOUNCECAST_STREAMER_PASSWORD,
+  BOUNCECAST_STREAMER_UPDATE,
   BOUNCECAST_STREAM_KEYS,
   BOUNCECAST_STREAM_KEY_REVOKE,
   fetchData,
@@ -26,9 +28,13 @@ import {
 
 const UserAddOutlined = dynamic(() => import('@ant-design/icons/UserAddOutlined'), { ssr: false });
 const KeyOutlined = dynamic(() => import('@ant-design/icons/KeyOutlined'), { ssr: false });
-const MailOutlined = dynamic(() => import('@ant-design/icons/MailOutlined'), { ssr: false });
+const LockOutlined = dynamic(() => import('@ant-design/icons/LockOutlined'), { ssr: false });
 const CopyOutlined = dynamic(() => import('@ant-design/icons/CopyOutlined'), { ssr: false });
 const CustomerServiceOutlined = dynamic(() => import('@ant-design/icons/CustomerServiceOutlined'), {
+  ssr: false,
+});
+const StopOutlined = dynamic(() => import('@ant-design/icons/StopOutlined'), { ssr: false });
+const CheckCircleOutlined = dynamic(() => import('@ant-design/icons/CheckCircleOutlined'), {
   ssr: false,
 });
 
@@ -41,6 +47,7 @@ type Streamer = {
   email: string;
   role: string;
   status: string;
+  passwordSet: boolean;
   streamKeyCount: number;
 };
 
@@ -54,7 +61,16 @@ type StreamKey = {
   revokedAt?: string;
 };
 
-const columns = [
+const statusColor = {
+  active: 'green',
+  invited: 'gold',
+  disabled: 'default',
+};
+
+const columns = (
+  openPasswordModal: (streamer: Streamer) => void,
+  updateStreamerStatus: (streamer: Streamer, status: string) => void,
+) => [
   {
     title: 'DJ',
     dataIndex: 'displayName',
@@ -73,6 +89,22 @@ const columns = [
     render: role => <Tag color={role === 'owner' ? 'gold' : 'blue'}>{role}</Tag>,
   },
   {
+    title: 'Status',
+    dataIndex: 'status',
+    key: 'status',
+    render: status => <Tag color={statusColor[status] || 'default'}>{status}</Tag>,
+  },
+  {
+    title: 'Dashboard',
+    dataIndex: 'passwordSet',
+    key: 'passwordSet',
+    render: passwordSet => (
+      <Tag color={passwordSet ? 'green' : 'gold'}>
+        {passwordSet ? 'password set' : 'needs password'}
+      </Tag>
+    ),
+  },
+  {
     title: 'Stream Keys',
     dataIndex: 'streamKeyCount',
     key: 'streamKeyCount',
@@ -85,6 +117,35 @@ const columns = [
     dataIndex: 'email',
     key: 'email',
     render: email => email || 'Not set',
+  },
+  {
+    title: 'Actions',
+    key: 'actions',
+    render: (_, streamer) => (
+      <Space>
+        <Button size="small" icon={<LockOutlined />} onClick={() => openPasswordModal(streamer)}>
+          Password
+        </Button>
+        {streamer.status === 'active' ? (
+          <Button
+            size="small"
+            danger
+            icon={<StopOutlined />}
+            onClick={() => updateStreamerStatus(streamer, 'disabled')}
+          >
+            Disable
+          </Button>
+        ) : (
+          <Button
+            size="small"
+            icon={<CheckCircleOutlined />}
+            onClick={() => updateStreamerStatus(streamer, 'active')}
+          >
+            Activate
+          </Button>
+        )}
+      </Space>
+    ),
   },
 ];
 
@@ -171,6 +232,9 @@ export default function Streamers() {
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
   const [keyForm] = Form.useForm();
+  const [passwordForm] = Form.useForm();
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [passwordStreamer, setPasswordStreamer] = useState<Streamer | null>(null);
 
   const loadStreamers = async () => {
     setLoading(true);
@@ -225,6 +289,53 @@ export default function Streamers() {
     setKeyModalOpen(true);
   };
 
+  const openPasswordModal = (streamer: Streamer) => {
+    setPasswordStreamer(streamer);
+    passwordForm.resetFields();
+    setPasswordModalOpen(true);
+  };
+
+  const setStreamerPassword = async () => {
+    if (!passwordStreamer) {
+      return;
+    }
+    const values = await passwordForm.validateFields();
+    setSaving(true);
+    try {
+      await fetchData(BOUNCECAST_STREAMER_PASSWORD, {
+        method: 'POST',
+        data: {
+          id: passwordStreamer.id,
+          password: values.password,
+        },
+      });
+      setPasswordModalOpen(false);
+      await loadStreamers();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateStreamerStatus = async (streamer: Streamer, status: string) => {
+    setSaving(true);
+    try {
+      await fetchData(BOUNCECAST_STREAMER_UPDATE, {
+        method: 'POST',
+        data: {
+          id: streamer.id,
+          displayName: streamer.displayName,
+          handle: streamer.handle,
+          email: streamer.email,
+          role: streamer.role,
+          status,
+        },
+      });
+      await loadStreamers();
+    } finally {
+      setSaving(false);
+    }
+  };
+
   useEffect(() => {
     loadStreamers();
   }, []);
@@ -271,7 +382,7 @@ export default function Streamers() {
           <Card>
             <Statistic
               title="Active streamer accounts"
-              value={streamers.length}
+              value={streamers.filter(streamer => streamer.status === 'active').length}
               prefix={<CustomerServiceOutlined />}
             />
           </Card>
@@ -287,14 +398,18 @@ export default function Streamers() {
         </Col>
         <Col xs={24} md={8}>
           <Card>
-            <Statistic title="Email routes" value={0} prefix={<MailOutlined />} />
+            <Statistic
+              title="Dashboard logins"
+              value={streamers.filter(streamer => streamer.passwordSet).length}
+              prefix={<LockOutlined />}
+            />
           </Card>
         </Col>
       </Row>
 
       <Card title="Streamer accounts" className="studio-panel">
         <Table
-          columns={columns}
+          columns={columns(openPasswordModal, updateStreamerStatus)}
           dataSource={streamers}
           loading={loading}
           rowKey="id"
@@ -356,6 +471,33 @@ export default function Streamers() {
                 { label: 'Owner', value: 'owner' },
               ]}
             />
+          </Form.Item>
+          <Form.Item name="password" label="Dashboard password">
+            <Input.Password placeholder="Optional for now" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={
+          passwordStreamer ? `Set password for ${passwordStreamer.displayName}` : 'Set password'
+        }
+        open={passwordModalOpen}
+        onCancel={() => setPasswordModalOpen(false)}
+        onOk={setStreamerPassword}
+        confirmLoading={saving}
+        okText="Save password"
+      >
+        <Form form={passwordForm} layout="vertical">
+          <Form.Item
+            name="password"
+            label="New dashboard password"
+            rules={[
+              { required: true, message: 'Add a dashboard password' },
+              { min: 8, message: 'Use at least 8 characters' },
+            ]}
+          >
+            <Input.Password autoComplete="new-password" placeholder="At least 8 characters" />
           </Form.Item>
         </Form>
       </Modal>

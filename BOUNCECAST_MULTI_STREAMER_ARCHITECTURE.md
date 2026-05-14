@@ -37,10 +37,13 @@ Recommended entities:
 ### Phase 2: Dashboard Auth
 
 - Use the additive `bouncecast_*` tables introduced in `00002_bouncecast_multi_streamer_foundation.sql`.
+- Use the additive `bouncecast_streamer_sessions` table introduced in `00004_bouncecast_streamer_sessions.sql` for DJ Studio bearer sessions.
+- Let the existing owner/admin create streamer accounts, reset streamer passwords, and activate or disable dashboard access.
 - Add session or token auth for dashboard users.
 - Preserve the existing admin password as an owner bootstrap login.
 - Add roles such as owner, manager, streamer, moderator.
 - Do not reuse chat `users` as dashboard identities.
+- Keep `/api/bouncecast/studio/*` separate from Owncast-compatible `/api/admin/*` endpoints until dashboard contracts are stable.
 
 ### Phase 3: Per-Streamer Stream Keys
 

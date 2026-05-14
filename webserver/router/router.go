@@ -54,6 +54,8 @@ func Start(enableVerboseLogging bool) error {
 	r.Options("/api/admin/bouncecast/streamers", middleware.RequireAdminAuth(adminhandlers.GetBounceCastStreamers))
 	r.Get("/api/admin/bouncecast/streamers", middleware.RequireAdminAuth(adminhandlers.GetBounceCastStreamers))
 	r.Post("/api/admin/bouncecast/streamers", middleware.RequireAdminAuth(adminhandlers.CreateBounceCastStreamer))
+	r.Post("/api/admin/bouncecast/streamers/update", middleware.RequireAdminAuth(adminhandlers.UpdateBounceCastStreamer))
+	r.Post("/api/admin/bouncecast/streamers/password", middleware.RequireAdminAuth(adminhandlers.SetBounceCastStreamerPassword))
 	r.Options("/api/admin/bouncecast/streamkeys", middleware.RequireAdminAuth(adminhandlers.GetBounceCastStreamKeys))
 	r.Get("/api/admin/bouncecast/streamkeys", middleware.RequireAdminAuth(adminhandlers.GetBounceCastStreamKeys))
 	r.Post("/api/admin/bouncecast/streamkeys", middleware.RequireAdminAuth(adminhandlers.CreateBounceCastStreamKey))
@@ -74,6 +76,15 @@ func Start(enableVerboseLogging bool) error {
 	r.Options("/api/admin/bouncecast/schedule", middleware.RequireAdminAuth(adminhandlers.GetBounceCastSchedule))
 	r.Get("/api/admin/bouncecast/schedule", middleware.RequireAdminAuth(adminhandlers.GetBounceCastSchedule))
 	r.Post("/api/admin/bouncecast/schedule", middleware.RequireAdminAuth(adminhandlers.CreateBounceCastSchedule))
+
+	// BounceCast Studio DJ dashboard auth. This is additive and does not replace
+	// the existing Owncast admin authentication path.
+	r.Options("/api/bouncecast/studio/login", handlers.BounceCastStudioOptions)
+	r.Post("/api/bouncecast/studio/login", handlers.BounceCastStudioLogin)
+	r.Options("/api/bouncecast/studio/me", handlers.BounceCastStudioOptions)
+	r.Get("/api/bouncecast/studio/me", handlers.BounceCastStudioMe)
+	r.Options("/api/bouncecast/studio/logout", handlers.BounceCastStudioOptions)
+	r.Post("/api/bouncecast/studio/logout", handlers.BounceCastStudioLogout)
 
 	// Single ActivityPub Actor
 	r.HandleFunc("/federation/user/*", middleware.RequireActivityPubOrRedirect(aphandlers.ActorHandler))

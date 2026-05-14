@@ -112,6 +112,10 @@ export const UPDATE_STREAM_KEYS = `${API_LOCATION}config/streamkeys`;
 
 export const BOUNCECAST_STREAMERS = `${API_LOCATION}bouncecast/streamers`;
 
+export const BOUNCECAST_STREAMER_UPDATE = `${API_LOCATION}bouncecast/streamers/update`;
+
+export const BOUNCECAST_STREAMER_PASSWORD = `${API_LOCATION}bouncecast/streamers/password`;
+
 export const BOUNCECAST_STREAM_KEYS = `${API_LOCATION}bouncecast/streamkeys`;
 
 export const BOUNCECAST_STREAM_KEY_REVOKE = `${API_LOCATION}bouncecast/streamkeys/revoke`;
