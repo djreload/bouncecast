@@ -211,6 +211,48 @@ make test
 make build
 ```
 
+### Windows Host CGO Setup
+
+When running Go tests from Windows PowerShell instead of WSL, `github.com/mattn/go-sqlite3` needs CGO and a Windows GCC toolchain.
+
+Install MSYS2 and UCRT64 GCC:
+
+```powershell
+winget install --id MSYS2.MSYS2 --exact --source winget --accept-package-agreements --accept-source-agreements
+C:\msys64\usr\bin\bash.exe -lc "pacman --noconfirm -Syu"
+C:\msys64\usr\bin\bash.exe -lc "pacman --noconfirm -S --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-pkgconf make"
+```
+
+Add these paths to your user PATH:
+
+```text
+C:\msys64\ucrt64\bin
+C:\msys64\usr\bin
+```
+
+Configure Go to use the MSYS2 compiler:
+
+```powershell
+go env -w CGO_ENABLED=1 CC=C:\msys64\ucrt64\bin\gcc.exe CXX=C:\msys64\ucrt64\bin\g++.exe
+```
+
+For the current PowerShell session, put MSYS2 first so the newer `make` is used:
+
+```powershell
+$machine=[Environment]::GetEnvironmentVariable('Path','Machine')
+$user=[Environment]::GetEnvironmentVariable('Path','User')
+$env:Path="C:\msys64\ucrt64\bin;C:\msys64\usr\bin;$machine;$user"
+```
+
+Verify:
+
+```powershell
+go env CGO_ENABLED CC CXX
+gcc --version
+make --version
+go test ./...
+```
+
 ## 14. Common Troubleshooting
 
 If `go test` fails because `gcc` is missing:

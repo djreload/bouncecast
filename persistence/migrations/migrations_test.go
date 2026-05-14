@@ -7,6 +7,8 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+const latestGooseMigrationVersion int64 = 3
+
 func openTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 	db, err := sql.Open("sqlite3", ":memory:")
@@ -42,7 +44,7 @@ func mustExec(t *testing.T, db *sql.DB, query string) {
 }
 
 // TestRun_FreshDatabase verifies that Run on an empty database creates all
-// expected tables and records the goose baseline migration.
+// expected tables and records the current goose migration version.
 func TestRun_FreshDatabase(t *testing.T) {
 	db := openTestDB(t)
 
@@ -54,6 +56,10 @@ func TestRun_FreshDatabase(t *testing.T) {
 		"datastore", "webhooks", "users", "user_access_tokens",
 		"ap_followers", "ap_outbox", "ap_accepted_activities",
 		"notifications", "messages", "auth", "ip_bans",
+		"bouncecast_streamer_accounts", "bouncecast_streamer_stream_keys",
+		"bouncecast_stream_schedule", "bouncecast_go_live_events",
+		"bouncecast_notification_subscribers", "bouncecast_notification_deliveries",
+		"bouncecast_notification_settings",
 		"goose_db_version",
 	}
 	for _, name := range expectedTables {
@@ -67,8 +73,8 @@ func TestRun_FreshDatabase(t *testing.T) {
 		t.Error("fresh install should not have legacy config table")
 	}
 
-	if v := gooseVersion(t, db); v != 1 {
-		t.Errorf("goose version = %d, want 1", v)
+	if v := gooseVersion(t, db); v != latestGooseMigrationVersion {
+		t.Errorf("goose version = %d, want %d", v, latestGooseMigrationVersion)
 	}
 
 	// Calling Run a second time should be a no-op (idempotent).
@@ -78,7 +84,7 @@ func TestRun_FreshDatabase(t *testing.T) {
 }
 
 // TestRun_LegacyDatabaseAtV9 verifies that an existing v9 install transitions
-// to goose without invoking legacy migrations and without altering the schema.
+// to goose without invoking legacy migrations and only applies goose migrations.
 func TestRun_LegacyDatabaseAtV9(t *testing.T) {
 	db := openTestDB(t)
 	createV9Schema(t, db)
@@ -91,9 +97,9 @@ func TestRun_LegacyDatabaseAtV9(t *testing.T) {
 		t.Fatalf("Run on v9 legacy DB: %v", err)
 	}
 
-	// Goose should record the baseline.
-	if v := gooseVersion(t, db); v != 1 {
-		t.Errorf("goose version = %d, want 1", v)
+	// Goose should record the current migration version.
+	if v := gooseVersion(t, db); v != latestGooseMigrationVersion {
+		t.Errorf("goose version = %d, want %d", v, latestGooseMigrationVersion)
 	}
 
 	// Config version should still be 9 — the legacy bridge was not invoked.
@@ -103,16 +109,16 @@ func TestRun_LegacyDatabaseAtV9(t *testing.T) {
 		t.Errorf("config.version = %d, want 9", version)
 	}
 
-	// Only goose_db_version was added; no other tables were created or dropped.
+	// goose_db_version and the BounceCast extension tables were added.
 	var newTableCount int
 	mustScan(t, db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table'`), &newTableCount)
-	if newTableCount != tableCount+1 { // +1 for goose_db_version
-		t.Errorf("table count changed from %d to %d (expected +1 for goose_db_version)", tableCount, newTableCount)
+	if newTableCount != tableCount+8 {
+		t.Errorf("table count changed from %d to %d (expected +8 for goose and BounceCast tables)", tableCount, newTableCount)
 	}
 }
 
 // TestRun_LegacyDatabasePreV9 verifies that a pre-v9 install runs the legacy
-// bridge to reach v9, then goose records the baseline.
+// bridge to reach v9, then goose records the current migration version.
 func TestRun_LegacyDatabasePreV9(t *testing.T) {
 	// The legacy migration code writes a backup file to config.BackupDirectory.
 	// Use a temp working directory so the side effect is contained.
@@ -137,9 +143,9 @@ func TestRun_LegacyDatabasePreV9(t *testing.T) {
 		t.Errorf("config.version = %d after legacy bridge, want 9", version)
 	}
 
-	// Goose should have recorded the baseline.
-	if v := gooseVersion(t, db); v != 1 {
-		t.Errorf("goose version = %d, want 1", v)
+	// Goose should have recorded the current migration version.
+	if v := gooseVersion(t, db); v != latestGooseMigrationVersion {
+		t.Errorf("goose version = %d, want %d", v, latestGooseMigrationVersion)
 	}
 }
 
