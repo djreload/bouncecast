@@ -135,7 +135,7 @@ export const API_YP_RESET = `${API_LOCATION}yp/reset`;
 const GITHUB_RELEASE_URL = 'https://api.github.com/repos/owncast/owncast/releases/latest';
 
 interface FetchOptions {
-  data?: any;
+  data?: unknown;
   method?: string;
   auth?: boolean;
 }
@@ -147,19 +147,22 @@ export async function fetchData(url: string, options?: FetchOptions) {
   const requestOptions: RequestInit = {
     method,
   };
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+  };
 
-  if (data) {
+  if (data !== undefined) {
     requestOptions.body = JSON.stringify(data);
+    headers['Content-Type'] = 'application/json';
   }
 
   if (auth && ADMIN_USERNAME && ADMIN_STREAMKEY) {
     const encoded = btoa(`${ADMIN_USERNAME}:${ADMIN_STREAMKEY}`);
-    requestOptions.headers = {
-      Authorization: `Basic ${encoded}`,
-    };
+    headers.Authorization = `Basic ${encoded}`;
     requestOptions.mode = 'cors';
     requestOptions.credentials = 'include';
   }
+  requestOptions.headers = headers;
 
   const response = await fetch(url, requestOptions);
   const json = await response.json();

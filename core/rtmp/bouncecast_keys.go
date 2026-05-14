@@ -624,9 +624,17 @@ func sendBounceCastEmail(settings bounceCastEmailSettings, destination string, p
 		return fmt.Errorf("SMTP host and from address are required")
 	}
 
-	from := mail.Address{Name: settings.fromName, Address: settings.fromAddress}
-	to := mail.Address{Address: destination}
-	subject := strings.ReplaceAll(settings.subject, "{{streamer}}", payload.Streamer)
+	fromAddress := strings.TrimSpace(settings.fromAddress)
+	if _, err := mail.ParseAddress(fromAddress); err != nil {
+		return fmt.Errorf("invalid SMTP from address: %w", err)
+	}
+	to, err := mail.ParseAddress(strings.TrimSpace(destination))
+	if err != nil {
+		return fmt.Errorf("invalid email destination: %w", err)
+	}
+
+	from := mail.Address{Name: sanitizeBounceCastEmailHeader(settings.fromName), Address: fromAddress}
+	subject := sanitizeBounceCastEmailHeader(strings.ReplaceAll(settings.subject, "{{streamer}}", payload.Streamer))
 	body := fmt.Sprintf("%s is live on BounceCast.\n\n", payload.Streamer)
 	if payload.ScheduleTitle != "" {
 		body += fmt.Sprintf("Set: %s\n", payload.ScheduleTitle)
@@ -643,7 +651,14 @@ func sendBounceCastEmail(settings bounceCastEmailSettings, destination string, p
 	message.WriteString(body)
 
 	address := net.JoinHostPort(settings.host, strconv.Itoa(settings.port))
-	client, err := smtp.Dial(address)
+	dialer := net.Dialer{Timeout: 10 * time.Second}
+	connection, err := dialer.Dial("tcp", address)
+	if err != nil {
+		return err
+	}
+	defer connection.Close()
+
+	client, err := smtp.NewClient(connection, settings.host)
 	if err != nil {
 		return err
 	}
@@ -664,10 +679,10 @@ func sendBounceCastEmail(settings bounceCastEmailSettings, destination string, p
 			return err
 		}
 	}
-	if err := client.Mail(settings.fromAddress); err != nil {
+	if err := client.Mail(fromAddress); err != nil {
 		return err
 	}
-	if err := client.Rcpt(destination); err != nil {
+	if err := client.Rcpt(to.Address); err != nil {
 		return err
 	}
 
@@ -684,6 +699,12 @@ func sendBounceCastEmail(settings bounceCastEmailSettings, destination string, p
 	}
 
 	return client.Quit()
+}
+
+func sanitizeBounceCastEmailHeader(value string) string {
+	value = strings.ReplaceAll(value, "\r", " ")
+	value = strings.ReplaceAll(value, "\n", " ")
+	return strings.TrimSpace(value)
 }
 
 func readBounceCastEmailSettings() bounceCastEmailSettings {

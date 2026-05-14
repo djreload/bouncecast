@@ -4,7 +4,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"net/mail"
+	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -165,6 +169,8 @@ const (
 	bounceCastEmailSubjectKey     = "email_subject"
 )
 
+var bounceCastHandlePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$`)
+
 // GetBounceCastStreamers returns BounceCast dashboard streamer accounts.
 func GetBounceCastStreamers(w http.ResponseWriter, r *http.Request) {
 	rows, err := data.GetDatabase().Query(`
@@ -224,6 +230,20 @@ func CreateBounceCastStreamer(w http.ResponseWriter, r *http.Request) {
 		webutils.BadRequestHandler(w, errors.New("displayName and handle are required"))
 		return
 	}
+	if !bounceCastHandlePattern.MatchString(handle) {
+		webutils.BadRequestHandler(w, errors.New("handle must be 1-32 letters, numbers, underscores, or hyphens"))
+		return
+	}
+
+	email := strings.TrimSpace(request.Email)
+	if email != "" {
+		parsedEmail, err := mail.ParseAddress(email)
+		if err != nil {
+			webutils.BadRequestHandler(w, errors.New("email must be a valid email address"))
+			return
+		}
+		email = parsedEmail.Address
+	}
 
 	role := strings.TrimSpace(request.Role)
 	if role == "" {
@@ -233,7 +253,7 @@ func CreateBounceCastStreamer(w http.ResponseWriter, r *http.Request) {
 	result, err := data.GetDatabase().Exec(`
 		INSERT INTO bouncecast_streamer_accounts(display_name, handle, email, role, status)
 		VALUES(?, ?, NULLIF(?, ''), ?, 'active')
-	`, displayName, handle, strings.TrimSpace(request.Email), role)
+	`, displayName, handle, email, role)
 	if err != nil {
 		webutils.InternalErrorHandler(w, err)
 		return
@@ -453,6 +473,11 @@ func CreateBounceCastNotificationSubscriber(w http.ResponseWriter, r *http.Reque
 		webutils.BadRequestHandler(w, errors.New("channel must be email, push, or webhook"))
 		return
 	}
+	normalizedDestination, err := normalizeBounceCastSubscriberDestination(channel, destination)
+	if err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
 
 	result, err := data.GetDatabase().Exec(`
 		INSERT INTO bouncecast_notification_subscribers(channel, destination, display_name, verified_at)
@@ -460,7 +485,7 @@ func CreateBounceCastNotificationSubscriber(w http.ResponseWriter, r *http.Reque
 		ON CONFLICT(channel, destination) DO UPDATE SET
 			display_name = excluded.display_name,
 			disabled_at = NULL
-	`, channel, destination, strings.TrimSpace(request.DisplayName))
+	`, channel, normalizedDestination, strings.TrimSpace(request.DisplayName))
 	if err != nil {
 		webutils.InternalErrorHandler(w, err)
 		return
@@ -571,11 +596,33 @@ func SetBounceCastEmailSettings(w http.ResponseWriter, r *http.Request) {
 	if request.Port == 0 {
 		request.Port = 587
 	}
+	if request.Port < 1 || request.Port > 65535 {
+		webutils.BadRequestHandler(w, errors.New("port must be between 1 and 65535"))
+		return
+	}
 	if strings.TrimSpace(request.FromName) == "" {
 		request.FromName = "BounceCast"
 	}
 	if strings.TrimSpace(request.Subject) == "" {
 		request.Subject = "{{streamer}} is live on BounceCast"
+	}
+	if err := validateBounceCastEmailHeader(request.FromName, "fromName"); err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+	if err := validateBounceCastEmailHeader(request.Subject, "subject"); err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+
+	fromAddress := strings.TrimSpace(request.FromAddress)
+	if fromAddress != "" {
+		parsedFromAddress, err := mail.ParseAddress(fromAddress)
+		if err != nil {
+			webutils.BadRequestHandler(w, errors.New("fromAddress must be a valid email address"))
+			return
+		}
+		fromAddress = parsedFromAddress.Address
 	}
 
 	settings := map[string]string{
@@ -583,7 +630,7 @@ func SetBounceCastEmailSettings(w http.ResponseWriter, r *http.Request) {
 		bounceCastEmailHostKey:        strings.TrimSpace(request.Host),
 		bounceCastEmailPortKey:        strconv.Itoa(request.Port),
 		bounceCastEmailUsernameKey:    strings.TrimSpace(request.Username),
-		bounceCastEmailFromAddressKey: strings.TrimSpace(request.FromAddress),
+		bounceCastEmailFromAddressKey: fromAddress,
 		bounceCastEmailFromNameKey:    strings.TrimSpace(request.FromName),
 		bounceCastEmailStartTLSKey:    strconv.FormatBool(request.StartTLS),
 		bounceCastEmailSubjectKey:     strings.TrimSpace(request.Subject),
@@ -602,6 +649,40 @@ func SetBounceCastEmailSettings(w http.ResponseWriter, r *http.Request) {
 	savedSettings := readBounceCastEmailSettings()
 	savedSettings.Password = ""
 	webutils.WriteResponse(w, savedSettings)
+}
+
+func normalizeBounceCastSubscriberDestination(channel string, destination string) (string, error) {
+	switch channel {
+	case "email":
+		parsedEmail, err := mail.ParseAddress(destination)
+		if err != nil {
+			return "", errors.New("email destination must be a valid email address")
+		}
+		return parsedEmail.Address, nil
+	case "webhook":
+		parsedURL, err := url.Parse(destination)
+		if err != nil || parsedURL.Host == "" || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") {
+			return "", errors.New("webhook destination must be a valid http or https URL")
+		}
+		return parsedURL.String(), nil
+	case "push":
+		var subscription struct {
+			Endpoint string `json:"endpoint"`
+		}
+		if err := json.Unmarshal([]byte(destination), &subscription); err != nil || strings.TrimSpace(subscription.Endpoint) == "" {
+			return "", errors.New("push destination must be a browser push subscription JSON payload")
+		}
+		return destination, nil
+	default:
+		return "", fmt.Errorf("unsupported notification channel: %s", channel)
+	}
+}
+
+func validateBounceCastEmailHeader(value string, field string) error {
+	if strings.ContainsAny(value, "\r\n") {
+		return fmt.Errorf("%s cannot contain line breaks", field)
+	}
+	return nil
 }
 
 // GetBounceCastPushSettings returns the current browser push status for BounceCast go-live alerts.
@@ -759,6 +840,10 @@ func CreateBounceCastSchedule(w http.ResponseWriter, r *http.Request) {
 		parsedEndsAt, err := time.Parse(time.RFC3339, request.EndsAt)
 		if err != nil {
 			webutils.BadRequestHandler(w, errors.New("endsAt must be RFC3339"))
+			return
+		}
+		if !parsedEndsAt.After(startsAt) {
+			webutils.BadRequestHandler(w, errors.New("endsAt must be after startsAt"))
 			return
 		}
 		endsAt = parsedEndsAt
