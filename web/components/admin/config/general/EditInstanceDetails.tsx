@@ -225,22 +225,15 @@ export default function EditInstanceDetails() {
         onChange={handleFieldChange}
       />
 
-      <div style={{ marginBottom: '50px', marginRight: '150px' }}>
-        <div
-          style={{
-            display: 'flex',
-            width: '80vh',
-            justifyContent: 'space-between',
-            alignItems: 'end',
-          }}
-        >
-          <p style={{ margin: '20px', marginRight: '10px', fontWeight: '400' }}>Offline Message:</p>
+      <div className="offline-message-editor">
+        <div className="offline-message-editor-row">
+          <p className="offline-message-label">Offline Message:</p>
           <CodeMirror
             value={formDataValues.offlineMessage}
             {...TEXTFIELD_PROPS_SERVER_OFFLINE_MESSAGE}
             theme={bbedit}
             height="150px"
-            width="450px"
+            width="100%"
             onChange={value => {
               handleFieldChange({ fieldName: 'offlineMessage', value });
             }}
@@ -257,11 +250,7 @@ export default function EditInstanceDetails() {
           />
         </div>
 
-        <Button
-          type="primary"
-          onClick={handleSaveOfflineMessage}
-          style={{ margin: '10px', float: 'right' }}
-        >
+        <Button type="primary" onClick={handleSaveOfflineMessage} className="offline-message-save">
           Save Message
         </Button>
         <FormStatusIndicator status={offlineMessageSaveStatus} />

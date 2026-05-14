@@ -81,9 +81,9 @@ export const TEXTFIELD_PROPS_SERVER_NAME = {
   apiPath: API_SERVER_NAME,
   configPath: 'instanceDetails',
   maxLength: TEXT_MAXLENGTH,
-  placeholder: 'Owncast site name', // like "gothland"
+  placeholder: 'BounceCast site name',
   label: 'Name',
-  tip: 'The name of your Owncast server',
+  tip: 'The name of your BounceCast server',
   required: true,
   useTrimLead: true,
 };
@@ -179,9 +179,9 @@ export const TEXTFIELD_PROPS_INSTANCE_URL = {
   apiPath: API_INSTANCE_URL,
   configPath: 'yp',
   maxLength: 255,
-  placeholder: 'https://owncast.mysite.com',
+  placeholder: 'https://bouncecast.mysite.com',
   label: 'Server URL',
-  tip: 'The full url to your Owncast server.',
+  tip: 'The full url to your BounceCast server.',
   type: TEXTFIELD_TYPE_URL,
   pattern: DEFAULT_TEXTFIELD_URL_PATTERN,
   useTrim: true,

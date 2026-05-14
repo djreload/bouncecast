@@ -129,6 +129,7 @@ export const MainLayout: FC<MainLayoutProps> = ({ children }) => {
 
   const appClass = classNames({
     'app-container': true,
+    'bouncecast-admin-shell': true,
     online,
   });
 
@@ -394,7 +395,9 @@ export const MainLayout: FC<MainLayoutProps> = ({ children }) => {
 
         {headerAlertMessage}
 
-        <Content className="main-content-container">{children}</Content>
+        <Content className="main-content-container">
+          <div className="admin-studio-shell">{children}</div>
+        </Content>
 
         <Footer className="footer-container">
           <a
