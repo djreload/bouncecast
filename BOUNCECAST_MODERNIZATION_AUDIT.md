@@ -18,6 +18,8 @@ This audit captures the first pass at updating BounceCast toward current enginee
   - webhook destinations must be HTTP or HTTPS URLs
   - push destinations must be browser push subscription JSON
 - Added schedule validation so set end times must be after start times.
+- Updated same-major Go dependencies for router, storage, markdown, system metrics, and `golang.org/x/*` packages.
+- Updated frontend package-lock dependencies within the current Next 14 / React 18 architecture and ran `npm audit fix` without force.
 
 ## Dependency Findings
 
@@ -33,6 +35,14 @@ This audit captures the first pass at updating BounceCast toward current enginee
 These should be handled as separate branches with visual regression checks, not bundled into livestreaming/backend work.
 
 `go list -m -u all` shows patch/minor updates are available for selected Go dependencies, including `golang.org/x/*`, `go-chi/chi/v5`, AWS SDK modules, and `goldmark`. These are safer than frontend framework major upgrades but still need full build/test coverage because they touch networking, storage, rendering, and generated dependencies.
+
+After the safe frontend package update, `npm audit` still reports 19 vulnerabilities. The remaining fixes require breaking changes:
+
+- Next.js 14 -> 16 for Next/PostCSS/eslint-config-next advisories.
+- Storybook 9 -> 10 or a Storybook package reshuffle for Storybook CLI/webpack polyfill advisories.
+- Replacing or deeply revisiting `next-pwa`, because npm's suggested fix downgrades it to `2.0.2` and is marked semver-major.
+
+Do not run `npm audit fix --force` on the main BounceCast branch without a dedicated migration pass.
 
 ## Recommended Next Modernization Order
 
