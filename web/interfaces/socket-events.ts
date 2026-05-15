@@ -10,6 +10,8 @@ export enum MessageType {
   USER_JOINED = 'USER_JOINED',
   USER_PARTED = 'USER_PARTED',
   CHAT_ACTION = 'CHAT_ACTION',
+  CHAT_REACTION = 'CHAT_REACTION',
+  STARS_SENT = 'STARS_SENT',
   FEDIVERSE_ENGAGEMENT_FOLLOW = 'FEDIVERSE_ENGAGEMENT_FOLLOW',
   FEDIVERSE_ENGAGEMENT_LIKE = 'FEDIVERSE_ENGAGEMENT_LIKE',
   FEDIVERSE_ENGAGEMENT_REPOST = 'FEDIVERSE_ENGAGEMENT_REPOST',
@@ -35,6 +37,7 @@ export class ChatEvent implements SocketEvent {
     this.timestamp = message.timestamp;
     this.type = message.type;
     this.body = message.body;
+    this.reactions = message.reactions || {};
     if (message.user) {
       this.user = new User(message.user);
     }
@@ -49,6 +52,8 @@ export class ChatEvent implements SocketEvent {
   user: User;
 
   body: string;
+
+  reactions?: Record<string, number>;
 }
 
 export interface NameChangeEvent extends SocketEvent {
@@ -59,6 +64,19 @@ export interface NameChangeEvent extends SocketEvent {
 export interface MessageVisibilityEvent extends SocketEvent {
   visible: boolean;
   ids: string[];
+}
+
+export interface MessageReactionEvent extends SocketEvent {
+  messageId: string;
+  counts: Record<string, number>;
+}
+
+export interface StarsSentSocketEvent extends SocketEvent {
+  displayName: string;
+  amount: number;
+  message?: string;
+  effect: string;
+  soundEnabled?: boolean;
 }
 
 export interface FediverseEvent extends SocketEvent {

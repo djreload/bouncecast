@@ -25,6 +25,8 @@ type ChatMessageRepository interface {
 	GetMessagesFromUser(userID string) ([]events.UserMessageEvent, error)
 	GetMessageIdsForUserID(userID string) ([]string, error)
 	SetMessageVisibilityForMessageIDs(messageIDs []string, visible bool) error
+	ToggleMessageReaction(messageID string, userID string, reaction string) (map[string]int, error)
+	GetReactionCountsForMessageIDs(messageIDs []string) (map[string]map[string]int, error)
 	GetMessagesCount() int64
 }
 
@@ -154,6 +156,37 @@ func makeUserMessageEventFromRowData(row rowData) events.UserMessageEvent {
 	}
 
 	return message
+}
+
+func (r *SqlChatMessageRepository) addReactionCounts(messages []interface{}) []interface{} {
+	messageIDs := make([]string, 0)
+	for _, message := range messages {
+		userMessage, ok := message.(events.UserMessageEvent)
+		if !ok {
+			continue
+		}
+		messageIDs = append(messageIDs, userMessage.ID)
+	}
+
+	reactionsByMessageID, err := r.GetReactionCountsForMessageIDs(messageIDs)
+	if err != nil {
+		log.Errorln("error fetching chat message reactions", err)
+		return messages
+	}
+
+	for index, message := range messages {
+		userMessage, ok := message.(events.UserMessageEvent)
+		if !ok {
+			continue
+		}
+
+		if counts := reactionsByMessageID[userMessage.ID]; len(counts) > 0 {
+			userMessage.Reactions = counts
+			messages[index] = userMessage
+		}
+	}
+
+	return messages
 }
 
 func makeSystemMessageChatEventFromRowData(row rowData) events.SystemMessageEvent {
@@ -321,13 +354,13 @@ func (r *SqlChatMessageRepository) GetChatModerationHistory() []interface{} {
 		log.Errorln("There is a problem enumerating chat message rows. Please report this:", query)
 		return nil
 	}
-
-	_historyCache = &result
-
 	if err = tx.Commit(); err != nil {
 		log.Errorln("error fetching chat moderation history", err)
 		return nil
 	}
+
+	result = r.addReactionCounts(result)
+	_historyCache = &result
 
 	return result
 }
@@ -366,11 +399,12 @@ func (r *SqlChatMessageRepository) GetChatHistory() []interface{} {
 		log.Errorln("There is a problem enumerating chat message rows. Please report this:", query)
 		return nil
 	}
-
 	if err = tx.Commit(); err != nil {
 		log.Errorln("error fetching chat history", err)
 		return nil
 	}
+
+	m = r.addReactionCounts(m)
 
 	// Invert order of messages
 	for i, j := 0, len(m)-1; i < j; i, j = i+1, j-1 {
@@ -503,6 +537,134 @@ func (r *SqlChatMessageRepository) SetMessageVisibilityForMessageIDs(messageIDs 
 	}
 
 	return nil
+}
+
+// ToggleMessageReaction toggles a user's reaction on a visible user chat message.
+func (r *SqlChatMessageRepository) ToggleMessageReaction(messageID string, userID string, reaction string) (map[string]int, error) {
+	defer func() {
+		_historyCache = nil
+	}()
+
+	r.datastore.DbLock.Lock()
+	defer r.datastore.DbLock.Unlock()
+
+	tx, err := r.datastore.DB.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback() // nolint
+
+	var existingMessageID string
+	err = tx.QueryRow(
+		"SELECT id FROM messages WHERE id = ? AND eventType = ? AND hidden_at IS NULL",
+		messageID,
+		events.MessageSent,
+	).Scan(&existingMessageID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, errors.New("message not found")
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	var existingReactionCount int
+	err = tx.QueryRow(
+		"SELECT COUNT(*) FROM chat_message_reactions WHERE message_id = ? AND user_id = ? AND reaction = ?",
+		messageID,
+		userID,
+		reaction,
+	).Scan(&existingReactionCount)
+	if err != nil {
+		return nil, err
+	}
+
+	if existingReactionCount > 0 {
+		if _, err = tx.Exec(
+			"DELETE FROM chat_message_reactions WHERE message_id = ? AND user_id = ? AND reaction = ?",
+			messageID,
+			userID,
+			reaction,
+		); err != nil {
+			return nil, err
+		}
+	} else if _, err = tx.Exec(
+		"INSERT INTO chat_message_reactions(message_id, user_id, reaction) VALUES(?, ?, ?)",
+		messageID,
+		userID,
+		reaction,
+	); err != nil {
+		return nil, err
+	}
+
+	counts, err := getReactionCountsForMessageID(tx, messageID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return counts, nil
+}
+
+// GetReactionCountsForMessageIDs returns reaction counts grouped by message ID.
+func (r *SqlChatMessageRepository) GetReactionCountsForMessageIDs(messageIDs []string) (map[string]map[string]int, error) {
+	reactionCounts := map[string]map[string]int{}
+	if len(messageIDs) == 0 {
+		return reactionCounts, nil
+	}
+
+	query := "SELECT message_id, reaction, COUNT(*) FROM chat_message_reactions WHERE message_id IN (?" + strings.Repeat(",?", len(messageIDs)-1) + ") GROUP BY message_id, reaction"
+	args := make([]interface{}, len(messageIDs))
+	for index, messageID := range messageIDs {
+		args[index] = messageID
+	}
+
+	rows, err := r.datastore.DB.Query(query, args...)
+	if err != nil {
+		return reactionCounts, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var messageID string
+		var reaction string
+		var count int
+		if err := rows.Scan(&messageID, &reaction, &count); err != nil {
+			return reactionCounts, err
+		}
+
+		if reactionCounts[messageID] == nil {
+			reactionCounts[messageID] = map[string]int{}
+		}
+		reactionCounts[messageID][reaction] = count
+	}
+
+	return reactionCounts, rows.Err()
+}
+
+func getReactionCountsForMessageID(tx *sql.Tx, messageID string) (map[string]int, error) {
+	rows, err := tx.Query(
+		"SELECT reaction, COUNT(*) FROM chat_message_reactions WHERE message_id = ? GROUP BY reaction",
+		messageID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	reactionCounts := map[string]int{}
+	for rows.Next() {
+		var reaction string
+		var count int
+		if err := rows.Scan(&reaction, &count); err != nil {
+			return nil, err
+		}
+		reactionCounts[reaction] = count
+	}
+
+	return reactionCounts, rows.Err()
 }
 
 // GetMessagesCount will return the number of messages in the database.

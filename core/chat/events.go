@@ -190,6 +190,36 @@ func (s *Server) userMessageSent(eventData chatClientEvent) {
 	eventData.client.MessageCount++
 }
 
+func (s *Server) messageReactionUpdated(eventData chatClientEvent) {
+	var event events.MessageReactionEvent
+	if err := json.Unmarshal(eventData.data, &event); err != nil {
+		log.Errorln("error unmarshalling to MessageReactionEvent", err)
+		return
+	}
+
+	event.SetDefaults()
+	if event.MessageID == "" || !events.IsAllowedMessageReaction(event.Reaction) {
+		return
+	}
+
+	user := eventData.client.User
+	if user == nil {
+		return
+	}
+
+	chatMessageRepository := chatmessagerepository.Get()
+	counts, err := chatMessageRepository.ToggleMessageReaction(event.MessageID, user.ID, event.Reaction)
+	if err != nil {
+		log.Debugln("error toggling chat message reaction", err)
+		return
+	}
+
+	event.Counts = counts
+	if err := s.Broadcast(event.GetBroadcastPayload()); err != nil {
+		log.Errorln("error broadcasting MessageReactionEvent payload", err)
+	}
+}
+
 func logSanitize(userValue string) string {
 	// strip carriage return and newline from user-submitted values to prevent log injection
 	sanitizedValue := strings.ReplaceAll(userValue, "\n", "")

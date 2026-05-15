@@ -77,6 +77,12 @@ func Start(enableVerboseLogging bool) error {
 	r.Get("/api/admin/bouncecast/schedule", middleware.RequireAdminAuth(adminhandlers.GetBounceCastSchedule))
 	r.Post("/api/admin/bouncecast/schedule", middleware.RequireAdminAuth(adminhandlers.CreateBounceCastSchedule))
 
+	r.Options("/api/admin/bouncecast/stars", middleware.RequireAdminAuth(adminhandlers.GetStarsAdmin))
+	r.Get("/api/admin/bouncecast/stars", middleware.RequireAdminAuth(adminhandlers.GetStarsAdmin))
+	r.Post("/api/admin/bouncecast/stars/settings", middleware.RequireAdminAuth(adminhandlers.SetStarsSettings))
+	r.Post("/api/admin/bouncecast/stars/packages", middleware.RequireAdminAuth(adminhandlers.UpsertStarPackage))
+	r.Post("/api/admin/bouncecast/stars/wallets/adjust", middleware.RequireAdminAuth(adminhandlers.AdjustStarWallet))
+
 	r.Options("/api/admin/config/chat/backgroundimage", middleware.RequireAdminAuth(adminhandlers.SetChatBackgroundImageURL))
 	r.Post("/api/admin/config/chat/backgroundimage", middleware.RequireAdminAuth(adminhandlers.SetChatBackgroundImageURL))
 	r.Options("/api/admin/config/chat/backgroundopacity", middleware.RequireAdminAuth(adminhandlers.SetChatBackgroundOpacity))
@@ -108,6 +114,14 @@ func Start(enableVerboseLogging bool) error {
 	r.Post("/api/bouncecast/studio/streamkeys/revoke", handlers.BounceCastStudioRevokeStreamKey)
 	r.Options("/api/bouncecast/studio/live-events", handlers.BounceCastStudioOptions)
 	r.Get("/api/bouncecast/studio/live-events", handlers.BounceCastStudioLiveEvents)
+
+	r.Options("/api/stars/config", handlers.GetStarsConfig)
+	r.Get("/api/stars/config", handlers.GetStarsConfig)
+	r.Get("/api/stars/wallet", middleware.RequireUserAccessToken(handlers.GetStarsWallet))
+	r.Post("/api/stars/paypal/order", middleware.RequireUserAccessToken(handlers.CreateStarsPayPalOrder))
+	r.Post("/api/stars/paypal/capture", middleware.RequireUserAccessToken(handlers.CaptureStarsPayPalOrder))
+	r.Post("/api/stars/send", middleware.RequireUserAccessToken(handlers.SendStars))
+	r.Post("/api/stars/paypal/webhook", handlers.PayPalStarsWebhook)
 
 	// Single ActivityPub Actor
 	r.HandleFunc("/federation/user/*", middleware.RequireActivityPubOrRedirect(aphandlers.ActorHandler))

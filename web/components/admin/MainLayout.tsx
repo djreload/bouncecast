@@ -199,6 +199,10 @@ export const MainLayout: FC<MainLayoutProps> = ({ children }) => {
       label: <Link href="/admin/schedule">Schedule</Link>,
       key: '/admin/schedule',
     },
+    {
+      label: <Link href="/admin/stars">Stars</Link>,
+      key: '/admin/stars',
+    },
   ];
 
   const utilitiesMenu = [

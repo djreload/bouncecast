@@ -5,6 +5,7 @@ type UserMessageEvent struct {
 	Event
 	UserEvent
 	MessageEvent
+	Reactions map[string]int `json:"reactions,omitempty"`
 }
 
 // GetBroadcastPayload will return the object to send to all chat users.
@@ -16,6 +17,7 @@ func (e *UserMessageEvent) GetBroadcastPayload() EventPayload {
 		"user":      e.User,
 		"type":      MessageSent,
 		"visible":   e.HiddenAt == nil,
+		"reactions": e.Reactions,
 	}
 }
 

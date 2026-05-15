@@ -1,4 +1,4 @@
-import { FC, ReactNode, useEffect, useState } from 'react';
+import { FC, ReactNode, useState } from 'react';
 import cn from 'classnames';
 import { Tooltip } from 'antd';
 import { useRecoilValue } from 'recoil';
@@ -11,11 +11,13 @@ import { ChatMessageTenorGifMatcher } from './tenorMatcher';
 import styles from './ChatUserMessage.module.scss';
 import { formatTimestamp } from './messageFmt';
 import { ChatMessage } from '../../../interfaces/chat-message.model';
-import { accessTokenAtom } from '../../stores/ClientConfigStore';
+import { accessTokenAtom, websocketServiceAtom } from '../../stores/ClientConfigStore';
 import { User } from '../../../interfaces/user.model';
 import { AuthedUserBadge } from '../ChatUserBadge/AuthedUserBadge';
 import { ModerationBadge } from '../ChatUserBadge/ModerationBadge';
 import { BotUserBadge } from '../ChatUserBadge/BotUserBadge';
+import { MessageType } from '../../../interfaces/socket-events';
+import WebsocketService from '../../../services/websocket-service';
 
 // Lazy loaded components
 
@@ -36,22 +38,6 @@ const reactionOptions = [
   { emoji: '\u{1F44D}', label: 'Thumbs up' },
   { emoji: '\u{1F622}', label: 'Cry' },
 ];
-
-function getReactionStorageKey(messageId: string): string {
-  return `bouncecast-chat-reactions:${messageId}`;
-}
-
-function loadStoredReactions(messageId: string): Record<string, number> {
-  if (typeof window === 'undefined') {
-    return {};
-  }
-
-  try {
-    return JSON.parse(window.localStorage.getItem(getReactionStorageKey(messageId)) || '{}');
-  } catch {
-    return {};
-  }
-}
 
 export type ChatUserMessageProps = {
   message: ChatMessage;
@@ -93,8 +79,9 @@ export const ChatUserMessage: FC<ChatUserMessageProps> = ({
   const { id: messageId, body, user, timestamp } = message;
   const { id: userId, displayName, displayColor } = user;
   const accessToken = useRecoilValue<string>(accessTokenAtom);
-  const [reactions, setReactions] = useState<Record<string, number>>({});
+  const websocketService = useRecoilValue<WebsocketService>(websocketServiceAtom);
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
+  const reactions = message.reactions || {};
 
   const color = `var(--theme-color-users-${displayColor})`;
   const formattedTimestamp = `Sent ${formatTimestamp(timestamp)}`;
@@ -110,24 +97,14 @@ export const ChatUserMessage: FC<ChatUserMessageProps> = ({
     badgeNodes.push(<BotUserBadge key="bot" userColor={displayColor} />);
   }
 
-  useEffect(() => {
-    setReactions(loadStoredReactions(messageId));
-    setReactionPickerOpen(false);
-  }, [messageId]);
-
-  const saveReactions = (nextReactions: Record<string, number>) => {
-    setReactions(nextReactions);
-
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(getReactionStorageKey(messageId), JSON.stringify(nextReactions));
-    }
-  };
-
   const addReaction = (emoji: string) => {
-    saveReactions({
-      ...reactions,
-      [emoji]: (reactions[emoji] || 0) + 1,
-    });
+    if (websocketService?.isConnected()) {
+      websocketService.send({
+        type: MessageType.CHAT_REACTION,
+        messageId,
+        reaction: emoji,
+      });
+    }
     setReactionPickerOpen(false);
   };
 

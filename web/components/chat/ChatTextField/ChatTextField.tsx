@@ -15,6 +15,7 @@ import {
 } from '../../stores/ClientConfigStore';
 import { MessageType } from '../../../interfaces/socket-events';
 import { ClientConfig } from '../../../interfaces/client-config.model';
+import { StarsChatPanel } from '../../stars/StarsChatPanel';
 import styles from './ChatTextField.module.scss';
 
 // Lazy loaded components
@@ -397,6 +398,7 @@ export const ChatTextField: FC<ChatTextFieldProps> = ({
         />
         {enabled && (
           <div style={{ display: 'flex', paddingLeft: '5px' }}>
+            <StarsChatPanel />
             <Popover
               content={
                 <div className={styles.emojiPickerContainer}>

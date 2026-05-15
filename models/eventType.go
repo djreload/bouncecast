@@ -16,6 +16,10 @@ const (
 	FediverseEngagementFollow EventType = "FEDIVERSE_ENGAGEMENT_FOLLOW"
 	// VisibiltyToggled is the event sent when a chat message's visibility changes.
 	VisibiltyToggled EventType = "VISIBILITY-UPDATE"
+	// MessageReactionUpdate is the event sent when a chat message reaction changes.
+	MessageReactionUpdate EventType = "CHAT_REACTION"
+	// StarsSent is the event sent when a viewer sends Stars.
+	StarsSent EventType = "STARS_SENT"
 	// PING is a ping message.
 	PING EventType = "PING"
 	// PONG is a pong message.

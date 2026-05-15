@@ -16,6 +16,10 @@ const (
 	UserColorChanged EventType = "COLOR_CHANGE"
 	// VisibiltyUpdate is the event sent when a chat message's visibility changes.
 	VisibiltyUpdate EventType = "VISIBILITY-UPDATE"
+	// MessageReactionUpdate is the event sent when a chat message reaction changes.
+	MessageReactionUpdate EventType = "CHAT_REACTION"
+	// StarsSent is the event sent when a viewer sends Stars.
+	StarsSent EventType = "STARS_SENT"
 	// PING is a ping message.
 	PING EventType = "PING"
 	// PONG is a pong message.

@@ -29,6 +29,7 @@ import { PushNotificationServiceWorker } from '../../workers/PushNotificationSer
 import { AppStateOptions } from '../../stores/application-state';
 import { Noscript } from '../../ui/Noscript/Noscript';
 import { ServerStatus } from '../../../interfaces/server-status.model';
+import { StarsOverlay } from '../../stars/StarsOverlay';
 
 // Lazy loaded components
 
@@ -108,6 +109,7 @@ export const Main: FC = () => {
           online={videoAvailable}
         />
         <Content />
+        <StarsOverlay />
         {fatalError && (
           <FatalErrorStateModal title={fatalError.title} message={fatalError.message} />
         )}

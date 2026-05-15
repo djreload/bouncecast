@@ -18,10 +18,12 @@ import {
   ConnectedClientInfoEvent,
   MessageType,
   ChatEvent,
+  MessageReactionEvent,
   NameChangeEvent,
   MessageVisibilityEvent,
   SocketEvent,
   FediverseEvent,
+  StarsSentSocketEvent,
 } from '../../interfaces/socket-events';
 import { mergeMeta } from '../../utils/helpers';
 import { handleConnectedClientInfoMessage } from './eventhandlers/connected-client-info-handler';
@@ -107,6 +109,11 @@ export const currentUserAtom = atom<CurrentUser>({
 export const chatMessagesAtom = atom<ChatMessage[]>({
   key: 'chatMessages',
   default: [] as ChatMessage[],
+});
+
+export const starsOverlayEventsAtom = atom<StarsSentSocketEvent[]>({
+  key: 'starsOverlayEventsAtom',
+  default: [] as StarsSentSocketEvent[],
 });
 
 export const chatAuthenticatedAtom = atom<boolean>({
@@ -217,6 +224,7 @@ export const ClientConfigStore: FC = () => {
   const setServerStatus = useSetRecoilState<ServerStatus>(serverStatusState);
   const setClockSkew = useSetRecoilState<Number>(clockSkewAtom);
   const setChatMessages = useSetRecoilState<SocketEvent[]>(chatMessagesAtom);
+  const setStarsOverlayEvents = useSetRecoilState<StarsSentSocketEvent[]>(starsOverlayEventsAtom);
   const [accessToken, setAccessToken] = useRecoilState<string>(accessTokenAtom);
   const setAppState = useSetRecoilState<AppStateOptions>(appStateAtom);
   const setGlobalFatalErrorMessage = useSetRecoilState<DisplayableError>(fatalErrorStateAtom);
@@ -332,6 +340,21 @@ export const ClientConfigStore: FC = () => {
     }
   };
 
+  const handleMessageReactionChange = (message: MessageReactionEvent) => {
+    setChatMessages(currentState =>
+      currentState.map(chatMessage => {
+        if (chatMessage.id !== message.messageId) {
+          return chatMessage;
+        }
+
+        return {
+          ...chatMessage,
+          reactions: message.counts || {},
+        };
+      }),
+    );
+  };
+
   const handleSocketDisconnect = () => {
     hasWebsocketDisconnected = true;
   };
@@ -389,6 +412,15 @@ export const ClientConfigStore: FC = () => {
         break;
       case MessageType.VISIBILITY_UPDATE:
         handleMessageVisibilityChange(message as MessageVisibilityEvent);
+        break;
+      case MessageType.CHAT_REACTION:
+        handleMessageReactionChange(message as MessageReactionEvent);
+        break;
+      case MessageType.STARS_SENT:
+        setStarsOverlayEvents(currentState => [
+          ...currentState.slice(-4),
+          message as StarsSentSocketEvent,
+        ]);
         break;
       case MessageType.ERROR_USER_DISABLED:
         console.log('User has been disabled');

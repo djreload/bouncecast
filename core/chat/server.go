@@ -416,6 +416,9 @@ func (s *Server) eventReceived(event chatClientEvent) {
 	case events.MessageSent:
 		s.userMessageSent(event)
 
+	case events.MessageReactionUpdate:
+		s.messageReactionUpdated(event)
+
 	case events.UserNameChanged:
 		s.userNameChanged(event)
 

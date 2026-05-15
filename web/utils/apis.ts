@@ -134,6 +134,24 @@ export const BOUNCECAST_PUSH_SETTINGS = `${API_LOCATION}bouncecast/push-settings
 
 export const BOUNCECAST_SCHEDULE = `${API_LOCATION}bouncecast/schedule`;
 
+export const BOUNCECAST_STARS_ADMIN = `${API_LOCATION}bouncecast/stars`;
+
+export const BOUNCECAST_STARS_SETTINGS = `${API_LOCATION}bouncecast/stars/settings`;
+
+export const BOUNCECAST_STARS_PACKAGES = `${API_LOCATION}bouncecast/stars/packages`;
+
+export const BOUNCECAST_STARS_WALLET_ADJUST = `${API_LOCATION}bouncecast/stars/wallets/adjust`;
+
+export const STARS_CONFIG = `${NEXT_PUBLIC_API_HOST}api/stars/config`;
+
+export const STARS_WALLET = `${NEXT_PUBLIC_API_HOST}api/stars/wallet`;
+
+export const STARS_PAYPAL_ORDER = `${NEXT_PUBLIC_API_HOST}api/stars/paypal/order`;
+
+export const STARS_PAYPAL_CAPTURE = `${NEXT_PUBLIC_API_HOST}api/stars/paypal/capture`;
+
+export const STARS_SEND = `${NEXT_PUBLIC_API_HOST}api/stars/send`;
+
 const STUDIO_API_LOCATION = `${NEXT_PUBLIC_API_HOST}api/bouncecast/studio/`;
 
 export const BOUNCECAST_STUDIO_LOGIN = `${STUDIO_API_LOCATION}login`;
