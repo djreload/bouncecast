@@ -1,0 +1,647 @@
+BounceCast live server install guide
+Debian 13 VPS with Plesk already installed
+
+Last updated: 2026-05-15
+Repository: https://github.com/djreload/bouncecast
+
+Purpose
+=======
+
+This guide installs BounceCast on a live Debian 13 VPS that already has Plesk
+installed. It uses Docker Compose from the command line for the application and
+uses Plesk for DNS/domain management, HTTPS certificates, and nginx reverse
+proxying.
+
+This guide assumes:
+
+- The VPS is Debian 13.
+- Plesk is already installed and working.
+- You have SSH access with sudo/root privileges.
+- You own a domain or subdomain, for example live.example.com.
+- You want the web/admin UI on HTTPS port 443.
+- You want RTMP ingest on TCP port 1935 for OBS or similar software.
+
+Important compatibility notes
+=============================
+
+1. Plesk supports Debian 13, but you should keep Plesk updated. Check Plesk's
+   Debian 13 limitations before using the server for production.
+
+2. The Plesk Docker extension may lag behind Plesk's operating system support.
+   If the Docker extension is missing or does not work correctly on Debian 13,
+   use the command-line Docker Compose setup below. That is the recommended
+   production path in this guide.
+
+3. BounceCast currently keeps some Owncast internal names for compatibility.
+   The Docker image still runs the /app/owncast binary internally. Do not rename
+   database files, internal API paths, persisted config keys, or the binary on a
+   live server unless there is a tested migration.
+
+4. Cloudflare normal proxying does not proxy RTMP on port 1935. If you use
+   Cloudflare for the web domain, keep the RTMP hostname DNS-only, or use a
+   separate direct subdomain such as rtmp.example.com.
+
+5. PayPal webhooks must reach BounceCast over a public HTTPS URL. If a
+   Cloudflare tunnel or Plesk domain is still pointing at another project,
+   PayPal webhooks will not reach BounceCast.
+
+
+Recommended server layout
+=========================
+
+Use these paths:
+
+  /opt/bouncecast/app       Git checkout of the BounceCast repository
+  /opt/bouncecast/compose   Docker Compose file
+  /var/lib/bouncecast/data  Persistent BounceCast data
+  /root/bouncecast-backups  Manual backup output
+
+The container exposes:
+
+  127.0.0.1:8080 -> BounceCast web/admin/API
+  0.0.0.0:1935   -> RTMP ingest
+
+The web port is bound to localhost only because Plesk/nginx should be the
+public HTTPS reverse proxy. The RTMP port is public because OBS needs to connect
+directly.
+
+
+Step 1 - Confirm server and Plesk versions
+==========================================
+
+SSH into the server:
+
+  ssh root@YOUR_SERVER_IP
+
+Check Debian:
+
+  cat /etc/os-release
+
+You should see Debian 13 / trixie.
+
+Check Plesk:
+
+  plesk version
+
+Update Plesk before installing production services:
+
+  plesk installer update
+
+Then reboot if the system or Plesk update asks for it:
+
+  reboot
+
+
+Step 2 - Install system packages
+================================
+
+Install basic tools:
+
+  apt update
+  apt install -y ca-certificates curl gnupg git ufw jq nano
+
+
+Step 3 - Install Docker Engine and Docker Compose plugin
+========================================================
+
+Remove conflicting distro Docker packages if they exist:
+
+  apt remove -y docker.io docker-compose docker-doc podman-docker containerd runc || true
+
+Add Docker's official Debian apt repository:
+
+  install -m 0755 -d /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+  chmod a+r /etc/apt/keyrings/docker.asc
+
+  tee /etc/apt/sources.list.d/docker.sources >/dev/null <<'EOF'
+Types: deb
+URIs: https://download.docker.com/linux/debian
+Suites: trixie
+Components: stable
+Architectures: amd64
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+
+If your VPS is ARM64, replace `Architectures: amd64` with:
+
+  Architectures: arm64
+
+Install Docker:
+
+  apt update
+  apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+Enable and start Docker:
+
+  systemctl enable --now docker
+  docker run --rm hello-world
+
+
+Step 4 - Create BounceCast directories
+======================================
+
+  mkdir -p /opt/bouncecast/app
+  mkdir -p /opt/bouncecast/compose
+  mkdir -p /var/lib/bouncecast/data
+  mkdir -p /root/bouncecast-backups
+
+
+Step 5 - Clone BounceCast
+=========================
+
+Clone the repository:
+
+  git clone https://github.com/djreload/bouncecast.git /opt/bouncecast/app
+  cd /opt/bouncecast/app
+
+For the current Stars/multi-streamer development branch, use:
+
+  git fetch origin
+  git checkout codex/multi-streamer-dashboard-foundation
+
+For a future stable production branch, replace the checkout command with the
+branch or tag you decide is production-ready, for example:
+
+  git checkout main
+
+
+Step 6 - Create the Docker Compose file
+=======================================
+
+Create:
+
+  nano /opt/bouncecast/compose/compose.yaml
+
+Paste:
+
+  services:
+    bouncecast:
+      build:
+        context: /opt/bouncecast/app
+      image: bouncecast:live
+      container_name: bouncecast
+      restart: unless-stopped
+      ports:
+        - "127.0.0.1:8080:8080"
+        - "1935:1935"
+      volumes:
+        - /var/lib/bouncecast/data:/app/data
+
+Save and exit.
+
+
+Step 7 - Build and start BounceCast
+===================================
+
+  cd /opt/bouncecast/compose
+  docker compose build --pull
+  docker compose up -d
+
+Check that it is running:
+
+  docker compose ps
+  docker compose logs --tail=80 bouncecast
+  curl -i http://127.0.0.1:8080/api/status
+
+Expected:
+
+  HTTP/1.1 200 OK
+
+
+Step 8 - Configure firewall and provider firewall
+=================================================
+
+Open only what is needed.
+
+If you use UFW:
+
+  ufw allow 22/tcp
+  ufw allow 80/tcp
+  ufw allow 443/tcp
+  ufw allow 8443/tcp
+  ufw allow 1935/tcp
+  ufw enable
+  ufw status verbose
+
+If Plesk Firewall is installed, also add/confirm these rules in:
+
+  Plesk > Tools & Settings > Firewall
+
+If your VPS provider has a cloud firewall/security group, open the same ports
+there too.
+
+Do not open port 8080 publicly when using Plesk as the HTTPS reverse proxy.
+
+
+Step 9 - Create the Plesk domain or subdomain
+=============================================
+
+In Plesk:
+
+1. Go to Websites & Domains.
+2. Add a domain or subdomain, for example:
+
+     live.example.com
+
+3. Point the DNS A record to the VPS public IP.
+4. Enable SSL/TLS with Let's Encrypt:
+
+     Websites & Domains > live.example.com > SSL/TLS Certificates
+
+5. Enable "Permanent SEO-safe 301 redirect from HTTP to HTTPS" if Plesk offers
+   it.
+
+Wait for DNS to resolve before continuing:
+
+  dig +short live.example.com
+
+
+Step 10 - Reverse proxy the web UI through Plesk
+================================================
+
+Preferred Plesk UI method
+------------------------
+
+If the Plesk Docker extension can see the local BounceCast container:
+
+1. Go to Websites & Domains > live.example.com.
+2. Open Docker Proxy Rules.
+3. Add a rule:
+
+     URL:       /
+     Container: bouncecast
+     Port:      8080
+
+4. Apply changes.
+
+Then test:
+
+  curl -I https://live.example.com/api/status
+
+Manual nginx method if Docker Proxy Rules are not usable
+--------------------------------------------------------
+
+In Plesk:
+
+1. Go to Websites & Domains > live.example.com > Apache & nginx Settings.
+2. Make sure nginx proxy mode is enabled.
+3. In "Additional nginx directives", add:
+
+  location / {
+      proxy_pass http://127.0.0.1:8080;
+      proxy_http_version 1.1;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+      proxy_read_timeout 3600s;
+      proxy_send_timeout 3600s;
+  }
+
+4. Apply changes.
+
+If Plesk reports a duplicate `location /` error, do not force it. Use Docker
+Proxy Rules for `/`, or create a clean subdomain with no conflicting hosting
+content. On some Plesk setups, adding only the websocket location is safer:
+
+  location /ws {
+      proxy_pass http://127.0.0.1:8080/ws;
+      proxy_http_version 1.1;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+      proxy_read_timeout 3600s;
+      proxy_send_timeout 3600s;
+  }
+
+Test nginx before reload if using SSH:
+
+  nginx -t
+  systemctl reload nginx
+
+
+Step 11 - First BounceCast admin login
+======================================
+
+Open:
+
+  https://live.example.com/admin/
+
+On a fresh install, the default admin password may still be:
+
+  abc123
+
+Immediately change it in the admin panel before announcing the server.
+
+Then configure:
+
+- Site name and details.
+- Logo/favicon.
+- Chat settings.
+- Stream keys.
+- Streamer accounts.
+- Schedule.
+- Email/Brevo SMTP settings if used.
+- Stars settings.
+
+
+Step 12 - OBS/RTMP setup
+========================
+
+In OBS:
+
+  Service:    Custom
+  Server:     rtmp://live.example.com/live
+  Stream key: your BounceCast stream key
+
+If you use Cloudflare proxying on live.example.com and RTMP does not connect,
+create a separate DNS-only hostname:
+
+  rtmp.example.com -> VPS public IP
+
+Then use:
+
+  rtmp://rtmp.example.com/live
+
+Make sure TCP 1935 is open in the VPS firewall and provider firewall.
+
+
+Step 13 - PayPal Stars setup
+============================
+
+In BounceCast admin:
+
+  https://live.example.com/admin/stars/
+
+Configure:
+
+- Enable Stars.
+- PayPal environment: sandbox or live.
+- PayPal client ID.
+- PayPal client secret.
+- PayPal webhook ID.
+- Currency, normally GBP.
+- Star packages.
+- Minimum/maximum send amount.
+- Cooldown.
+- Overlay and sound toggles.
+
+In PayPal Developer Dashboard:
+
+1. Create or open the PayPal REST app for the matching environment.
+2. Add a webhook URL:
+
+     https://live.example.com/api/stars/paypal/webhook
+
+3. Subscribe to at least:
+
+     CHECKOUT.ORDER.APPROVED
+     PAYMENT.CAPTURE.COMPLETED
+     PAYMENT.CAPTURE.DENIED
+     PAYMENT.CAPTURE.DECLINED
+     PAYMENT.CAPTURE.REFUNDED
+     PAYMENT.CAPTURE.REVERSED
+
+4. Copy the webhook ID into BounceCast admin.
+
+Test public Stars config:
+
+  curl -s https://live.example.com/api/stars/config | jq
+
+Never put PayPal client secrets in Git, Docker Compose files, screenshots, or
+support tickets.
+
+
+Step 14 - Email and live notification setup
+===========================================
+
+If using Brevo SMTP relay:
+
+1. In Brevo, create SMTP credentials.
+2. In BounceCast admin, configure the email sender.
+3. Use the SMTP host, port, username, and SMTP key from Brevo.
+4. Send a test notification.
+
+Recommended DNS records for email deliverability:
+
+- SPF record including Brevo.
+- DKIM records from Brevo.
+- DMARC record.
+
+These records are managed in Plesk DNS or your external DNS provider.
+
+
+Step 15 - Operational commands
+==============================
+
+View status:
+
+  cd /opt/bouncecast/compose
+  docker compose ps
+
+View logs:
+
+  cd /opt/bouncecast/compose
+  docker compose logs -f --tail=200 bouncecast
+
+Restart:
+
+  cd /opt/bouncecast/compose
+  docker compose restart bouncecast
+
+Stop:
+
+  cd /opt/bouncecast/compose
+  docker compose stop
+
+Start:
+
+  cd /opt/bouncecast/compose
+  docker compose up -d
+
+Shell into container:
+
+  docker exec -it bouncecast sh
+
+
+Step 16 - Backups
+=================
+
+The important live data is:
+
+  /var/lib/bouncecast/data
+
+For a consistent manual backup:
+
+  cd /opt/bouncecast/compose
+  docker compose stop
+  tar -C /var/lib/bouncecast -czf /root/bouncecast-backups/bouncecast-data-$(date +%F-%H%M).tar.gz data
+  docker compose up -d
+
+List backups:
+
+  ls -lh /root/bouncecast-backups
+
+Restore from backup:
+
+  cd /opt/bouncecast/compose
+  docker compose stop
+  mv /var/lib/bouncecast/data /var/lib/bouncecast/data.broken.$(date +%F-%H%M)
+  mkdir -p /var/lib/bouncecast
+  tar -C /var/lib/bouncecast -xzf /root/bouncecast-backups/YOUR_BACKUP_FILE.tar.gz
+  docker compose up -d
+
+Also configure Plesk/server backups if available, but do not rely only on Plesk
+website file backups unless they include /var/lib/bouncecast/data.
+
+
+Step 17 - Updating BounceCast
+=============================
+
+Before updating, take a backup.
+
+  cd /opt/bouncecast/compose
+  docker compose stop
+  tar -C /var/lib/bouncecast -czf /root/bouncecast-backups/bouncecast-data-before-update-$(date +%F-%H%M).tar.gz data
+  docker compose up -d
+
+Pull code:
+
+  cd /opt/bouncecast/app
+  git fetch origin
+  git checkout codex/multi-streamer-dashboard-foundation
+  git pull --ff-only
+
+Rebuild and restart:
+
+  cd /opt/bouncecast/compose
+  docker compose build --pull
+  docker compose up -d
+
+Verify:
+
+  curl -i http://127.0.0.1:8080/api/status
+  curl -I https://live.example.com/api/status
+  docker compose logs --tail=80 bouncecast
+
+
+Step 18 - Troubleshooting
+=========================
+
+Container will not start
+------------------------
+
+  cd /opt/bouncecast/compose
+  docker compose logs --tail=200 bouncecast
+
+Check if ports are already in use:
+
+  ss -ltnp | grep -E ':8080|:1935'
+
+Web domain gives 502/504
+------------------------
+
+Check local app:
+
+  curl -i http://127.0.0.1:8080/api/status
+
+Check Plesk/nginx:
+
+  nginx -t
+  systemctl status nginx --no-pager
+  tail -n 100 /var/log/nginx/error.log
+
+Admin page loads but chat does not update
+-----------------------------------------
+
+This is usually websocket proxying. Make sure `/ws` is proxied with:
+
+  proxy_http_version 1.1;
+  proxy_set_header Upgrade $http_upgrade;
+  proxy_set_header Connection "upgrade";
+  proxy_read_timeout 3600s;
+
+OBS cannot connect
+------------------
+
+Check RTMP port:
+
+  ss -ltnp | grep ':1935'
+
+From another machine:
+
+  nc -vz live.example.com 1935
+
+If using Cloudflare, make sure the RTMP hostname is DNS-only.
+
+PayPal purchases work but webhooks do not
+-----------------------------------------
+
+Check:
+
+  curl -i https://live.example.com/api/stars/config
+
+The webhook URL must be:
+
+  https://live.example.com/api/stars/paypal/webhook
+
+If the domain points to another project or tunnel, PayPal will never reach
+BounceCast.
+
+Docker build fails on small VPS
+-------------------------------
+
+The Go build can use memory. If the VPS has 1 GB RAM, add swap:
+
+  fallocate -l 2G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo '/swapfile none swap sw 0 0' >> /etc/fstab
+
+Then rebuild:
+
+  cd /opt/bouncecast/compose
+  docker compose build
+
+
+Production checklist
+====================
+
+- DNS points to the VPS.
+- HTTPS works through Plesk.
+- `/api/status` works over HTTPS.
+- `/ws` websocket works.
+- RTMP port 1935 is open.
+- Admin password changed from default.
+- Stream keys reviewed.
+- PayPal sandbox tested before live mode.
+- PayPal webhook URL points at BounceCast.
+- Email/Brevo sending tested.
+- Backups tested.
+- Docker restart policy is enabled.
+- Plesk and Debian updates are scheduled.
+- You know where logs and backups are.
+
+
+Useful references
+=================
+
+Plesk Debian 13 support:
+https://docs.plesk.com/release-notes/obsidian/system-requirements/
+
+Plesk Docker extension and proxy rules:
+https://docs.plesk.com/en-US/obsidian/administrator-guide/plesk-administration/using-docker.75823/
+
+Docker Engine on Debian:
+https://docs.docker.com/engine/install/debian/
+
+BounceCast repository:
+https://github.com/djreload/bouncecast
+
