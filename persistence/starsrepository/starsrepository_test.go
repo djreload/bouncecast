@@ -80,8 +80,12 @@ func TestSendingStarsDeductsAndPreventsNegativeBalance(t *testing.T) {
 	if _, _, err = repository.CompletePayPalOrder("ORDER-2", "CAPTURE-2", "PAYER-1", "COMPLETED"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = repository.SendStars("user-1", "Kevin", 25, "Big up", "sparkle"); err != nil {
+	sendEvent, err := repository.SendStars("user-1", "Kevin", 25, "Big up", "sparkle")
+	if err != nil {
 		t.Fatal(err)
+	}
+	if sendEvent.Amount != 25 || sendEvent.UserID != "user-1" || sendEvent.Effect != "sparkle" || sendEvent.CreatedAt.IsZero() {
+		t.Fatalf("unexpected send event: %+v", sendEvent)
 	}
 	if _, err = repository.SendStars("user-1", "Kevin", pkg.StarAmount, "Too much", "sparkle"); err == nil {
 		t.Fatal("expected insufficient balance to fail")
@@ -93,6 +97,26 @@ func TestSendingStarsDeductsAndPreventsNegativeBalance(t *testing.T) {
 	}
 	if summary.Wallet.Balance != pkg.StarAmount-25 || summary.Wallet.LifetimeSent != 25 {
 		t.Fatalf("wallet send state incorrect: %+v", summary.Wallet)
+	}
+}
+
+func TestAdminAdjustmentReturnsUpdatedWallet(t *testing.T) {
+	repository := newTestRepository(t)
+
+	wallet, err := repository.AdminAdjustWallet("user-1", 100, "test credit")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wallet.Balance != 100 || wallet.LifetimePurchased != 100 || wallet.UpdatedAt.IsZero() {
+		t.Fatalf("unexpected adjusted wallet: %+v", wallet)
+	}
+
+	wallet, err = repository.AdminAdjustWallet("user-1", -25, "test debit")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wallet.Balance != 75 || wallet.LifetimePurchased != 100 {
+		t.Fatalf("unexpected debited wallet: %+v", wallet)
 	}
 }
 

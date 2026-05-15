@@ -425,6 +425,7 @@ func (r *SqlRepository) SendStars(userID string, displayName string, amount int,
 	if effect == "" {
 		effect = "sparkle"
 	}
+	createdAt := time.Now().UTC()
 
 	r.datastore.DbLock.Lock()
 	defer r.datastore.DbLock.Unlock()
@@ -445,12 +446,13 @@ func (r *SqlRepository) SendStars(userID string, displayName string, amount int,
 	nextBalance := wallet.Balance - amount
 
 	result, err := tx.Exec(
-		"INSERT INTO star_send_events(user_id, display_name, amount, message, effect) VALUES(?, ?, ?, ?, ?)",
+		"INSERT INTO star_send_events(user_id, display_name, amount, message, effect, created_at) VALUES(?, ?, ?, ?, ?, ?)",
 		userID,
 		displayName,
 		amount,
 		nullableString(message),
 		effect,
+		createdAt,
 	)
 	if err != nil {
 		return models.StarSendEvent{}, err
@@ -474,7 +476,15 @@ func (r *SqlRepository) SendStars(userID string, displayName string, amount int,
 		return models.StarSendEvent{}, err
 	}
 
-	return r.getSendEvent(sendID)
+	return models.StarSendEvent{
+		ID:          sendID,
+		UserID:      userID,
+		DisplayName: displayName,
+		Amount:      amount,
+		Message:     message,
+		Effect:      effect,
+		CreatedAt:   createdAt,
+	}, nil
 }
 
 func (r *SqlRepository) GetLastSendTime(userID string) (*time.Time, error) {
@@ -490,6 +500,8 @@ func (r *SqlRepository) GetLastSendTime(userID string) (*time.Time, error) {
 }
 
 func (r *SqlRepository) AdminAdjustWallet(userID string, amount int, notes string) (models.StarWallet, error) {
+	updatedAt := time.Now().UTC()
+
 	r.datastore.DbLock.Lock()
 	defer r.datastore.DbLock.Unlock()
 
@@ -507,11 +519,15 @@ func (r *SqlRepository) AdminAdjustWallet(userID string, amount int, notes strin
 	if nextBalance < 0 {
 		return models.StarWallet{}, errors.New("wallet balance cannot be negative")
 	}
+	lifetimePurchased := wallet.LifetimePurchased
+	if amount > 0 {
+		lifetimePurchased += amount
+	}
 	if _, err := tx.Exec(
-		"UPDATE star_wallets SET balance=?, lifetime_purchased=lifetime_purchased+CASE WHEN ? > 0 THEN ? ELSE 0 END, updated_at=CURRENT_TIMESTAMP WHERE user_id=?",
+		"UPDATE star_wallets SET balance=?, lifetime_purchased=?, updated_at=? WHERE user_id=?",
 		nextBalance,
-		amount,
-		amount,
+		lifetimePurchased,
+		updatedAt,
 		userID,
 	); err != nil {
 		return models.StarWallet{}, err
@@ -523,11 +539,14 @@ func (r *SqlRepository) AdminAdjustWallet(userID string, amount int, notes strin
 		return models.StarWallet{}, err
 	}
 
-	summary, err := r.GetWalletSummary(userID)
-	if err != nil {
-		return models.StarWallet{}, err
-	}
-	return summary.Wallet, nil
+	return models.StarWallet{
+		UserID:            userID,
+		Balance:           nextBalance,
+		LifetimePurchased: lifetimePurchased,
+		LifetimeSent:      wallet.LifetimeSent,
+		CreatedAt:         wallet.CreatedAt,
+		UpdatedAt:         updatedAt,
+	}, nil
 }
 
 func (r *SqlRepository) RecordWebhookEvent(eventID string, eventType string, resourceID string, status string, errText string) error {
