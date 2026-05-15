@@ -166,6 +166,19 @@ interface FetchOptions {
   auth?: boolean;
 }
 
+function getCredentialSafeFetchURL(url: string): string {
+  if (typeof window === 'undefined') {
+    return url;
+  }
+
+  const safeBaseURL = `${window.location.protocol}//${window.location.host}`;
+  const requestURL = new URL(url, safeBaseURL);
+  requestURL.username = '';
+  requestURL.password = '';
+
+  return requestURL.toString();
+}
+
 export async function fetchData(url: string, options?: FetchOptions) {
   const { data, method = 'GET', auth = true } = options || {};
 
@@ -190,7 +203,7 @@ export async function fetchData(url: string, options?: FetchOptions) {
   }
   requestOptions.headers = headers;
 
-  const response = await fetch(url, requestOptions);
+  const response = await fetch(getCredentialSafeFetchURL(url), requestOptions);
   const json = await response.json();
 
   if (!response.ok) {
@@ -229,7 +242,7 @@ export async function fetchStudioData(url: string, token?: string, options?: Fet
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(url, requestOptions);
+  const response = await fetch(getCredentialSafeFetchURL(url), requestOptions);
   const json = await response.json();
   if (!response.ok) {
     const message = json.message || json.error || `An error has occurred: ${response.status}`;

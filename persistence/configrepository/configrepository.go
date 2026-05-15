@@ -69,6 +69,12 @@ type ConfigRepository interface {
 	GetChatSlurFilterEnabled() bool
 	SetChatRequireAuthentication(enabled bool) error
 	GetChatRequireAuthentication() bool
+	SetChatBackgroundImageURL(imageURL string) error
+	GetChatBackgroundImageURL() string
+	SetChatBackgroundOpacity(opacity float64) error
+	GetChatBackgroundOpacity() float64
+	SetChatTenorAPIKey(apiKey string) error
+	GetChatTenorAPIKey() string
 	GetExternalActions() []models.ExternalAction
 	SetExternalActions(actions []models.ExternalAction) error
 	SetCustomStyles(styles string) error

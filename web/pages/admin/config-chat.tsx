@@ -1,5 +1,6 @@
-import { Col, Row, Typography } from 'antd';
+import { Button, Col, Row, Slider, Typography } from 'antd';
 import React, { ReactElement, useContext, useEffect, useState } from 'react';
+import { FormStatusIndicator } from '../../components/admin/FormStatusIndicator';
 import { TEXTFIELD_TYPE_TEXTAREA } from '../../components/admin/TextField';
 import { TextFieldWithSubmit } from '../../components/admin/TextFieldWithSubmit';
 import { ToggleSwitch } from '../../components/admin/ToggleSwitch';
@@ -14,6 +15,7 @@ import {
 import { UpdateArgs } from '../../types/config-section';
 import {
   API_CHAT_FORBIDDEN_USERNAMES,
+  API_CHAT_BACKGROUND_OPACITY,
   API_CHAT_SUGGESTED_USERNAMES,
   FIELD_PROPS_CHAT_JOIN_MESSAGES_ENABLED,
   FIELD_PROPS_ENABLE_CHAT_SLUR_FILTER,
@@ -23,7 +25,9 @@ import {
   postConfigUpdateToAPI,
   RESET_TIMEOUT,
   TEXTFIELD_PROPS_CHAT_FORBIDDEN_USERNAMES,
+  TEXTFIELD_PROPS_CHAT_BACKGROUND_IMAGE_URL,
   TEXTFIELD_PROPS_CHAT_SUGGESTED_USERNAMES,
+  TEXTFIELD_PROPS_CHAT_TENOR_API_KEY,
   TEXTFIELD_PROPS_SERVER_WELCOME_MESSAGE,
   FIELD_PROPS_ENABLE_SPAM_PROTECTION,
 } from '../../utils/config-constants';
@@ -36,6 +40,7 @@ export default function ConfigChat() {
   const [formDataValues, setFormDataValues] = useState(null);
   const [forbiddenUsernameSaveState, setForbiddenUsernameSaveState] = useState<StatusState>(null);
   const [suggestedUsernameSaveState, setSuggestedUsernameSaveState] = useState<StatusState>(null);
+  const [chatOpacitySaveState, setChatOpacitySaveState] = useState<StatusState>(null);
   const serverStatusData = useContext(ServerStatusContext);
   const { serverConfig, setFieldInConfigState } = serverStatusData || {};
 
@@ -49,6 +54,11 @@ export default function ConfigChat() {
     chatSpamProtectionEnabled,
     chatSlurFilterEnabled,
     chatRequireAuthentication,
+    chatCustomization = {
+      backgroundImageUrl: '',
+      backgroundOpacity: 1,
+      tenorApiKey: '',
+    },
   } = serverConfig;
   const { welcomeMessage } = instanceDetails;
 
@@ -56,6 +66,16 @@ export default function ConfigChat() {
     setFormDataValues({
       ...formDataValues,
       [fieldName]: value,
+    });
+  };
+
+  const handleChatCustomizationFieldChange = ({ fieldName, value }: UpdateArgs) => {
+    setFormDataValues({
+      ...formDataValues,
+      chatCustomization: {
+        ...formDataValues.chatCustomization,
+        [fieldName]: value,
+      },
     });
   };
 
@@ -124,6 +144,37 @@ export default function ConfigChat() {
     setSuggestedUsernameSaveState(null);
   }
 
+  function resetChatOpacityState() {
+    setChatOpacitySaveState(null);
+  }
+
+  function saveChatBackgroundOpacity() {
+    postConfigUpdateToAPI({
+      apiPath: API_CHAT_BACKGROUND_OPACITY,
+      data: { value: formDataValues.chatCustomization.backgroundOpacity },
+      onSuccess: () => {
+        setFieldInConfigState({
+          fieldName: 'backgroundOpacity',
+          path: 'chatCustomization',
+          value: formDataValues.chatCustomization.backgroundOpacity,
+        });
+        setChatOpacitySaveState(createInputStatus(STATUS_SUCCESS));
+        setTimeout(resetChatOpacityState, RESET_TIMEOUT);
+      },
+      onError: (message: string) => {
+        setChatOpacitySaveState(createInputStatus(STATUS_ERROR, message));
+        setTimeout(resetChatOpacityState, RESET_TIMEOUT);
+      },
+    });
+  }
+
+  function handleChatBackgroundOpacityChange(value: number) {
+    handleChatCustomizationFieldChange({
+      fieldName: 'backgroundOpacity',
+      value: Number((value / 100).toFixed(2)),
+    });
+  }
+
   function saveSuggestedUsernames() {
     postConfigUpdateToAPI({
       apiPath: API_CHAT_SUGGESTED_USERNAMES,
@@ -176,6 +227,7 @@ export default function ConfigChat() {
       chatSpamProtectionEnabled,
       chatSlurFilterEnabled,
       chatRequireAuthentication,
+      chatCustomization,
     });
   }, [serverConfig]);
 
@@ -262,6 +314,58 @@ export default function ConfigChat() {
               {...FIELD_PROPS_CHAT_REQUIRE_AUTHENTICATION}
               checked={formDataValues.chatRequireAuthentication}
               onChange={handleChatRequireAuthenticationChange}
+            />
+          </div>
+          <br />
+          <div className="form-module">
+            <Title level={3}>Chat Appearance</Title>
+            <TextFieldWithSubmit
+              fieldName="backgroundImageUrl"
+              {...TEXTFIELD_PROPS_CHAT_BACKGROUND_IMAGE_URL}
+              value={formDataValues.chatCustomization.backgroundImageUrl}
+              initialValue={chatCustomization.backgroundImageUrl}
+              onChange={handleChatCustomizationFieldChange}
+            />
+            <div className="formfield-container">
+              <div className="label-side">
+                <label htmlFor="field-chat-background-opacity" className="formfield-label">
+                  Transparency
+                </label>
+              </div>
+              <div className="input-side">
+                <Slider
+                  id="field-chat-background-opacity"
+                  min={0}
+                  max={100}
+                  value={Math.round(formDataValues.chatCustomization.backgroundOpacity * 100)}
+                  tooltip={{ formatter: value => `${value}%` }}
+                  onChange={handleChatBackgroundOpacityChange}
+                />
+                <p className="field-tip">
+                  100% is fully opaque. Lower values make the chat panel more see-through for
+                  overlays.
+                </p>
+                <FormStatusIndicator status={chatOpacitySaveState} />
+                <Button
+                  type="primary"
+                  size="small"
+                  className="submit-button"
+                  onClick={saveChatBackgroundOpacity}
+                  disabled={
+                    formDataValues.chatCustomization.backgroundOpacity ===
+                    chatCustomization.backgroundOpacity
+                  }
+                >
+                  Update
+                </Button>
+              </div>
+            </div>
+            <TextFieldWithSubmit
+              fieldName="tenorApiKey"
+              {...TEXTFIELD_PROPS_CHAT_TENOR_API_KEY}
+              value={formDataValues.chatCustomization.tenorApiKey}
+              initialValue={chatCustomization.tenorApiKey}
+              onChange={handleChatCustomizationFieldChange}
             />
           </div>
         </Col>

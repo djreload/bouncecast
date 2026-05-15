@@ -121,6 +121,12 @@ export interface NotificationsConfig {
   discord: DiscordNotification;
 }
 
+export interface ChatCustomization {
+  backgroundImageUrl: string;
+  backgroundOpacity: number;
+  tenorApiKey: string;
+}
+
 export interface Health {
   healthy: boolean;
   healthyPercentage: number;
@@ -159,6 +165,7 @@ export interface ConfigDetails {
   notifications: NotificationsConfig;
   chatJoinMessagesEnabled: boolean;
   chatEstablishedUserMode: boolean;
+  chatCustomization: ChatCustomization;
   hideViewerCount: boolean;
   disableSearchIndexing: boolean;
 }

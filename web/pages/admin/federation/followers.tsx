@@ -111,7 +111,7 @@ export default function FediverseFollowers() {
       dataIndex: 'image',
       key: 'image',
       width: 90,
-      render: image => <Avatar size={40} src={image || '/img/logo.svg'} />,
+      render: image => <Avatar size={40} src={image || '/logo'} />,
     },
     {
       title: 'Name',

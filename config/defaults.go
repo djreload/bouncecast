@@ -50,7 +50,7 @@ func GetDefaults() Defaults {
 		Name:                 "New BounceCast Server",
 		Summary:              "BounceCast is a self-hosted livestreaming and chat server forked from Owncast, focused on custom branding, creator tools, and future modular streaming features.",
 		ServerWelcomeMessage: "",
-		Logo:                 "logo.svg",
+		Logo:                 "logo.png",
 		AdminPassword:        "abc123",
 		StreamKeys: []generated.StreamKey{
 			{Key: &defaultStreamKey, Comment: &defaultStreamKeyComment},

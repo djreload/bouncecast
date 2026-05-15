@@ -10,6 +10,7 @@ export interface ClientConfig {
   socialHandles: SocialHandle[];
   chatDisabled: boolean;
   chatRequireAuthentication: boolean;
+  chatCustomization: ChatCustomization;
   externalActions: any[];
   customStyles: string;
   appearanceVariables: Map<string, string>;
@@ -22,6 +23,12 @@ export interface ClientConfig {
 
 interface Authentication {
   indieAuthEnabled: boolean;
+}
+
+interface ChatCustomization {
+  backgroundImageUrl: string;
+  backgroundOpacity: number;
+  tenorApiKey: string;
 }
 
 interface Federation {
@@ -57,6 +64,11 @@ export function makeEmptyClientConfig(): ClientConfig {
     socialHandles: [],
     chatDisabled: false,
     chatRequireAuthentication: false,
+    chatCustomization: {
+      backgroundImageUrl: '',
+      backgroundOpacity: 1,
+      tenorApiKey: '',
+    },
     externalActions: [],
     customStyles: '',
     appearanceVariables: new Map(),

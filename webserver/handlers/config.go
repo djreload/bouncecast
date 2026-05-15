@@ -37,6 +37,7 @@ type webConfigResponse struct {
 	ChatDisabled               bool                         `json:"chatDisabled"`
 	ChatSpamProtectionDisabled bool                         `json:"chatSpamProtectionDisabled"`
 	ChatRequireAuthentication  bool                         `json:"chatRequireAuthentication"`
+	ChatCustomization          models.ChatCustomization     `json:"chatCustomization"`
 	NSFW                       bool                         `json:"nsfw"`
 	Authentication             authenticationConfigResponse `json:"authentication"`
 }
@@ -136,14 +137,19 @@ func getConfigResponse() webConfigResponse {
 		ChatDisabled:               configRepository.GetChatDisabled(),
 		ChatSpamProtectionDisabled: configRepository.GetChatSpamProtectionEnabled(),
 		ChatRequireAuthentication:  configRepository.GetChatRequireAuthentication(),
-		ExternalActions:            configRepository.GetExternalActions(),
-		CustomStyles:               configRepository.GetCustomStyles(),
-		MaxSocketPayloadSize:       config.MaxSocketPayloadSize,
-		Federation:                 federationResponse,
-		Notifications:              notificationsResponse,
-		Authentication:             authenticationResponse,
-		AppearanceVariables:        configRepository.GetCustomColorVariableValues(),
-		HideViewerCount:            configRepository.GetHideViewerCount(),
+		ChatCustomization: models.ChatCustomization{
+			BackgroundImageURL: configRepository.GetChatBackgroundImageURL(),
+			BackgroundOpacity:  configRepository.GetChatBackgroundOpacity(),
+			TenorAPIKey:        configRepository.GetChatTenorAPIKey(),
+		},
+		ExternalActions:      configRepository.GetExternalActions(),
+		CustomStyles:         configRepository.GetCustomStyles(),
+		MaxSocketPayloadSize: config.MaxSocketPayloadSize,
+		Federation:           federationResponse,
+		Notifications:        notificationsResponse,
+		Authentication:       authenticationResponse,
+		AppearanceVariables:  configRepository.GetCustomColorVariableValues(),
+		HideViewerCount:      configRepository.GetHideViewerCount(),
 	}
 }
 

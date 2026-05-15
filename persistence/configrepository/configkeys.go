@@ -47,10 +47,14 @@ const (
 	chatSpamProtectionEnabledKey    = "chat_spam_protection_enabled"
 	chatSlurFilterEnabledKey        = "chat_slur_filter_enabled"
 	chatRequireAuthenticationKey    = "chat_require_authentication"
-	notificationsEnabledKey         = "notifications_enabled"
-	discordConfigurationKey         = "discord_configuration"
-	browserPushConfigurationKey     = "browser_push_configuration"
-	browserPushPublicKeyKey         = "browser_push_public_key"
+	chatBackgroundImageURLKey       = "chat_background_image_url"
+	chatBackgroundOpacityKey        = "chat_background_opacity"
+	// nolint:gosec
+	chatTenorAPIKeyKey          = "chat_tenor_api_key"
+	notificationsEnabledKey     = "notifications_enabled"
+	discordConfigurationKey     = "discord_configuration"
+	browserPushConfigurationKey = "browser_push_configuration"
+	browserPushPublicKeyKey     = "browser_push_public_key"
 	// nolint:gosec
 	browserPushPrivateKeyKey             = "browser_push_private_key"
 	hasConfiguredInitialNotificationsKey = "has_configured_initial_notifications"

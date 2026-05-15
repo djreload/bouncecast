@@ -74,6 +74,11 @@ const initialServerConfigState: ConfigDetails = {
   chatRequireAuthentication: false,
   chatJoinMessagesEnabled: true,
   chatEstablishedUserMode: false,
+  chatCustomization: {
+    backgroundImageUrl: '',
+    backgroundOpacity: 1,
+    tenorApiKey: '',
+  },
   hideViewerCount: false,
   disableSearchIndexing: false,
 };

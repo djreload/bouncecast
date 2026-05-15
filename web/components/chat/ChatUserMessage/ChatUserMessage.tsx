@@ -1,4 +1,4 @@
-import { FC, ReactNode } from 'react';
+import { FC, ReactNode, useEffect, useState } from 'react';
 import cn from 'classnames';
 import { Tooltip } from 'antd';
 import { useRecoilValue } from 'recoil';
@@ -7,6 +7,7 @@ import { Interweave } from 'interweave';
 import { UrlMatcher } from 'interweave-autolink';
 import { ChatMessageHighlightMatcher } from './customMatcher';
 import { ChatMessageEmojiMatcher } from './emojiMatcher';
+import { ChatMessageTenorGifMatcher } from './tenorMatcher';
 import styles from './ChatUserMessage.module.scss';
 import { formatTimestamp } from './messageFmt';
 import { ChatMessage } from '../../../interfaces/chat-message.model';
@@ -27,6 +28,30 @@ const ChatModerationActionMenu = dynamic(
     ssr: false,
   },
 );
+
+const reactionOptions = [
+  { emoji: '\u{1F525}', label: 'Fire' },
+  { emoji: '\u{2764}\u{FE0F}', label: 'Heart' },
+  { emoji: '\u{1F602}', label: 'Laugh' },
+  { emoji: '\u{1F44D}', label: 'Thumbs up' },
+  { emoji: '\u{1F622}', label: 'Cry' },
+];
+
+function getReactionStorageKey(messageId: string): string {
+  return `bouncecast-chat-reactions:${messageId}`;
+}
+
+function loadStoredReactions(messageId: string): Record<string, number> {
+  if (typeof window === 'undefined') {
+    return {};
+  }
+
+  try {
+    return JSON.parse(window.localStorage.getItem(getReactionStorageKey(messageId)) || '{}');
+  } catch {
+    return {};
+  }
+}
 
 export type ChatUserMessageProps = {
   message: ChatMessage;
@@ -68,6 +93,8 @@ export const ChatUserMessage: FC<ChatUserMessageProps> = ({
   const { id: messageId, body, user, timestamp } = message;
   const { id: userId, displayName, displayColor } = user;
   const accessToken = useRecoilValue<string>(accessTokenAtom);
+  const [reactions, setReactions] = useState<Record<string, number>>({});
+  const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
 
   const color = `var(--theme-color-users-${displayColor})`;
   const formattedTimestamp = `Sent ${formatTimestamp(timestamp)}`;
@@ -83,6 +110,47 @@ export const ChatUserMessage: FC<ChatUserMessageProps> = ({
     badgeNodes.push(<BotUserBadge key="bot" userColor={displayColor} />);
   }
 
+  useEffect(() => {
+    setReactions(loadStoredReactions(messageId));
+    setReactionPickerOpen(false);
+  }, [messageId]);
+
+  const saveReactions = (nextReactions: Record<string, number>) => {
+    setReactions(nextReactions);
+
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(getReactionStorageKey(messageId), JSON.stringify(nextReactions));
+    }
+  };
+
+  const addReaction = (emoji: string) => {
+    saveReactions({
+      ...reactions,
+      [emoji]: (reactions[emoji] || 0) + 1,
+    });
+    setReactionPickerOpen(false);
+  };
+
+  const handleMessageClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    if (target.closest('a, button')) {
+      return;
+    }
+
+    setReactionPickerOpen(isOpen => !isOpen);
+  };
+
+  const handleMessageKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return;
+    }
+
+    event.preventDefault();
+    setReactionPickerOpen(isOpen => !isOpen);
+  };
+
+  const activeReactions = Object.entries(reactions).filter(([, count]) => count > 0);
+
   return (
     <div
       className={cn(
@@ -97,6 +165,11 @@ export const ChatUserMessage: FC<ChatUserMessageProps> = ({
         })}
         style={{ borderColor: color }}
         title={formattedTimestamp}
+        role="button"
+        tabIndex={0}
+        aria-label={`React to ${displayName}'s message`}
+        onClick={handleMessageClick}
+        onKeyDown={handleMessageKeyDown}
       >
         <div className={styles.background} style={{ color }} />
 
@@ -111,12 +184,38 @@ export const ChatUserMessage: FC<ChatUserMessageProps> = ({
             className={styles.message}
             content={body}
             matchers={[
+              new ChatMessageTenorGifMatcher('tenorGif'),
               new UrlMatcher('url', { customTLDs: ['online'] }),
               new ChatMessageHighlightMatcher('highlight', { highlightString }),
               new ChatMessageEmojiMatcher('emoji', { className: 'emoji' }),
             ]}
           />
         </Tooltip>
+        {reactionPickerOpen && (
+          <div className={styles.reactionTray} aria-label="Message reactions">
+            {reactionOptions.map(reaction => (
+              <button
+                key={reaction.label}
+                type="button"
+                className={styles.reactionButton}
+                aria-label={reaction.label}
+                title={reaction.label}
+                onClick={() => addReaction(reaction.emoji)}
+              >
+                {reaction.emoji}
+              </button>
+            ))}
+          </div>
+        )}
+        {activeReactions.length > 0 && (
+          <div className={styles.reactionSummary} aria-label="Selected reactions">
+            {activeReactions.map(([emoji, count]) => (
+              <span key={emoji} className={styles.reactionPill}>
+                {emoji} {count}
+              </span>
+            ))}
+          </div>
+        )}
         {showModeratorMenu && (
           <div className={styles.modMenuWrapper}>
             <ChatModerationActionMenu

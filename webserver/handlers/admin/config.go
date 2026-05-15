@@ -984,6 +984,98 @@ func SetChatRequireAuthentication(w http.ResponseWriter, r *http.Request) {
 	webutils.WriteSimpleResponse(w, true, "chat authentication requirement changed")
 }
 
+// SetChatBackgroundImageURL will set the optional public chat background image URL.
+func SetChatBackgroundImageURL(w http.ResponseWriter, r *http.Request) {
+	if !requirePOST(w, r) {
+		return
+	}
+
+	configValue, success := getValueFromRequest(w, r)
+	if !success {
+		return
+	}
+
+	value, ok := configValue.Value.(string)
+	if !ok {
+		webutils.WriteSimpleResponse(w, false, "chat background image URL must be a string")
+		return
+	}
+
+	value = strings.TrimSpace(value)
+	if len(value) > 1024 {
+		webutils.WriteSimpleResponse(w, false, "chat background image URL is too long")
+		return
+	}
+
+	configRepository := configrepository.Get()
+	if err := configRepository.SetChatBackgroundImageURL(value); err != nil {
+		webutils.WriteSimpleResponse(w, false, err.Error())
+		return
+	}
+	webutils.WriteSimpleResponse(w, true, "chat background image updated")
+}
+
+// SetChatBackgroundOpacity will set the chat background opacity between 0 and 1.
+func SetChatBackgroundOpacity(w http.ResponseWriter, r *http.Request) {
+	if !requirePOST(w, r) {
+		return
+	}
+
+	configValue, success := getValueFromRequest(w, r)
+	if !success {
+		return
+	}
+
+	value, ok := configValue.Value.(float64)
+	if !ok {
+		webutils.WriteSimpleResponse(w, false, "chat background opacity must be a number")
+		return
+	}
+
+	if value < 0 || value > 1 {
+		webutils.WriteSimpleResponse(w, false, "chat background opacity must be between 0 and 1")
+		return
+	}
+
+	configRepository := configrepository.Get()
+	if err := configRepository.SetChatBackgroundOpacity(value); err != nil {
+		webutils.WriteSimpleResponse(w, false, err.Error())
+		return
+	}
+	webutils.WriteSimpleResponse(w, true, "chat background opacity updated")
+}
+
+// SetChatTenorAPIKey will set the public Tenor browser API key for GIF search.
+func SetChatTenorAPIKey(w http.ResponseWriter, r *http.Request) {
+	if !requirePOST(w, r) {
+		return
+	}
+
+	configValue, success := getValueFromRequest(w, r)
+	if !success {
+		return
+	}
+
+	value, ok := configValue.Value.(string)
+	if !ok {
+		webutils.WriteSimpleResponse(w, false, "Tenor API key must be a string")
+		return
+	}
+
+	value = strings.TrimSpace(value)
+	if len(value) > 255 {
+		webutils.WriteSimpleResponse(w, false, "Tenor API key is too long")
+		return
+	}
+
+	configRepository := configrepository.Get()
+	if err := configRepository.SetChatTenorAPIKey(value); err != nil {
+		webutils.WriteSimpleResponse(w, false, err.Error())
+		return
+	}
+	webutils.WriteSimpleResponse(w, true, "Tenor API key updated")
+}
+
 func requirePOST(w http.ResponseWriter, r *http.Request) bool {
 	if r.Method != http.MethodPost {
 		webutils.WriteSimpleResponse(w, false, r.Method+" not supported")

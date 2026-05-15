@@ -2,6 +2,7 @@ import { Virtuoso } from 'react-virtuoso';
 import { useState, useMemo, useRef, CSSProperties, FC, useEffect } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { Interweave } from 'interweave';
+import { useRecoilValue } from 'recoil';
 import {
   ConnectedClientInfoEvent,
   FediverseEvent,
@@ -22,6 +23,8 @@ import { ChatSocialMessage } from '../ChatSocialMessage/ChatSocialMessage';
 import { ChatNameChangeMessage } from '../ChatNameChangeMessage/ChatNameChangeMessage';
 import { User } from '../../../interfaces/user.model';
 import { ComponentError } from '../../ui/ComponentError/ComponentError';
+import { ClientConfig } from '../../../interfaces/client-config.model';
+import { clientConfigStateAtom } from '../../stores/ClientConfigStore';
 
 export type ChatContainerProps = {
   messages: ChatMessage[];
@@ -39,6 +42,28 @@ export type ChatContainerProps = {
 };
 
 let resizeWindowCallback: () => void;
+const defaultChatWidth = 320;
+
+function clampChatOpacity(opacity?: number): number {
+  if (typeof opacity !== 'number' || Number.isNaN(opacity)) {
+    return 1;
+  }
+
+  return Math.min(1, Math.max(0, opacity));
+}
+
+function getSafeBackgroundImage(backgroundImageUrl?: string): string {
+  const trimmedURL = backgroundImageUrl?.trim();
+  if (!trimmedURL) {
+    return 'none';
+  }
+
+  if (!/^(https?:\/\/|\/|data:image\/)/i.test(trimmedURL)) {
+    return 'none';
+  }
+
+  return `url("${trimmedURL.replace(/"/g, '\\"')}")`;
+}
 
 function shouldCollapseMessages(message: ChatMessage, previous: ChatMessage): boolean {
   if (!message || !message.user) {
@@ -95,9 +120,19 @@ export const ChatContainer: FC<ChatContainerProps> = ({
   const chatInputEnabled = inputEnabled !== undefined ? inputEnabled : chatAvailable;
   const [showScrollToBottomButton, setShowScrollToBottomButton] = useState(false);
   const [isAtBottom, setIsAtBottom] = useState(false);
+  const clientConfig = useRecoilValue<ClientConfig>(clientConfigStateAtom);
+  const { chatCustomization } = clientConfig || {};
+  const chatBackgroundOpacity = clampChatOpacity(chatCustomization?.backgroundOpacity);
 
   const chatContainerRef = useRef(null);
   const scrollToBottomDelay = useRef(null);
+  const chatContainerStyle = {
+    ...(desktop ? { width: `${defaultChatWidth}px` } : {}),
+    '--bouncecast-chat-background-image': getSafeBackgroundImage(
+      chatCustomization?.backgroundImageUrl,
+    ),
+    '--bouncecast-chat-background-opacity': chatBackgroundOpacity,
+  } as CSSProperties & Record<string, string | number>;
 
   const collapsedIndexes: boolean[] = [];
   let consecutiveTally: number = 1;
@@ -296,7 +331,6 @@ export const ChatContainer: FC<ChatContainerProps> = ({
     [messages, usernameToHighlight, chatUserId, isModerator, showScrollToBottomButton, isAtBottom],
   );
 
-  const defaultChatWidth: number = 320;
   function clampChatWidth(desired) {
     return Math.max(200, Math.min(window.innerWidth * 0.666, desired));
   }
@@ -367,7 +401,7 @@ export const ChatContainer: FC<ChatContainerProps> = ({
         aria-live="off"
         id="chat-container"
         className={`${styles.chatContainer}${readonly ? ' readonly-chat' : ''}`}
-        style={desktop && { width: `${defaultChatWidth}px` }}
+        style={chatContainerStyle}
       >
         {MessagesTable}
         {showInput && (

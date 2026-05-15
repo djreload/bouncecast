@@ -77,6 +77,13 @@ func Start(enableVerboseLogging bool) error {
 	r.Get("/api/admin/bouncecast/schedule", middleware.RequireAdminAuth(adminhandlers.GetBounceCastSchedule))
 	r.Post("/api/admin/bouncecast/schedule", middleware.RequireAdminAuth(adminhandlers.CreateBounceCastSchedule))
 
+	r.Options("/api/admin/config/chat/backgroundimage", middleware.RequireAdminAuth(adminhandlers.SetChatBackgroundImageURL))
+	r.Post("/api/admin/config/chat/backgroundimage", middleware.RequireAdminAuth(adminhandlers.SetChatBackgroundImageURL))
+	r.Options("/api/admin/config/chat/backgroundopacity", middleware.RequireAdminAuth(adminhandlers.SetChatBackgroundOpacity))
+	r.Post("/api/admin/config/chat/backgroundopacity", middleware.RequireAdminAuth(adminhandlers.SetChatBackgroundOpacity))
+	r.Options("/api/admin/config/chat/tenorapikey", middleware.RequireAdminAuth(adminhandlers.SetChatTenorAPIKey))
+	r.Post("/api/admin/config/chat/tenorapikey", middleware.RequireAdminAuth(adminhandlers.SetChatTenorAPIKey))
+
 	// BounceCast Studio DJ dashboard auth. This is additive and does not replace
 	// the existing Owncast admin authentication path.
 	r.Options("/api/bouncecast/studio/login", handlers.BounceCastStudioOptions)

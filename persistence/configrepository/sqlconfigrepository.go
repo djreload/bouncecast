@@ -572,6 +572,58 @@ func (r *SqlConfigRepository) GetChatRequireAuthentication() bool {
 	return false
 }
 
+// SetChatBackgroundImageURL will set an optional public chat background image.
+func (r *SqlConfigRepository) SetChatBackgroundImageURL(imageURL string) error {
+	return r.datastore.SetString(chatBackgroundImageURLKey, imageURL)
+}
+
+// GetChatBackgroundImageURL will return the optional public chat background image.
+func (r *SqlConfigRepository) GetChatBackgroundImageURL() string {
+	imageURL, err := r.datastore.GetString(chatBackgroundImageURLKey)
+	if err != nil {
+		return ""
+	}
+
+	return imageURL
+}
+
+// SetChatBackgroundOpacity will set the chat panel background opacity.
+func (r *SqlConfigRepository) SetChatBackgroundOpacity(opacity float64) error {
+	return r.datastore.SetNumber(chatBackgroundOpacityKey, opacity)
+}
+
+// GetChatBackgroundOpacity will return the chat panel background opacity.
+func (r *SqlConfigRepository) GetChatBackgroundOpacity() float64 {
+	opacity, err := r.datastore.GetNumber(chatBackgroundOpacityKey)
+	if err != nil {
+		return 1
+	}
+
+	if opacity < 0 {
+		return 0
+	}
+	if opacity > 1 {
+		return 1
+	}
+
+	return opacity
+}
+
+// SetChatTenorAPIKey will set the public Tenor browser API key for GIF search.
+func (r *SqlConfigRepository) SetChatTenorAPIKey(apiKey string) error {
+	return r.datastore.SetString(chatTenorAPIKeyKey, apiKey)
+}
+
+// GetChatTenorAPIKey will return the public Tenor browser API key for GIF search.
+func (r *SqlConfigRepository) GetChatTenorAPIKey() string {
+	apiKey, err := r.datastore.GetString(chatTenorAPIKeyKey)
+	if err != nil {
+		return ""
+	}
+
+	return apiKey
+}
+
 // GetExternalActions will return the registered external actions.
 func (r *SqlConfigRepository) GetExternalActions() []models.ExternalAction {
 	configEntry, err := r.datastore.Get(externalActionsKey)

@@ -9,6 +9,8 @@ $p-v-size: 2px;
   font-size: var(--chat-message-text-size);
   padding: $p-v-size $p-h-size;
   color: var(--theme-color-components-chat-text);
+  text-shadow: 0 1px 8px rgb(0 0 0 / 45%);
+  cursor: pointer;
 
   * {
     z-index: 100;
@@ -69,6 +71,24 @@ $p-v-size: 2px;
         color: var(--theme-color-palette-4);
       }
     }
+
+    :global(.chat-tenor-gif-link) {
+      display: block;
+      width: min(100%, 220px);
+      margin-top: 0.4rem;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid rgb(32 228 255 / 26%);
+      box-shadow: 0 12px 32px rgb(0 0 0 / 24%);
+    }
+
+    :global(.chat-tenor-gif) {
+      display: block;
+      width: 100%;
+      max-height: 180px;
+      object-fit: cover;
+      background: rgb(0 0 0 / 35%);
+    }
   }
 
   &.ownMessage {
@@ -111,6 +131,67 @@ $p-v-size: 2px;
   &:hover .modMenuWrapper {
     display: block;
   }
+}
+
+.reactionTray {
+  display: flex;
+  gap: 0.25rem;
+  width: max-content;
+  max-width: 100%;
+  margin-top: 0.45rem;
+  padding: 0.25rem;
+  border: 1px solid rgb(32 228 255 / 24%);
+  border-radius: 999px;
+  background: rgb(8 11 26 / 88%);
+  box-shadow:
+    0 0 22px rgb(255 54 188 / 20%),
+    0 12px 32px rgb(0 0 0 / 30%);
+}
+
+.reactionButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 7%);
+  cursor: pointer;
+  font-size: 16px;
+  transition:
+    background 120ms ease,
+    transform 120ms ease;
+
+  &:hover,
+  &:focus-visible {
+    background: rgb(255 54 188 / 24%);
+    outline: 1px solid rgb(32 228 255 / 65%);
+    transform: translateY(-1px) scale(1.08);
+  }
+}
+
+.reactionSummary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.35rem;
+}
+
+.reactionPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  min-height: 22px;
+  padding: 0 0.45rem;
+  border: 1px solid rgb(255 54 188 / 28%);
+  border-radius: 999px;
+  color: var(--rave-text);
+  background: rgb(255 255 255 / 7%);
+  box-shadow: 0 0 16px rgb(32 228 255 / 12%);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .messagePadding {

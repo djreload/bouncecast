@@ -67,8 +67,13 @@ func GetServerConfig(w http.ResponseWriter, r *http.Request) {
 		ChatSpamProtectionEnabled: configRepository.GetChatSpamProtectionEnabled(),
 		ChatSlurFilterEnabled:     configRepository.GetChatSlurFilterEnabled(),
 		ChatRequireAuthentication: configRepository.GetChatRequireAuthentication(),
-		HideViewerCount:           configRepository.GetHideViewerCount(),
-		DisableSearchIndexing:     configRepository.GetDisableSearchIndexing(),
+		ChatCustomization: models.ChatCustomization{
+			BackgroundImageURL: configRepository.GetChatBackgroundImageURL(),
+			BackgroundOpacity:  configRepository.GetChatBackgroundOpacity(),
+			TenorAPIKey:        configRepository.GetChatTenorAPIKey(),
+		},
+		HideViewerCount:       configRepository.GetHideViewerCount(),
+		DisableSearchIndexing: configRepository.GetDisableSearchIndexing(),
 		VideoSettings: videoSettings{
 			VideoQualityVariants: videoQualityVariants,
 			LatencyLevel:         configRepository.GetStreamLatencyLevel().Level,
@@ -131,6 +136,7 @@ type serverConfigAdminResponse struct {
 	ChatSpamProtectionEnabled bool                        `json:"chatSpamProtectionEnabled"`
 	ChatSlurFilterEnabled     bool                        `json:"chatSlurFilterEnabled"`
 	ChatRequireAuthentication bool                        `json:"chatRequireAuthentication"`
+	ChatCustomization         models.ChatCustomization    `json:"chatCustomization"`
 	DisableSearchIndexing     bool                        `json:"disableSearchIndexing"`
 	StreamKeyOverridden       bool                        `json:"streamKeyOverridden"`
 	HideViewerCount           bool                        `json:"hideViewerCount"`

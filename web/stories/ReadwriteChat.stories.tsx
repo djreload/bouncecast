@@ -32,6 +32,11 @@ const Page = () => {
   const fakeConfig: ClientConfig = {
     chatDisabled: false,
     chatRequireAuthentication: false,
+    chatCustomization: {
+      backgroundImageUrl: '',
+      backgroundOpacity: 1,
+      tenorApiKey: '',
+    },
     name: 'Fake Owncast Server',
     summary: '',
     logo: '',

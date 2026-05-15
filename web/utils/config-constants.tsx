@@ -42,6 +42,9 @@ const API_CHAT_ESTABLISHED_MODE = '/chat/establishedusermode';
 const API_CHAT_SPAM_PROTECTION_ENABLED = '/chat/spamprotectionenabled';
 const API_CHAT_SLUR_FILTER_ENABLED = '/chat/slurfilterenabled';
 const API_CHAT_REQUIRE_AUTHENTICATION = '/chat/requireauthentication';
+const API_CHAT_BACKGROUND_IMAGE_URL = '/chat/backgroundimage';
+export const API_CHAT_BACKGROUND_OPACITY = '/chat/backgroundopacity';
+const API_CHAT_TENOR_API_KEY = '/chat/tenorapikey';
 const API_DISABLE_SEARCH_INDEXING = '/disablesearchindexing';
 const API_SOCKET_HOST_OVERRIDE = '/sockethostoverride';
 const API_VIDEO_SERVING_ENDPOINT = '/videoservingendpoint';
@@ -308,6 +311,26 @@ export const FIELD_PROPS_CHAT_REQUIRE_AUTHENTICATION = {
   label: 'Require Authentication',
   tip: 'Only users who have authenticated may chat.',
   useSubmit: true,
+};
+
+export const TEXTFIELD_PROPS_CHAT_BACKGROUND_IMAGE_URL = {
+  apiPath: API_CHAT_BACKGROUND_IMAGE_URL,
+  configPath: 'chatCustomization',
+  maxLength: 1024,
+  placeholder: 'https://example.com/background.jpg',
+  label: 'Chat background',
+  tip: 'Optional image URL for the chat backdrop. Leave blank to use the default rave theme.',
+  useTrim: true,
+};
+
+export const TEXTFIELD_PROPS_CHAT_TENOR_API_KEY = {
+  apiPath: API_CHAT_TENOR_API_KEY,
+  configPath: 'chatCustomization',
+  maxLength: 255,
+  placeholder: 'Tenor browser API key',
+  label: 'Tenor GIF API key',
+  tip: 'Optional public Tenor browser key used by viewers to search and post GIF links from chat.',
+  useTrim: true,
 };
 
 export const TEXTFIELD_PROPS_CHAT_FORBIDDEN_USERNAMES = {
