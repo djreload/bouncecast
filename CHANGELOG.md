@@ -35,6 +35,12 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 - Moderator uses the existing Owncast moderator scope, preserving existing chat moderation behavior.
 - Owner/admin/DJ scopes are foundation work and need deeper permission wiring in later passes.
 
+### Deployment
+
+- Deployed the account/roles build to the live Docker/Plesk server for `k-nrg.co.uk`.
+- Verified the live database migrated successfully to version 7.
+- Verified the public status endpoint, `/admin/accounts/`, and the admin BounceCast users API returned HTTP 200.
+
 ## 2026-05-15
 
 ### Added
