@@ -1,0 +1,102 @@
+# BounceCast Changelog
+
+This changelog tracks the BounceCast fork work from the first visible rebrand onward. Keep new user-facing features, backend behavior changes, migrations, deployment notes, and known compatibility risks here as the project evolves.
+
+## Unreleased / Next
+
+- Continue wiring stored BounceCast account roles into real product permissions:
+  - `moderator` already maps to the existing Owncast moderator scope.
+  - `owner`, `admin`, and `dj` are stored and exposed, but do not yet replace Owncast basic admin auth or the Studio DJ login flow.
+- Add rate limiting and abuse protection around public account registration, login, profile updates, Stars checkout, and Stars sending before broader public launch.
+- Add profile image upload/storage support; current public profile images are URL/path based.
+- Continue live VPS deployment notes as production configuration changes.
+
+## 2026-05-17
+
+### Added
+
+- Added public BounceCast account registration and login APIs.
+- Added profile editing for display name and profile image URL.
+- Added a public `Register / Login` entry point in the site user menu.
+- Added chat avatar rendering from registered user profile images.
+- Added admin account management at `/admin/accounts/`.
+- Added configurable user role flags for visitor, owner, admin, moderator, and DJ.
+- Added database migration `00007_bouncecast_user_accounts.sql` for account fields on existing users.
+- Added backend tests for account registration, login, profile updates, and admin role updates.
+
+### Changed
+
+- Updated chat user persistence and chat history reads to carry profile image metadata.
+- Updated the generated static web bundle so Docker serves the account and admin role UI.
+
+### Notes
+
+- Visitor is the default derived role and is not stored as a database scope.
+- Moderator uses the existing Owncast moderator scope, preserving existing chat moderation behavior.
+- Owner/admin/DJ scopes are foundation work and need deeper permission wiring in later passes.
+
+## 2026-05-15
+
+### Added
+
+- Added BounceCast chat customization settings:
+  - Custom chat background.
+  - Chat transparency controls.
+  - Tenor GIF API key configuration.
+  - Clickable emoji reactions on chat messages.
+- Added the BounceCast logo mark and favicon treatment using the heart/disc branding direction.
+- Added the BounceCast Stars support system foundation:
+  - Admin Stars settings.
+  - Configurable star packages.
+  - Ledger-based wallet storage.
+  - PayPal order/capture/webhook storage paths.
+  - Public buy/send Stars UI paths.
+  - Stars overlay event plumbing.
+  - Admin Stars logs.
+- Added Debian 13 plus Plesk live server installation documentation.
+
+### Fixed
+
+- Fixed Stars wallet adjustment locking behavior to protect ledger/balance consistency.
+
+### Notes
+
+- Stars are site-support gifts only. They have no cash value, streamer payout, creator balance, revenue split, or withdrawal dashboard.
+
+## 2026-05-14
+
+### Added
+
+- Added SMTP email notifications for go-live events.
+- Added browser push notifications for stream events.
+- Added Brevo SMTP relay options.
+- Added inactive DJ registration flow so admins can activate DJs.
+- Added Studio dashboard auth foundation.
+- Added DJ Studio dashboard pages.
+- Added Studio schedule management.
+- Added Windows CGO test setup notes/tooling support.
+
+### Changed
+
+- Applied a BounceCast rave-theme pass across public/admin UI.
+- Unified admin pages toward the Studio visual style for cleaner contrast and consistency.
+- Updated project dependencies.
+- Hardened the streamer go-live workflow and modernization foundations.
+
+## 2026-05-13
+
+### Added
+
+- Completed the initial safe visible BounceCast rebrand while preserving Owncast internals.
+- Added repository inspection, branding asset documentation, WSL Debian 13 developer setup documentation, and the BounceCast roadmap.
+- Added the multi-streamer dashboard foundation.
+- Added Studio admin APIs.
+- Added per-streamer RTMP stream keys.
+- Added stream go-live event tracking.
+- Added queued go-live notifications.
+- Added webhook notifications for BounceCast stream events.
+
+### Notes
+
+- Go module paths, import paths, persisted config keys, API route names, migration compatibility, RTMP/HLS internals, and Docker startup behavior were intentionally preserved unless a later task proved a change safe.
+- BounceCast remains an Owncast fork and retains required upstream attribution.
