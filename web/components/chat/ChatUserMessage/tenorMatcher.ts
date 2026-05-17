@@ -7,7 +7,19 @@ export interface ChatMessageTenorGifProps {
   url: string;
 }
 
-const tenorGifURLRegex = /https:\/\/media\d*\.tenor\.com\/[^\s<>()"]+\.gif(?:\?[^\s<>()"]*)?/i;
+const tenorGifURLPattern = String.raw`https:\/\/media\d*\.tenor\.com\/[^\s<>()"]+\.gif(?:\?[^\s<>()"]*)?`;
+const tenorGifURLRegex = new RegExp(tenorGifURLPattern, 'i');
+const tenorGifAnchorRegex = new RegExp(
+  String.raw`<a\b[^>]*href="(${tenorGifURLPattern})"[^>]*>[\s\S]*?<\/a>`,
+  'gi',
+);
+
+export function renderTenorGifEmbeds(content: string): string {
+  return (content || '').replace(tenorGifAnchorRegex, (_match, url) => {
+    const safeUrl = String(url);
+    return `<a class="chat-tenor-gif-link" href="${safeUrl}" target="_blank" rel="noopener noreferrer"><img alt="Tenor GIF" class="chat-tenor-gif" loading="lazy" src="${safeUrl}" /></a>`;
+  });
+}
 
 export class ChatMessageTenorGifMatcher extends Matcher<ChatMessageTenorGifProps> {
   match(str: string): MatchResponse<Partial<ChatMessageTenorGifProps>> | null {

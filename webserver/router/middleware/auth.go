@@ -1,9 +1,15 @@
 package middleware
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/hex"
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/owncast/owncast/models"
 	"github.com/owncast/owncast/persistence/authrepository"
@@ -12,6 +18,10 @@ import (
 	"github.com/owncast/owncast/utils"
 	log "github.com/sirupsen/logrus"
 )
+
+const AdminSessionCookieName = "bouncecast_admin_session"
+
+const adminSessionDuration = 30 * 24 * time.Hour
 
 // ExternalAccessTokenHandlerFunc is a function that is called after validing access.
 type ExternalAccessTokenHandlerFunc func(models.ExternalAPIUser, http.ResponseWriter, *http.Request)
@@ -41,10 +51,7 @@ func RequireAdminAuth(handler http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		user, pass, ok := r.BasicAuth()
-
-		// Failed
-		if !ok || subtle.ConstantTimeCompare([]byte(user), []byte(username)) != 1 || utils.CompareHash(password, pass) != nil {
+		if !isValidAdminBasicAuth(r, username, password) && !isValidAdminSessionCookie(r, password) {
 			w.Header().Set("WWW-Authenticate", `Basic realm="`+realm+`"`)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			log.Debugln("Failed admin authentication")
@@ -53,6 +60,64 @@ func RequireAdminAuth(handler http.HandlerFunc) http.HandlerFunc {
 
 		handler(w, r)
 	}
+}
+
+func CheckAdminCredentials(username string, plainPassword string) bool {
+	adminPasswordHash := configrepository.Get().GetAdminPassword()
+	return subtle.ConstantTimeCompare([]byte(strings.TrimSpace(username)), []byte("admin")) == 1 &&
+		utils.CompareHash(adminPasswordHash, plainPassword) == nil
+}
+
+func SetAdminSessionCookie(w http.ResponseWriter, r *http.Request) {
+	adminPasswordHash := configrepository.Get().GetAdminPassword()
+	expiresAt := time.Now().Add(adminSessionDuration)
+	expiresUnix := expiresAt.Unix()
+	payload := strconv.FormatInt(expiresUnix, 10)
+	signature := signAdminSession(payload, adminPasswordHash)
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     AdminSessionCookieName,
+		Value:    payload + "." + signature,
+		Path:     "/",
+		Expires:  expiresAt,
+		MaxAge:   int(adminSessionDuration.Seconds()),
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   r.TLS != nil,
+	})
+}
+
+func isValidAdminBasicAuth(r *http.Request, username string, passwordHash string) bool {
+	user, pass, ok := r.BasicAuth()
+	return ok &&
+		subtle.ConstantTimeCompare([]byte(user), []byte(username)) == 1 &&
+		utils.CompareHash(passwordHash, pass) == nil
+}
+
+func isValidAdminSessionCookie(r *http.Request, adminPasswordHash string) bool {
+	cookie, err := r.Cookie(AdminSessionCookieName)
+	if err != nil {
+		return false
+	}
+
+	parts := strings.Split(cookie.Value, ".")
+	if len(parts) != 2 {
+		return false
+	}
+
+	expiresUnix, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil || time.Now().Unix() > expiresUnix {
+		return false
+	}
+
+	expectedSignature := signAdminSession(parts[0], adminPasswordHash)
+	return hmac.Equal([]byte(parts[1]), []byte(expectedSignature))
+}
+
+func signAdminSession(payload string, adminPasswordHash string) string {
+	mac := hmac.New(sha256.New, []byte(adminPasswordHash))
+	_, _ = mac.Write([]byte(fmt.Sprintf("bouncecast-admin-session:%s", payload)))
+	return hex.EncodeToString(mac.Sum(nil))
 }
 
 func accessDenied(w http.ResponseWriter) {

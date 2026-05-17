@@ -7,7 +7,7 @@ import { Interweave } from 'interweave';
 import { UrlMatcher } from 'interweave-autolink';
 import { ChatMessageHighlightMatcher } from './customMatcher';
 import { ChatMessageEmojiMatcher } from './emojiMatcher';
-import { ChatMessageTenorGifMatcher } from './tenorMatcher';
+import { ChatMessageTenorGifMatcher, renderTenorGifEmbeds } from './tenorMatcher';
 import styles from './ChatUserMessage.module.scss';
 import { formatTimestamp } from './messageFmt';
 import { ChatMessage } from '../../../interfaces/chat-message.model';
@@ -162,7 +162,7 @@ export const ChatUserMessage: FC<ChatUserMessageProps> = ({
         <Tooltip mouseEnterDelay={1}>
           <Interweave
             className={styles.message}
-            content={body}
+            content={renderTenorGifEmbeds(body)}
             matchers={[
               new ChatMessageTenorGifMatcher('tenorGif'),
               new UrlMatcher('url', { customTLDs: ['online'] }),

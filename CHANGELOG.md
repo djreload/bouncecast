@@ -18,16 +18,27 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 - Added public BounceCast account registration and login APIs.
 - Added profile editing for display name and profile image URL.
 - Added a public `Register / Login` entry point in the site user menu.
+- Added a unified `/login` page for DJ/streamer and admin sign-in:
+  - Admin credentials create a browser session and redirect to `/admin/`.
+  - DJ/streamer credentials create a Studio session and redirect to `/studio`.
 - Added chat avatar rendering from registered user profile images.
 - Added admin account management at `/admin/accounts/`.
 - Added configurable user role flags for visitor, owner, admin, moderator, and DJ.
 - Added database migration `00007_bouncecast_user_accounts.sql` for account fields on existing users.
+- Added database migration `00008_bouncecast_single_chat_reaction.sql` to enforce one reaction per user per chat message.
 - Added backend tests for account registration, login, profile updates, and admin role updates.
 
 ### Changed
 
 - Updated chat user persistence and chat history reads to carry profile image metadata.
+- Updated Tenor GIF chat picks so selected GIFs render inline instead of appearing as plain links.
+- Updated Stars chat messages and live overlay effects so sent Stars show a clearer message, queued overlay animation, and matching effect styling.
 - Updated the generated static web bundle so Docker serves the account and admin role UI.
+
+### Fixed
+
+- Fixed chat reactions so one user can only select one reaction on a message; picking a different reaction switches it, and picking the same reaction clears it.
+- Fixed Stars overlay delivery in test and early-start paths so sending Stars cannot panic if the chat server has not started yet.
 
 ### Notes
 

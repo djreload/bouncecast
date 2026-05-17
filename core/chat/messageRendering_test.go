@@ -50,6 +50,17 @@ func TestAllowEmojiImages(t *testing.T) {
 	}
 }
 
+// Test to make sure selected Tenor GIFs render as images while other remote images stay blocked.
+func TestAllowTenorGifImages(t *testing.T) {
+	messageContent := `![Tenor GIF](https://media.tenor.com/example/tenor.gif)`
+	expected := `<p><img src="https://media.tenor.com/example/tenor.gif" alt="Tenor GIF"></p>`
+	result := events.RenderAndSanitize(messageContent)
+
+	if result != expected {
+		t.Errorf("message rendering/sanitation does not match expected.  Got\n%s, \n\n want:\n%s", result, expected)
+	}
+}
+
 // Test to verify we can pass raw html and render markdown.
 func TestAllowHTML(t *testing.T) {
 	messageContent := `<img src="/img/emoji/beerparrot.gif"><ul><li>**test thing**</li></ul>`

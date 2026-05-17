@@ -206,7 +206,7 @@ export const ChatTextField: FC<ChatTextFieldProps> = ({
 
   const onGifSelect = (url: string) => {
     const prefix = getTextContent(contentEditable).length > 0 ? ' ' : '';
-    insertPlainTextAtEnd(`${prefix}${url} `);
+    insertPlainTextAtEnd(`${prefix}![Tenor GIF](${url}) `);
     setGifPopoverOpen(false);
   };
 

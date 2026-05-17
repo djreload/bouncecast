@@ -118,6 +118,9 @@ func Start(enableVerboseLogging bool) error {
 	r.Options("/api/bouncecast/studio/live-events", handlers.BounceCastStudioOptions)
 	r.Get("/api/bouncecast/studio/live-events", handlers.BounceCastStudioLiveEvents)
 
+	r.Options("/api/bouncecast/admin/login", handlers.BounceCastAdminLogin)
+	r.Post("/api/bouncecast/admin/login", handlers.BounceCastAdminLogin)
+
 	r.Options("/api/bouncecast/account/register", handlers.BounceCastAccountOptions)
 	r.Post("/api/bouncecast/account/register", handlers.BounceCastAccountRegister)
 	r.Options("/api/bouncecast/account/login", handlers.BounceCastAccountOptions)

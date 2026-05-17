@@ -577,32 +577,35 @@ func (r *SqlChatMessageRepository) ToggleMessageReaction(messageID string, userI
 		return nil, err
 	}
 
-	var existingReactionCount int
+	var existingReaction string
 	err = tx.QueryRow(
-		"SELECT COUNT(*) FROM chat_message_reactions WHERE message_id = ? AND user_id = ? AND reaction = ?",
+		"SELECT reaction FROM chat_message_reactions WHERE message_id = ? AND user_id = ? LIMIT 1",
 		messageID,
 		userID,
-		reaction,
-	).Scan(&existingReactionCount)
-	if err != nil {
+	).Scan(&existingReaction)
+	if errors.Is(err, sql.ErrNoRows) {
+		existingReaction = ""
+	} else if err != nil {
 		return nil, err
 	}
 
-	if existingReactionCount > 0 {
-		if _, err = tx.Exec(
-			"DELETE FROM chat_message_reactions WHERE message_id = ? AND user_id = ? AND reaction = ?",
+	if _, err = tx.Exec(
+		"DELETE FROM chat_message_reactions WHERE message_id = ? AND user_id = ?",
+		messageID,
+		userID,
+	); err != nil {
+		return nil, err
+	}
+
+	if existingReaction != reaction {
+		_, err = tx.Exec(
+			"INSERT INTO chat_message_reactions(message_id, user_id, reaction) VALUES(?, ?, ?)",
 			messageID,
 			userID,
 			reaction,
-		); err != nil {
-			return nil, err
-		}
-	} else if _, err = tx.Exec(
-		"INSERT INTO chat_message_reactions(message_id, user_id, reaction) VALUES(?, ?, ?)",
-		messageID,
-		userID,
-		reaction,
-	); err != nil {
+		)
+	}
+	if err != nil {
 		return nil, err
 	}
 

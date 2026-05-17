@@ -247,7 +247,8 @@ func RenderMarkdown(raw string) string {
 
 var (
 	_sanitizeReSrcMatch    = regexp.MustCompile(`(?i)^/img/emoji/[^\.%]*.[A-Z]*$`)
-	_sanitizeReClassMatch  = regexp.MustCompile(`(?i)^(emoji)[A-Z_]*?$`)
+	_sanitizeReTenorMatch  = regexp.MustCompile(`(?i)^https://media\d*\.tenor\.com/[^\s<>()"]+\.gif(?:\?[^\s<>()"]*)?$`)
+	_sanitizeReClassMatch  = regexp.MustCompile(`(?i)^(emoji|chat-tenor-gif)[A-Z_-]*?$`)
 	_sanitizeNonEmptyMatch = regexp.MustCompile(`^.+$`)
 )
 
@@ -272,8 +273,9 @@ func sanitize(raw string) string {
 
 	p.AllowElements("p")
 
-	// Allow img tags from the the local emoji directory only
+	// Allow image tags only for local custom emoji and Tenor GIF picks.
 	p.AllowAttrs("src").Matching(_sanitizeReSrcMatch).OnElements("img")
+	p.AllowAttrs("src").Matching(_sanitizeReTenorMatch).OnElements("img")
 	p.AllowAttrs("alt", "title").Matching(_sanitizeNonEmptyMatch).OnElements("img")
 	p.AllowAttrs("class").Matching(_sanitizeReClassMatch).OnElements("img")
 

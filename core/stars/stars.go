@@ -269,7 +269,7 @@ func (s *Service) SendStars(user models.User, amount int, message string, effect
 		return models.StarSendEvent{}, err
 	}
 
-	chatLine := fmt.Sprintf("%s sent %d Stars", user.DisplayName, amount)
+	chatLine := fmt.Sprintf("%s sent %d Stars ⭐", user.DisplayName, amount)
 	if message != "" {
 		chatLine += " - " + message
 	}

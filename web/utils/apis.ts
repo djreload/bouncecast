@@ -178,6 +178,8 @@ export const BOUNCECAST_STUDIO_STREAM_KEY_REVOKE = `${STUDIO_API_LOCATION}stream
 
 export const BOUNCECAST_STUDIO_LIVE_EVENTS = `${STUDIO_API_LOCATION}live-events`;
 
+export const BOUNCECAST_ADMIN_LOGIN = `${NEXT_PUBLIC_API_HOST}api/bouncecast/admin/login`;
+
 const ACCOUNT_API_LOCATION = `${NEXT_PUBLIC_API_HOST}api/bouncecast/account/`;
 
 export const BOUNCECAST_ACCOUNT_REGISTER = `${ACCOUNT_API_LOCATION}register`;

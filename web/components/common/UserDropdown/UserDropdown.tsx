@@ -30,6 +30,10 @@ const LockOutlined = dynamic(() => import('@ant-design/icons/LockOutlined'), {
   ssr: false,
 });
 
+const DashboardOutlined = dynamic(() => import('@ant-design/icons/DashboardOutlined'), {
+  ssr: false,
+});
+
 const ShrinkOutlined = dynamic(() => import('@ant-design/icons/ShrinkOutlined'), {
   ssr: false,
 });
@@ -163,12 +167,20 @@ export const UserDropdown: FC<UserDropdownProps> = ({
     },
     {
       key: 1,
+      icon: <DashboardOutlined />,
+      label: 'Dashboard login',
+      onClick: () => {
+        window.location.href = '/login';
+      },
+    },
+    {
+      key: 2,
       icon: <EditOutlined />,
       label: 'Change name',
       onClick: handleChangeName,
     },
     {
-      key: 2,
+      key: 3,
       icon: <LockOutlined />,
       label: 'Indie/Fediverse auth',
       onClick: () => setShowAuthModal(true),

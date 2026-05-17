@@ -1,4 +1,5 @@
-import { FC, useEffect, useState } from 'react';
+import classNames from 'classnames';
+import { FC, useEffect, useRef, useState } from 'react';
 import { useRecoilValue } from 'recoil';
 import { starsOverlayEventsAtom } from '../stores/ClientConfigStore';
 import { StarsSentSocketEvent } from '../../interfaces/socket-events';
@@ -31,19 +32,39 @@ function playStarSound() {
 export const StarsOverlay: FC = () => {
   const events = useRecoilValue<StarsSentSocketEvent[]>(starsOverlayEventsAtom);
   const [activeEvent, setActiveEvent] = useState<StarsSentSocketEvent>(null);
+  const [queue, setQueue] = useState<StarsSentSocketEvent[]>([]);
+  const seenEventIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    if (!events.length) {
+    const newEvents = events.filter(event => {
+      if (!event.id || seenEventIds.current.has(event.id)) {
+        return false;
+      }
+      seenEventIds.current.add(event.id);
+      return true;
+    });
+
+    if (newEvents.length > 0) {
+      setQueue(currentQueue => [...currentQueue, ...newEvents]);
+    }
+  }, [events]);
+
+  useEffect(() => {
+    if (activeEvent || queue.length === 0) {
       return undefined;
     }
-    const nextEvent = events[events.length - 1];
+
+    const nextEvent = queue[0];
     setActiveEvent(nextEvent);
     if (nextEvent.soundEnabled) {
       playStarSound();
     }
-    const timer = window.setTimeout(() => setActiveEvent(null), 4200);
+    const timer = window.setTimeout(() => {
+      setActiveEvent(null);
+      setQueue(currentQueue => currentQueue.slice(1));
+    }, 4200);
     return () => window.clearTimeout(timer);
-  }, [events]);
+  }, [activeEvent, queue]);
 
   if (!activeEvent) {
     return null;
@@ -51,8 +72,8 @@ export const StarsOverlay: FC = () => {
 
   return (
     <div className={styles.root} aria-live="polite">
-      <div className={styles.toast}>
-        <span className={styles.amount}>{activeEvent.amount} Stars</span>
+      <div className={classNames(styles.toast, styles[activeEvent.effect] || styles.sparkle)}>
+        <span className={styles.amount}>{activeEvent.amount} Stars ⭐</span>
         <span className={styles.sender}>{activeEvent.displayName}</span>
         {activeEvent.message && <p className={styles.message}>{activeEvent.message}</p>}
       </div>

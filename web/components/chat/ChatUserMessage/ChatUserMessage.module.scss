@@ -94,6 +94,18 @@ $p-v-size: 2px;
       box-shadow: 0 12px 32px rgb(0 0 0 / 24%);
     }
 
+    img[src*='tenor.com'] {
+      display: block;
+      width: min(100%, 220px);
+      max-height: 180px;
+      margin-top: 0.4rem;
+      border: 1px solid rgb(32 228 255 / 26%);
+      border-radius: 8px;
+      object-fit: cover;
+      background: rgb(0 0 0 / 35%);
+      box-shadow: 0 12px 32px rgb(0 0 0 / 24%);
+    }
+
     :global(.chat-tenor-gif) {
       display: block;
       width: 100%;

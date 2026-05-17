@@ -179,6 +179,10 @@ func SendSystemMessageToClient(clientID uint, text string) {
 
 // Broadcast will send all connected clients the outbound object provided.
 func Broadcast(event events.OutboundEvent) error {
+	if _server == nil {
+		return errors.New("chat server not started")
+	}
+
 	return _server.Broadcast(event.GetBroadcastPayload())
 }
 
