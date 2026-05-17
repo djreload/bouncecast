@@ -1,0 +1,46 @@
+.accountPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.accountHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.9rem;
+  border: 1px solid rgb(32 228 255 / 18%);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at top left, rgb(255 54 188 / 18%), transparent 36%), rgb(7 10 24 / 76%);
+}
+
+.accountTitle {
+  margin: 0;
+  color: var(--rave-text, #f8fbff);
+  font-weight: 800;
+}
+
+.accountMeta {
+  margin: 0;
+  color: var(--rave-muted, #aeb8d8);
+  font-size: 0.86rem;
+}
+
+.roleRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.avatarPreview {
+  border: 1px solid rgb(32 228 255 / 35%);
+  box-shadow:
+    0 0 20px rgb(32 228 255 / 15%),
+    0 0 22px rgb(255 54 188 / 12%);
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+}

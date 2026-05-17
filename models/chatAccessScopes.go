@@ -9,4 +9,8 @@ const (
 	ScopeHasAdminAccess = "HAS_ADMIN_ACCESS"
 
 	ModeratorScopeKey = "MODERATOR"
+
+	BounceCastOwnerScopeKey = "OWNER"
+	BounceCastAdminScopeKey = "ADMIN"
+	BounceCastDJScopeKey    = "DJ"
 )

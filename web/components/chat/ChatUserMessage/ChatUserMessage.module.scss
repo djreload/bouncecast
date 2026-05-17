@@ -28,6 +28,18 @@ $p-v-size: 2px;
     font-weight: 600;
   }
 
+  .profileImage {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
+    margin-right: 0.45rem;
+    border: 1px solid rgb(32 228 255 / 35%);
+    border-radius: 50%;
+    object-fit: cover;
+    background: rgb(255 255 255 / 10%);
+    box-shadow: 0 0 14px rgb(255 54 188 / 15%);
+  }
+
   .repeatUser {
     // nolint: scss/at-extend-no-missing-placeholder
     @extend .user;

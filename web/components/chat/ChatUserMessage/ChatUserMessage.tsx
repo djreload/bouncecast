@@ -77,7 +77,7 @@ export const ChatUserMessage: FC<ChatUserMessageProps> = ({
   isAuthorBot,
 }) => {
   const { id: messageId, body, user, timestamp } = message;
-  const { id: userId, displayName, displayColor } = user;
+  const { id: userId, displayName, displayColor, profileImageUrl } = user;
   const accessToken = useRecoilValue<string>(accessTokenAtom);
   const websocketService = useRecoilValue<WebsocketService>(websocketServiceAtom);
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
@@ -152,6 +152,9 @@ export const ChatUserMessage: FC<ChatUserMessageProps> = ({
 
         <UserTooltip user={user}>
           <div className={sameUserAsLast ? styles.repeatUser : styles.user} style={{ color }}>
+            {profileImageUrl && (
+              <img src={profileImageUrl} alt="" loading="lazy" className={styles.profileImage} />
+            )}
             <span className={styles.userName}>{displayName}</span>
             <span className={styles.userBadges}>{badgeNodes}</span>
           </div>

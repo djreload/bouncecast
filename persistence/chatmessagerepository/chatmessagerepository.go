@@ -128,6 +128,7 @@ func makeUserMessageEventFromRowData(row rowData) events.UserMessageEvent {
 	u := models.User{
 		ID:              *row.userID,
 		DisplayName:     displayName,
+		ProfileImageURL: stringFromPointer(row.userProfileImageURL),
 		DisplayColor:    displayColor,
 		CreatedAt:       createdAt,
 		DisabledAt:      row.userDisabledAt,
@@ -251,6 +252,7 @@ type rowData struct {
 
 	userType            *string
 	userScopes          *string
+	userProfileImageURL *string
 	hiddenAt            *time.Time
 	userCreatedAt       *time.Time
 	userDisabledAt      *time.Time
@@ -288,6 +290,7 @@ func getChat(rows *sql.Rows) ([]interface{}, error) {
 			&row.userAuthenticatedAt,
 			&row.userScopes,
 			&row.userType,
+			&row.userProfileImageURL,
 		); err != nil {
 			return nil, err
 		}
@@ -315,6 +318,13 @@ func getChat(rows *sql.Rows) ([]interface{}, error) {
 	return history, nil
 }
 
+func stringFromPointer(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
 var _historyCache *[]interface{}
 
 // GetChatModerationHistory will return all the chat messages suitable for moderation purposes.
@@ -332,7 +342,7 @@ func (r *SqlChatMessageRepository) GetChatModerationHistory() []interface{} {
 	defer tx.Rollback() // nolint
 
 	// Get all messages regardless of visibility
-	query := "SELECT messages.id, user_id, body, title, subtitle, image, link, eventType, hidden_at, timestamp, display_name, display_color, created_at, disabled_at, previous_names, namechanged_at, authenticated_at, scopes, type FROM messages INNER JOIN users ON messages.user_id = users.id ORDER BY timestamp DESC"
+	query := "SELECT messages.id, user_id, body, title, subtitle, image, link, eventType, hidden_at, timestamp, display_name, display_color, created_at, disabled_at, previous_names, namechanged_at, authenticated_at, scopes, type, COALESCE(profile_image_url, '') FROM messages INNER JOIN users ON messages.user_id = users.id ORDER BY timestamp DESC"
 	stmt, err := tx.Prepare(query)
 	if err != nil {
 		log.Errorln("error fetching chat moderation history", err)
@@ -376,7 +386,7 @@ func (r *SqlChatMessageRepository) GetChatHistory() []interface{} {
 	defer tx.Rollback() // nolint
 
 	// Get all visible messages
-	query := "SELECT messages.id, messages.user_id, messages.body, messages.title, messages.subtitle, messages.image, messages.link, messages.eventType, messages.hidden_at, messages.timestamp, users.display_name, users.display_color, users.created_at, users.disabled_at, users.previous_names, users.namechanged_at, users.authenticated_at, users.scopes, users.type FROM users JOIN messages ON users.id = messages.user_id WHERE hidden_at IS NULL AND disabled_at IS NULL ORDER BY timestamp DESC LIMIT ?"
+	query := "SELECT messages.id, messages.user_id, messages.body, messages.title, messages.subtitle, messages.image, messages.link, messages.eventType, messages.hidden_at, messages.timestamp, users.display_name, users.display_color, users.created_at, users.disabled_at, users.previous_names, users.namechanged_at, users.authenticated_at, users.scopes, users.type, COALESCE(users.profile_image_url, '') FROM users JOIN messages ON users.id = messages.user_id WHERE hidden_at IS NULL AND disabled_at IS NULL ORDER BY timestamp DESC LIMIT ?"
 
 	stmt, err := tx.Prepare(query)
 	if err != nil {
@@ -449,7 +459,7 @@ func (r *SqlChatMessageRepository) GetMessageIdsForUserID(userID string) ([]stri
 	}
 
 	defer tx.Rollback() // nolint
-	query := "SELECT messages.id, user_id, body, title, subtitle, image, link, eventType, hidden_at, timestamp, display_name, display_color, created_at, disabled_at,  previous_names, namechanged_at, authenticated_at, scopes, type FROM messages INNER JOIN users ON messages.user_id = users.id WHERE user_id IS ?"
+	query := "SELECT messages.id, user_id, body, title, subtitle, image, link, eventType, hidden_at, timestamp, display_name, display_color, created_at, disabled_at,  previous_names, namechanged_at, authenticated_at, scopes, type, COALESCE(profile_image_url, '') FROM messages INNER JOIN users ON messages.user_id = users.id WHERE user_id IS ?"
 
 	stmt, err := tx.Prepare(query)
 	if err != nil {

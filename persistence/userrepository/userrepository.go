@@ -226,10 +226,7 @@ func (r *SqlUserRepository) GetUserByToken(token string) *models.User {
 		return nil
 	}
 
-	var scopes []string
-	if u.Scopes.Valid {
-		scopes = strings.Split(u.Scopes.String, ",")
-	}
+	scopes := splitUserScopes(u.Scopes.String, u.Scopes.Valid)
 
 	var disabledAt *time.Time
 	if u.DisabledAt.Valid {
@@ -241,7 +238,7 @@ func (r *SqlUserRepository) GetUserByToken(token string) *models.User {
 		authenticatedAt = &u.AuthenticatedAt.Time
 	}
 
-	return &models.User{
+	user := &models.User{
 		ID:              u.ID,
 		DisplayName:     u.DisplayName,
 		DisplayColor:    int(u.DisplayColor),
@@ -253,6 +250,8 @@ func (r *SqlUserRepository) GetUserByToken(token string) *models.User {
 		Authenticated:   authenticatedAt != nil,
 		Scopes:          scopes,
 	}
+	r.enrichUserAccountFields(user)
+	return user
 }
 
 // SetAccessTokenToOwner will reassign an access token to be owned by a
@@ -290,12 +289,9 @@ func (r *SqlUserRepository) GetUserByAuth(authToken string, authType models.Auth
 		return nil
 	}
 
-	var scopes []string
-	if u.Scopes.Valid {
-		scopes = strings.Split(u.Scopes.String, ",")
-	}
+	scopes := splitUserScopes(u.Scopes.String, u.Scopes.Valid)
 
-	return &models.User{
+	user := &models.User{
 		ID:              u.ID,
 		DisplayName:     u.DisplayName,
 		DisplayColor:    int(u.DisplayColor),
@@ -306,6 +302,8 @@ func (r *SqlUserRepository) GetUserByAuth(authToken string, authType models.Auth
 		AuthenticatedAt: &u.AuthenticatedAt.Time,
 		Scopes:          scopes,
 	}
+	r.enrichUserAccountFields(user)
+	return user
 }
 
 // SetModerator will add or remove moderator status for a single user by ID.
@@ -457,10 +455,7 @@ func (r *SqlUserRepository) getUsersFromRows(rows *sql.Rows) []*models.User {
 			return nil
 		}
 
-		var scopes []string
-		if scopesString != nil {
-			scopes = strings.Split(*scopesString, ",")
-		}
+		scopes := splitUserScopesFromPointer(scopesString)
 
 		user := &models.User{
 			ID:            id,
@@ -496,12 +491,9 @@ func (r *SqlUserRepository) getUserFromRow(row *sql.Row) *models.User {
 		return nil
 	}
 
-	var scopes []string
-	if scopesString != nil {
-		scopes = strings.Split(*scopesString, ",")
-	}
+	scopes := splitUserScopesFromPointer(scopesString)
 
-	return &models.User{
+	user := &models.User{
 		ID:            id,
 		DisplayName:   displayName,
 		DisplayColor:  displayColor,
@@ -511,6 +503,63 @@ func (r *SqlUserRepository) getUserFromRow(row *sql.Row) *models.User {
 		NameChangedAt: userNameChangedAt,
 		Scopes:        scopes,
 	}
+	r.enrichUserAccountFields(user)
+	return user
+}
+
+func (r *SqlUserRepository) enrichUserAccountFields(user *models.User) {
+	if user == nil {
+		return
+	}
+
+	var email sql.NullString
+	var profileImageURL sql.NullString
+	var registeredAt sql.NullTime
+	var lastLoginAt sql.NullTime
+	err := r.datastore.DB.QueryRow(`
+		SELECT email, profile_image_url, registered_at, last_login_at
+		FROM users
+		WHERE id = ?
+	`, user.ID).Scan(&email, &profileImageURL, &registeredAt, &lastLoginAt)
+	if err != nil {
+		return
+	}
+
+	if email.Valid {
+		user.Email = email.String
+	}
+	if profileImageURL.Valid {
+		user.ProfileImageURL = profileImageURL.String
+	}
+	if registeredAt.Valid {
+		user.RegisteredAt = &registeredAt.Time
+	}
+	if lastLoginAt.Valid {
+		user.LastLoginAt = &lastLoginAt.Time
+	}
+}
+
+func splitUserScopesFromPointer(scopesString *string) []string {
+	if scopesString == nil {
+		return nil
+	}
+	return splitUserScopes(*scopesString, true)
+}
+
+func splitUserScopes(scopesString string, valid bool) []string {
+	if !valid {
+		return nil
+	}
+
+	parts := strings.Split(scopesString, ",")
+	scopes := make([]string, 0, len(parts))
+	for _, scope := range parts {
+		scope = strings.TrimSpace(scope)
+		if scope != "" {
+			scopes = append(scopes, scope)
+		}
+	}
+	return scopes
 }
 
 // InsertExternalAPIUser will add a new API user to the database.

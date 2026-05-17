@@ -1,4 +1,4 @@
-import { MenuProps, Dropdown, Button } from 'antd';
+import { MenuProps, Dropdown, Button, Avatar } from 'antd';
 import classnames from 'classnames';
 
 import { useRecoilState, useRecoilValue } from 'recoil';
@@ -64,6 +64,13 @@ const AuthModal = dynamic(
   },
 );
 
+const AccountModal = dynamic(
+  () => import('../../modals/AccountModal/AccountModal').then(mod => mod.AccountModal),
+  {
+    ssr: false,
+  },
+);
+
 export type UserDropdownProps = {
   id: string;
   username?: string;
@@ -79,6 +86,7 @@ export const UserDropdown: FC<UserDropdownProps> = ({
 }) => {
   const [showNameChangeModal, setShowNameChangeModal] = useState<boolean>(false);
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
+  const [showAccountModal, setShowAccountModal] = useState<boolean>(false);
   const [chatState, setChatState] = useRecoilState(chatStateAtom);
   const [popupWindow, setPopupWindow] = useState<Window>(null);
   const appState = useRecoilValue<AppStateOptions>(appStateAtom);
@@ -149,20 +157,26 @@ export const UserDropdown: FC<UserDropdownProps> = ({
   const items: MenuProps['items'] = [
     {
       key: 0,
+      icon: <UserOutlined />,
+      label: currentUser.email ? 'Profile' : 'Register / log in',
+      onClick: () => setShowAccountModal(true),
+    },
+    {
+      key: 1,
       icon: <EditOutlined />,
       label: 'Change name',
       onClick: handleChangeName,
     },
     {
-      key: 1,
+      key: 2,
       icon: <LockOutlined />,
-      label: 'Authenticate',
+      label: 'Indie/Fediverse auth',
       onClick: () => setShowAuthModal(true),
     },
   ];
   if (canShowHideChat)
     items.push({
-      key: 3,
+      key: 4,
       'aria-expanded': chatState === ChatState.VISIBLE,
       className: styles.chatToggle, // TODO why do we hide this button on tablets?
       icon: <MessageOutlined />,
@@ -171,7 +185,7 @@ export const UserDropdown: FC<UserDropdownProps> = ({
     } as MenuProps['items'][0]);
   if (canShowChatPopup)
     items.push({
-      key: 4,
+      key: 5,
       icon: popupWindow ? <ShrinkOutlined /> : <ExpandAltOutlined />,
       label: popupWindow ? 'Put chat back' : 'Pop out chat',
       onClick: popupWindow ? closeChatPopup : openChatPopup,
@@ -190,14 +204,28 @@ export const UserDropdown: FC<UserDropdownProps> = ({
     >
       <div className={styles.root}>
         <Dropdown menu={{ items }} trigger={['click']}>
-          <Button id={id} type="primary" icon={<UserOutlined className={styles.userIcon} />}>
+          <Button
+            id={id}
+            type="primary"
+            icon={
+              currentUser.profileImageUrl ? (
+                <Avatar
+                  src={currentUser.profileImageUrl}
+                  size={22}
+                  className={styles.profileAvatar}
+                />
+              ) : (
+                <UserOutlined className={styles.userIcon} />
+              )
+            }
+          >
             <span
               className={classnames([
                 styles.username,
                 hideTitleOnMobile && styles.hideTitleOnMobile,
               ])}
             >
-              {username}
+              {currentUser.email ? username : 'Register / Login'}
             </span>
             <CaretDownOutlined />
           </Button>
@@ -215,6 +243,13 @@ export const UserDropdown: FC<UserDropdownProps> = ({
           handleCancel={() => setShowAuthModal(false)}
         >
           <AuthModal />
+        </Modal>
+        <Modal
+          title="BounceCast Account"
+          open={showAccountModal}
+          handleCancel={() => setShowAccountModal(false)}
+        >
+          <AccountModal closeModal={() => setShowAccountModal(false)} />
         </Modal>
       </div>
     </ErrorBoundary>

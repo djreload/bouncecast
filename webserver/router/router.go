@@ -82,6 +82,9 @@ func Start(enableVerboseLogging bool) error {
 	r.Post("/api/admin/bouncecast/stars/settings", middleware.RequireAdminAuth(adminhandlers.SetStarsSettings))
 	r.Post("/api/admin/bouncecast/stars/packages", middleware.RequireAdminAuth(adminhandlers.UpsertStarPackage))
 	r.Post("/api/admin/bouncecast/stars/wallets/adjust", middleware.RequireAdminAuth(adminhandlers.AdjustStarWallet))
+	r.Options("/api/admin/bouncecast/users", middleware.RequireAdminAuth(adminhandlers.GetBounceCastUsers))
+	r.Get("/api/admin/bouncecast/users", middleware.RequireAdminAuth(adminhandlers.GetBounceCastUsers))
+	r.Post("/api/admin/bouncecast/users/permissions", middleware.RequireAdminAuth(adminhandlers.SetBounceCastUserPermissions))
 
 	r.Options("/api/admin/config/chat/backgroundimage", middleware.RequireAdminAuth(adminhandlers.SetChatBackgroundImageURL))
 	r.Post("/api/admin/config/chat/backgroundimage", middleware.RequireAdminAuth(adminhandlers.SetChatBackgroundImageURL))
@@ -114,6 +117,15 @@ func Start(enableVerboseLogging bool) error {
 	r.Post("/api/bouncecast/studio/streamkeys/revoke", handlers.BounceCastStudioRevokeStreamKey)
 	r.Options("/api/bouncecast/studio/live-events", handlers.BounceCastStudioOptions)
 	r.Get("/api/bouncecast/studio/live-events", handlers.BounceCastStudioLiveEvents)
+
+	r.Options("/api/bouncecast/account/register", handlers.BounceCastAccountOptions)
+	r.Post("/api/bouncecast/account/register", handlers.BounceCastAccountRegister)
+	r.Options("/api/bouncecast/account/login", handlers.BounceCastAccountOptions)
+	r.Post("/api/bouncecast/account/login", handlers.BounceCastAccountLogin)
+	r.Options("/api/bouncecast/account/me", handlers.BounceCastAccountOptions)
+	r.Get("/api/bouncecast/account/me", middleware.RequireUserAccessToken(handlers.BounceCastAccountMe))
+	r.Options("/api/bouncecast/account/profile", handlers.BounceCastAccountOptions)
+	r.Post("/api/bouncecast/account/profile", middleware.RequireUserAccessToken(handlers.BounceCastAccountUpdateProfile))
 
 	r.Options("/api/stars/config", handlers.GetStarsConfig)
 	r.Get("/api/stars/config", handlers.GetStarsConfig)

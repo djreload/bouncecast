@@ -1,0 +1,49 @@
+import {
+  BOUNCECAST_ACCOUNT_LOGIN,
+  BOUNCECAST_ACCOUNT_ME,
+  BOUNCECAST_ACCOUNT_PROFILE,
+  BOUNCECAST_ACCOUNT_REGISTER,
+  getUnauthedData,
+} from '../utils/apis';
+
+function withAccessToken(url: string, accessToken?: string): string {
+  if (!accessToken) {
+    return url;
+  }
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}accessToken=${encodeURIComponent(accessToken)}`;
+}
+
+export type AccountPayload = {
+  displayName?: string;
+  email?: string;
+  password?: string;
+  profileImageUrl?: string;
+};
+
+export class AccountService {
+  public static async register(accessToken: string, payload: AccountPayload) {
+    return getUnauthedData(withAccessToken(BOUNCECAST_ACCOUNT_REGISTER, accessToken), {
+      method: 'POST',
+      data: payload,
+    });
+  }
+
+  public static async login(payload: AccountPayload) {
+    return getUnauthedData(BOUNCECAST_ACCOUNT_LOGIN, {
+      method: 'POST',
+      data: payload,
+    });
+  }
+
+  public static async me(accessToken: string) {
+    return getUnauthedData(withAccessToken(BOUNCECAST_ACCOUNT_ME, accessToken));
+  }
+
+  public static async updateProfile(accessToken: string, payload: AccountPayload) {
+    return getUnauthedData(withAccessToken(BOUNCECAST_ACCOUNT_PROFILE, accessToken), {
+      method: 'POST',
+      data: payload,
+    });
+  }
+}

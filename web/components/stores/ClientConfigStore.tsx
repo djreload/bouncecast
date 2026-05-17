@@ -73,7 +73,7 @@ const initialConfig = configResult.config;
 const initialStatus = statusResult.status;
 const hasHydratedConfig = configResult.success;
 const hasHydratedStatus = statusResult.success;
-const ACCESS_TOKEN_KEY = 'accessToken';
+export const ACCESS_TOKEN_KEY = 'accessToken';
 
 let serverStatusRefreshPoll: ReturnType<typeof setInterval>;
 let hasBeenModeratorNotified = false;

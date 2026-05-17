@@ -7,7 +7,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-const latestGooseMigrationVersion int64 = 6
+const latestGooseMigrationVersion int64 = 7
 
 func openTestDB(t *testing.T) *sql.DB {
 	t.Helper()

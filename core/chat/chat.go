@@ -47,6 +47,10 @@ func Start(getStatusFunc func() models.Status) error {
 
 // GetClientsForUser will return chat connections that are owned by a specific user.
 func GetClientsForUser(userID string) ([]*Client, error) {
+	if _server == nil {
+		return nil, errors.New("chat server not started")
+	}
+
 	_server.mu.Lock()
 	defer _server.mu.Unlock()
 

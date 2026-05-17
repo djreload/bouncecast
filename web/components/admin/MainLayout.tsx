@@ -192,6 +192,10 @@ export const MainLayout: FC<MainLayoutProps> = ({ children }) => {
 
   const studioMenu = [
     {
+      label: <Link href="/admin/accounts">Accounts</Link>,
+      key: '/admin/accounts',
+    },
+    {
       label: <Link href="/admin/streamers">Streamers</Link>,
       key: '/admin/streamers',
     },

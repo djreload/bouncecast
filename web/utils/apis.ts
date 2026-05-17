@@ -142,6 +142,10 @@ export const BOUNCECAST_STARS_PACKAGES = `${API_LOCATION}bouncecast/stars/packag
 
 export const BOUNCECAST_STARS_WALLET_ADJUST = `${API_LOCATION}bouncecast/stars/wallets/adjust`;
 
+export const BOUNCECAST_USERS = `${API_LOCATION}bouncecast/users`;
+
+export const BOUNCECAST_USER_PERMISSIONS = `${API_LOCATION}bouncecast/users/permissions`;
+
 export const STARS_CONFIG = `${NEXT_PUBLIC_API_HOST}api/stars/config`;
 
 export const STARS_WALLET = `${NEXT_PUBLIC_API_HOST}api/stars/wallet`;
@@ -173,6 +177,16 @@ export const BOUNCECAST_STUDIO_STREAM_KEYS = `${STUDIO_API_LOCATION}streamkeys`;
 export const BOUNCECAST_STUDIO_STREAM_KEY_REVOKE = `${STUDIO_API_LOCATION}streamkeys/revoke`;
 
 export const BOUNCECAST_STUDIO_LIVE_EVENTS = `${STUDIO_API_LOCATION}live-events`;
+
+const ACCOUNT_API_LOCATION = `${NEXT_PUBLIC_API_HOST}api/bouncecast/account/`;
+
+export const BOUNCECAST_ACCOUNT_REGISTER = `${ACCOUNT_API_LOCATION}register`;
+
+export const BOUNCECAST_ACCOUNT_LOGIN = `${ACCOUNT_API_LOCATION}login`;
+
+export const BOUNCECAST_ACCOUNT_ME = `${ACCOUNT_API_LOCATION}me`;
+
+export const BOUNCECAST_ACCOUNT_PROFILE = `${ACCOUNT_API_LOCATION}profile`;
 
 export const API_YP_RESET = `${API_LOCATION}yp/reset`;
 
