@@ -56,19 +56,25 @@ export const Header: FC<HeaderComponentProps> = ({ name, chatAvailable, chatDisa
           {name}
         </h1>
       </div>
-      {chatAvailable && !chatDisabled && (
-        <UserDropdown id="user-menu" hideTitleOnMobile showToggleChatOption={canHideChat} />
-      )}
-      {!chatAvailable && !chatDisabled && (
-        <Tooltip
-          overlayClassName={styles.toolTip}
-          title={t(Localization.Frontend.Header.chatWillBeAvailable)}
-          placement="left"
-        >
-          <span className={styles.chatOfflineText} id="owncast-chat-offline-text">
-            {t(Localization.Frontend.Header.chatOffline)}
-          </span>
-        </Tooltip>
+      {!chatDisabled && (
+        <div className={styles.headerActions}>
+          {!chatAvailable && (
+            <Tooltip
+              overlayClassName={styles.toolTip}
+              title={t(Localization.Frontend.Header.chatWillBeAvailable)}
+              placement="left"
+            >
+              <span className={styles.chatOfflineText} id="owncast-chat-offline-text">
+                {t(Localization.Frontend.Header.chatOffline)}
+              </span>
+            </Tooltip>
+          )}
+          <UserDropdown
+            id="user-menu"
+            hideTitleOnMobile
+            showToggleChatOption={chatAvailable && canHideChat}
+          />
+        </div>
       )}
     </header>
   );

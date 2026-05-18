@@ -1,6 +1,7 @@
 import {
   BOUNCECAST_ACCOUNT_LOGIN,
   BOUNCECAST_ACCOUNT_ME,
+  BOUNCECAST_ACCOUNT_NOTIFICATIONS,
   BOUNCECAST_ACCOUNT_PROFILE,
   BOUNCECAST_ACCOUNT_REGISTER,
   getUnauthedData,
@@ -19,6 +20,15 @@ export type AccountPayload = {
   email?: string;
   password?: string;
   profileImageUrl?: string;
+  notificationPreferences?: NotificationPreferencesPayload;
+};
+
+export type NotificationPreferencesPayload = {
+  email?: boolean;
+  browserPush?: boolean;
+  browserPushEndpoint?: string;
+  messenger?: boolean;
+  messengerDestination?: string;
 };
 
 export class AccountService {
@@ -42,6 +52,16 @@ export class AccountService {
 
   public static async updateProfile(accessToken: string, payload: AccountPayload) {
     return getUnauthedData(withAccessToken(BOUNCECAST_ACCOUNT_PROFILE, accessToken), {
+      method: 'POST',
+      data: payload,
+    });
+  }
+
+  public static async updateNotifications(
+    accessToken: string,
+    payload: NotificationPreferencesPayload,
+  ) {
+    return getUnauthedData(withAccessToken(BOUNCECAST_ACCOUNT_NOTIFICATIONS, accessToken), {
       method: 'POST',
       data: payload,
     });

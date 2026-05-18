@@ -190,6 +190,8 @@ export const BOUNCECAST_ACCOUNT_ME = `${ACCOUNT_API_LOCATION}me`;
 
 export const BOUNCECAST_ACCOUNT_PROFILE = `${ACCOUNT_API_LOCATION}profile`;
 
+export const BOUNCECAST_ACCOUNT_NOTIFICATIONS = `${ACCOUNT_API_LOCATION}notifications`;
+
 export const API_YP_RESET = `${API_LOCATION}yp/reset`;
 
 const GITHUB_RELEASE_URL = 'https://api.github.com/repos/owncast/owncast/releases/latest';

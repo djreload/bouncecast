@@ -1,3 +1,5 @@
+@use '../../../styles/mixins' as *;
+
 .accountPanel {
   display: flex;
   flex-direction: column;
@@ -43,4 +45,42 @@
 .formActions {
   display: flex;
   justify-content: flex-end;
+}
+
+.notificationBox {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.85rem;
+  border: 1px solid rgb(32 228 255 / 16%);
+  border-radius: 8px;
+  background: rgb(9 14 32 / 62%);
+}
+
+.notificationGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+
+  @include screen(tablet) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.notificationOption {
+  min-height: 42px;
+  margin-bottom: 0;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 8px;
+  background: rgb(255 255 255 / 5%);
+
+  :global(.ant-checkbox-wrapper) {
+    color: var(--rave-text, #f8fbff);
+    font-weight: 700;
+  }
+
+  :global(.ant-checkbox-wrapper-disabled) {
+    color: var(--rave-muted, #aeb8d8);
+  }
 }

@@ -17,6 +17,7 @@ func cleanupBounceCastAccountTestUsers(t *testing.T) {
 	_, _ = db.Exec(`DELETE FROM user_access_tokens WHERE user_id IN (
 		SELECT id FROM users WHERE email LIKE '%@account-test.example' OR display_name LIKE 'Account Test%'
 	)`)
+	_, _ = db.Exec(`DELETE FROM notifications WHERE destination LIKE '%account-test.example%' OR destination LIKE 'account-test:%'`)
 	_, _ = db.Exec(`DELETE FROM users WHERE email LIKE '%@account-test.example' OR display_name LIKE 'Account Test%'`)
 }
 
@@ -33,7 +34,12 @@ func TestBounceCastAccountRegisterLoginAndProfile(t *testing.T) {
 		"displayName":"Account Test DJ",
 		"email":"Account Test <dj@account-test.example>",
 		"password":"correct-password",
-		"profileImageUrl":"https://example.com/avatar.png"
+		"profileImageUrl":"https://example.com/avatar.png",
+		"notificationPreferences": {
+			"email": true,
+			"messenger": true,
+			"messengerDestination": "account-test:messenger"
+		}
 	}`))
 	registerRecorder := httptest.NewRecorder()
 	BounceCastAccountRegister(registerRecorder, registerRequest)
@@ -57,6 +63,9 @@ func TestBounceCastAccountRegisterLoginAndProfile(t *testing.T) {
 	if registerResponse.User.ProfileImageURL != "https://example.com/avatar.png" {
 		t.Fatalf("profile image url = %q", registerResponse.User.ProfileImageURL)
 	}
+	if !registerResponse.NotificationPreferences.Email || !registerResponse.NotificationPreferences.Messenger || registerResponse.NotificationPreferences.MessengerDestination != "account-test:messenger" {
+		t.Fatalf("notification preferences were not saved: %+v", registerResponse.NotificationPreferences)
+	}
 
 	loginRequest := httptest.NewRequest(http.MethodPost, "/api/bouncecast/account/login", strings.NewReader(`{
 		"email":"dj@account-test.example",
@@ -78,6 +87,9 @@ func TestBounceCastAccountRegisterLoginAndProfile(t *testing.T) {
 	if loginResponse.User.ID != anonymousUser.ID {
 		t.Fatalf("login user id = %q, want %q", loginResponse.User.ID, anonymousUser.ID)
 	}
+	if !loginResponse.NotificationPreferences.Email || !loginResponse.NotificationPreferences.Messenger {
+		t.Fatalf("login response missing notification preferences: %+v", loginResponse.NotificationPreferences)
+	}
 
 	loggedInUser := userrepository.Get().GetUserByToken(loginResponse.AccessToken)
 	profileRequest := httptest.NewRequest(http.MethodPost, "/api/bouncecast/account/profile?accessToken="+loginResponse.AccessToken, strings.NewReader(`{
@@ -96,5 +108,33 @@ func TestBounceCastAccountRegisterLoginAndProfile(t *testing.T) {
 	}
 	if updatedUser.ProfileImageURL != "/public/avatar.png" {
 		t.Fatalf("profile image url = %q", updatedUser.ProfileImageURL)
+	}
+
+	notificationRequest := httptest.NewRequest(http.MethodPost, "/api/bouncecast/account/notifications?accessToken="+loginResponse.AccessToken, strings.NewReader(`{
+		"email": false,
+		"browserPush": true,
+		"browserPushEndpoint": "account-test:browser-push",
+		"messenger": false
+	}`))
+	notificationRecorder := httptest.NewRecorder()
+	BounceCastAccountUpdateNotifications(*loggedInUser, notificationRecorder, notificationRequest)
+	if notificationRecorder.Code != http.StatusOK {
+		t.Fatalf("notifications status = %d, want 200: %s", notificationRecorder.Code, notificationRecorder.Body.String())
+	}
+
+	var notificationResponse bounceCastAccountResponse
+	if err := json.NewDecoder(notificationRecorder.Body).Decode(&notificationResponse); err != nil {
+		t.Fatalf("decode notification response: %v", err)
+	}
+	if notificationResponse.NotificationPreferences.Email || !notificationResponse.NotificationPreferences.BrowserPush || notificationResponse.NotificationPreferences.Messenger {
+		t.Fatalf("unexpected updated notification preferences: %+v", notificationResponse.NotificationPreferences)
+	}
+
+	var browserPushRegistrations int
+	if err := data.GetDatabase().QueryRow(`SELECT count(*) FROM notifications WHERE channel = 'BROWSER_PUSH_NOTIFICATION' AND destination = 'account-test:browser-push'`).Scan(&browserPushRegistrations); err != nil {
+		t.Fatal(err)
+	}
+	if browserPushRegistrations != 1 {
+		t.Fatalf("browser push registrations = %d, want 1", browserPushRegistrations)
 	}
 }

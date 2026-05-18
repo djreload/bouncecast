@@ -17,6 +17,7 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 
 - Added database migration `00009_bouncecast_account_notifications.sql` for public account notification opt-in preferences.
 - Added public account notification preference persistence for email, browser push, and Messenger destinations.
+- Added public account UI controls for email, browser push, and Facebook Messenger go-live opt-ins.
 
 ### Fixed
 
