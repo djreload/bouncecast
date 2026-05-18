@@ -4,6 +4,14 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 
 ## Unreleased / Next
 
+- Added public BounceCast discovery APIs for active DJ profiles, individual DJ profiles, and public schedule lineup.
+- Added a protected unified Account Hub API that combines profile, notification preferences, roles, dashboard destinations, Stars wallet summary, leaderboard, and linked DJ schedule context.
+- Added `/account` as a public Account Hub page for login/register, profile pictures, notification opt-ins, Stars wallet status, role destinations, and linked DJ schedule.
+- Added `/djs` as a public DJ roster/profile page.
+- Added an upcoming lineup panel to the public stream homepage.
+- Added Account Hub and DJ lineup entries to the public user menu.
+- Added an admin command-center summary for accounts, DJ access, public schedule, and Stars activity.
+- Changed `/admin/accounts/` from a multi-select role editor into a clearer permission matrix for owner/admin/moderator/DJ roles.
 - Continue live VPS deployment notes as production configuration changes.
 
 ## 2026-05-18

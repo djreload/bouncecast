@@ -1,7 +1,7 @@
 BounceCast live server install guide
 Debian 13 VPS with Plesk already installed
 
-Last updated: 2026-05-15
+Last updated: 2026-05-18
 Repository: https://github.com/djreload/bouncecast
 
 Purpose
@@ -44,6 +44,11 @@ Important compatibility notes
 5. PayPal webhooks must reach BounceCast over a public HTTPS URL. If a
    Cloudflare tunnel or Plesk domain is still pointing at another project,
    PayPal webhooks will not reach BounceCast.
+
+6. The current development branch includes public Account Hub, DJ roster, and
+   public schedule endpoints. When updating a live server, rebuild the Docker
+   image after pulling so the generated static web bundle and the Go API routes
+   stay in sync.
 
 
 Recommended server layout
@@ -572,6 +577,10 @@ Verify:
 
   curl -i http://127.0.0.1:8080/api/status
   curl -I https://live.example.com/api/status
+  curl -I https://live.example.com/account
+  curl -I https://live.example.com/djs
+  curl -s https://live.example.com/api/bouncecast/schedule?limit=3 | jq .
+  curl -s https://live.example.com/api/bouncecast/djs | jq .
   docker compose logs --tail=80 bouncecast
 
 

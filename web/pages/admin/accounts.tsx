@@ -4,10 +4,10 @@ import {
   Avatar,
   Button,
   Card,
+  Checkbox,
   Col,
   Input,
   Row,
-  Select,
   Space,
   Statistic,
   Table,
@@ -174,26 +174,31 @@ export default function AccountsAdmin() {
       key: 'current',
       render: (_, record: AccountUser) => displayPermissions(record.permissions),
     },
-    {
-      title: 'Permissions',
-      key: 'permissions',
-      render: (_, record: AccountUser) => (
-        <Select
-          mode="multiple"
-          allowClear
-          style={{ minWidth: 240 }}
-          placeholder="Visitor"
-          options={permissionOptions}
-          value={pendingPermissions[record.id] || editablePermissions(record.permissions)}
-          onChange={value =>
-            setPendingPermissions(current => ({
-              ...current,
-              [record.id]: value,
-            }))
-          }
-        />
-      ),
-    },
+    ...permissionOptions.map(option => ({
+      title: option.label,
+      key: option.value,
+      align: 'center' as const,
+      render: (_, record: AccountUser) => {
+        const activePermissions =
+          pendingPermissions[record.id] || editablePermissions(record.permissions);
+        return (
+          <Checkbox
+            checked={activePermissions.includes(option.value)}
+            onChange={event => {
+              const checked = event.target.checked;
+              const nextPermissions = checked
+                ? [...activePermissions, option.value]
+                : activePermissions.filter(permission => permission !== option.value);
+              setPendingPermissions(current => ({
+                ...current,
+                [record.id]: nextPermissions,
+              }));
+            }}
+            aria-label={`${option.label} permission for ${record.displayName}`}
+          />
+        );
+      },
+    })),
     {
       title: 'Status',
       key: 'status',

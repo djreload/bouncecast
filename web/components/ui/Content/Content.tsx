@@ -38,6 +38,7 @@ import { DesktopContent } from './DesktopContent';
 import { MobileContent } from './MobileContent';
 import { ChatModal } from '../../modals/ChatModal/ChatModal';
 import { Footer } from '../Footer/Footer';
+import { PublicLineup } from '../../bouncecast/PublicLineup';
 
 // Lazy loaded components
 const ChatContainer = dynamic(
@@ -294,6 +295,7 @@ export const Content: FC = () => {
             externalActionSelected={externalActionSelected}
           />
         </Row>
+        <PublicLineup />
 
         <Modal
           title="Browser Notifications"

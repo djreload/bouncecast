@@ -148,6 +148,8 @@ export const BOUNCECAST_USERS = `${API_LOCATION}bouncecast/users`;
 
 export const BOUNCECAST_USER_PERMISSIONS = `${API_LOCATION}bouncecast/users/permissions`;
 
+export const BOUNCECAST_COMMAND_CENTER = `${API_LOCATION}bouncecast/command-center`;
+
 export const STARS_CONFIG = `${NEXT_PUBLIC_API_HOST}api/stars/config`;
 
 export const STARS_LEADERBOARD = `${NEXT_PUBLIC_API_HOST}api/stars/leaderboard`;
@@ -197,6 +199,12 @@ export const BOUNCECAST_ACCOUNT_PROFILE = `${ACCOUNT_API_LOCATION}profile`;
 export const BOUNCECAST_ACCOUNT_PROFILE_IMAGE = `${ACCOUNT_API_LOCATION}profile-image`;
 
 export const BOUNCECAST_ACCOUNT_NOTIFICATIONS = `${ACCOUNT_API_LOCATION}notifications`;
+
+export const BOUNCECAST_ACCOUNT_HUB = `${ACCOUNT_API_LOCATION}hub`;
+
+export const BOUNCECAST_PUBLIC_DJS = `${NEXT_PUBLIC_API_HOST}api/bouncecast/djs`;
+
+export const BOUNCECAST_PUBLIC_SCHEDULE = `${NEXT_PUBLIC_API_HOST}api/bouncecast/schedule`;
 
 export const API_YP_RESET = `${API_LOCATION}yp/reset`;
 

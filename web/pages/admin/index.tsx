@@ -9,7 +9,7 @@ import { LogTable } from '../../components/admin/LogTable';
 import { Offline } from '../../components/admin/Offline';
 import { StreamHealthOverview } from '../../components/admin/StreamHealthOverview';
 
-import { LOGS_WARN, fetchData, FETCH_INTERVAL } from '../../utils/apis';
+import { BOUNCECAST_COMMAND_CENTER, LOGS_WARN, fetchData, FETCH_INTERVAL } from '../../utils/apis';
 import { formatIPAddress, isEmptyObject } from '../../utils/format';
 import { NewsFeed } from '../../components/admin/NewsFeed';
 
@@ -24,6 +24,144 @@ const UserOutlined = dynamic(() => import('@ant-design/icons/UserOutlined'), {
 const ClockCircleOutlined = dynamic(() => import('@ant-design/icons/ClockCircleOutlined'), {
   ssr: false,
 });
+
+const TeamOutlined = dynamic(() => import('@ant-design/icons/TeamOutlined'), {
+  ssr: false,
+});
+
+const CalendarOutlined = dynamic(() => import('@ant-design/icons/CalendarOutlined'), {
+  ssr: false,
+});
+
+const StarOutlined = dynamic(() => import('@ant-design/icons/StarOutlined'), {
+  ssr: false,
+});
+
+const SafetyCertificateOutlined = dynamic(
+  () => import('@ant-design/icons/SafetyCertificateOutlined'),
+  { ssr: false },
+);
+
+type CommandCenterSummary = {
+  accounts: {
+    total: number;
+    registered: number;
+    owners: number;
+    admins: number;
+    moderators: number;
+    djs: number;
+    disabled: number;
+  };
+  streamers: {
+    total: number;
+    active: number;
+    inactive: number;
+    disabled: number;
+  };
+  schedule: {
+    upcoming: number;
+    live: number;
+  };
+  stars: {
+    enabled: boolean;
+    wallets: number;
+    pendingOrders: number;
+    completedOrders: number;
+    sendEvents: number;
+  };
+};
+
+function CommandCenter({ summary }: { summary?: CommandCenterSummary }) {
+  if (!summary) {
+    return null;
+  }
+
+  return (
+    <div className="bouncecast-studio-dashboard">
+      <div className="studio-hero">
+        <div>
+          <span className="studio-eyebrow">Command center</span>
+          <h1>BounceCast operations</h1>
+          <p>One snapshot for accounts, DJ access, public schedule, and Stars activity.</p>
+        </div>
+      </div>
+      <Row gutter={[16, 16]} className="studio-stat-row">
+        <Col xs={24} md={6}>
+          <Card className="studio-panel">
+            <Statistic
+              title="Registered accounts"
+              value={summary.accounts.registered}
+              suffix={`/ ${summary.accounts.total}`}
+              prefix={<UserOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} md={6}>
+          <Card className="studio-panel">
+            <Statistic
+              title="Active DJs"
+              value={summary.streamers.active}
+              suffix={`/ ${summary.streamers.total}`}
+              prefix={<TeamOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} md={6}>
+          <Card className="studio-panel">
+            <Statistic
+              title="Upcoming sets"
+              value={summary.schedule.upcoming}
+              prefix={<CalendarOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} md={6}>
+          <Card className="studio-panel">
+            <Statistic
+              title="Stars sends"
+              value={summary.stars.sendEvents}
+              prefix={<StarOutlined />}
+            />
+          </Card>
+        </Col>
+      </Row>
+      <Row gutter={[16, 16]} className="studio-stat-row">
+        <Col xs={24} md={8}>
+          <Card className="studio-panel">
+            <Statistic
+              title="Privileged account roles"
+              value={
+                summary.accounts.owners + summary.accounts.admins + summary.accounts.moderators
+              }
+              suffix={`roles, ${summary.accounts.djs} DJs`}
+              prefix={<SafetyCertificateOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} md={8}>
+          <Card className="studio-panel">
+            <Statistic
+              title="Pending DJ approvals"
+              value={summary.streamers.inactive}
+              suffix={`${summary.streamers.disabled} disabled`}
+              prefix={<TeamOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} md={8}>
+          <Card className="studio-panel">
+            <Statistic
+              title="Stars wallets"
+              value={summary.stars.wallets}
+              suffix={summary.stars.enabled ? 'enabled' : 'disabled'}
+              prefix={<StarOutlined />}
+            />
+          </Card>
+        </Col>
+      </Row>
+    </div>
+  );
+}
 
 function streamDetailsFormatter(streamDetails) {
   return (
@@ -49,6 +187,7 @@ export default function Home() {
   const encoder = streamDetails?.encoder || 'Unknown encoder';
 
   const [logsData, setLogs] = useState([]);
+  const [commandCenter, setCommandCenter] = useState<CommandCenterSummary | undefined>();
   const getLogs = async () => {
     try {
       const result = await fetchData(LOGS_WARN);
@@ -59,6 +198,9 @@ export default function Home() {
   };
   const getMoreStats = () => {
     getLogs();
+    fetchData(BOUNCECAST_COMMAND_CENTER)
+      .then(result => setCommandCenter(result))
+      .catch(error => console.log('==== command center error', error));
   };
 
   useEffect(() => {
@@ -83,7 +225,12 @@ export default function Home() {
   }
 
   if (!broadcaster) {
-    return <Offline logs={logsData} config={configData} />;
+    return (
+      <>
+        <CommandCenter summary={commandCenter} />
+        <Offline logs={logsData} config={configData} />
+      </>
+    );
   }
 
   // map out settings
@@ -127,6 +274,7 @@ export default function Home() {
 
   return (
     <div className="home-container">
+      <CommandCenter summary={commandCenter} />
       <div className="sections-container">
         <div className="online-status-section">
           <Card size="small" type="inner" className="online-details-card">

@@ -86,6 +86,8 @@ func Start(enableVerboseLogging bool) error {
 	r.Options("/api/admin/bouncecast/users", middleware.RequireAdminAuth(adminhandlers.GetBounceCastUsers))
 	r.Get("/api/admin/bouncecast/users", middleware.RequireAdminAuth(adminhandlers.GetBounceCastUsers))
 	r.Post("/api/admin/bouncecast/users/permissions", middleware.RequireAdminAuth(adminhandlers.SetBounceCastUserPermissions))
+	r.Options("/api/admin/bouncecast/command-center", middleware.RequireAdminAuth(adminhandlers.GetBounceCastCommandCenter))
+	r.Get("/api/admin/bouncecast/command-center", middleware.RequireAdminAuth(adminhandlers.GetBounceCastCommandCenter))
 
 	r.Options("/api/admin/config/chat/backgroundimage", middleware.RequireAdminAuth(adminhandlers.SetChatBackgroundImageURL))
 	r.Post("/api/admin/config/chat/backgroundimage", middleware.RequireAdminAuth(adminhandlers.SetChatBackgroundImageURL))
@@ -134,6 +136,15 @@ func Start(enableVerboseLogging bool) error {
 	r.Post("/api/bouncecast/account/profile-image", middleware.RequireUserAccessToken(handlers.BounceCastAccountUploadProfileImage))
 	r.Options("/api/bouncecast/account/notifications", handlers.BounceCastAccountOptions)
 	r.Post("/api/bouncecast/account/notifications", middleware.RequireUserAccessToken(handlers.BounceCastAccountUpdateNotifications))
+	r.Options("/api/bouncecast/account/hub", handlers.BounceCastAccountOptions)
+	r.Get("/api/bouncecast/account/hub", middleware.RequireUserAccessToken(handlers.BounceCastAccountHub))
+
+	r.Options("/api/bouncecast/djs", handlers.BounceCastPublicOptions)
+	r.Get("/api/bouncecast/djs", handlers.GetBounceCastPublicDJs)
+	r.Options("/api/bouncecast/djs/{handle}", handlers.BounceCastPublicOptions)
+	r.Get("/api/bouncecast/djs/{handle}", handlers.GetBounceCastPublicDJProfile)
+	r.Options("/api/bouncecast/schedule", handlers.BounceCastPublicOptions)
+	r.Get("/api/bouncecast/schedule", handlers.GetBounceCastPublicSchedule)
 
 	r.Options("/api/stars/config", handlers.GetStarsConfig)
 	r.Get("/api/stars/config", handlers.GetStarsConfig)
