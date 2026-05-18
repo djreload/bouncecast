@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/owncast/owncast/utils"
 	"github.com/owncast/owncast/webserver/router/middleware"
 	webutils "github.com/owncast/owncast/webserver/utils"
 )
@@ -29,19 +30,39 @@ func BounceCastAdminLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !middleware.CheckAdminCredentials(strings.TrimSpace(request.Username), request.Password) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		_ = json.NewEncoder(w).Encode(webutils.J{"error": "invalid admin credentials"})
+	username := strings.TrimSpace(request.Username)
+	password := strings.TrimSpace(request.Password)
+	if middleware.CheckAdminCredentials(username, password) {
+		middleware.SetAdminSessionCookie(w, r)
+		webutils.WriteResponse(w, webutils.J{
+			"role":        "admin",
+			"destination": "/admin/",
+			"message":     "Admin login successful.",
+		})
 		return
 	}
 
+	roleUser, err := getBounceCastAccountRoleUserForLogin(username)
+	if err != nil || roleUser.PasswordHash == "" || !roleUser.canUseAdmin() {
+		writeBounceCastAdminUnauthorized(w)
+		return
+	}
+	if err := utils.CompareHash(roleUser.PasswordHash, password); err != nil {
+		writeBounceCastAdminUnauthorized(w)
+		return
+	}
 	middleware.SetAdminSessionCookie(w, r)
 	webutils.WriteResponse(w, webutils.J{
-		"role":        "admin",
+		"role":        roleUser.adminRoleName(),
 		"destination": "/admin/",
 		"message":     "Admin login successful.",
 	})
+}
+
+func writeBounceCastAdminUnauthorized(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusUnauthorized)
+	_ = json.NewEncoder(w).Encode(webutils.J{"error": "invalid admin credentials"})
 }
 
 func setBounceCastAdminSessionHeaders(w http.ResponseWriter) {

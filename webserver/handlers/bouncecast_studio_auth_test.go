@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/owncast/owncast/core/data"
+	"github.com/owncast/owncast/models"
 	"github.com/owncast/owncast/utils"
 )
 
@@ -22,6 +23,10 @@ func resetBounceCastStudioAuthTestTables(t *testing.T) {
 	_, _ = db.Exec(`DELETE FROM bouncecast_streamer_sessions`)
 	_, _ = db.Exec(`DELETE FROM bouncecast_streamer_stream_keys`)
 	_, _ = db.Exec(`DELETE FROM bouncecast_streamer_accounts`)
+	_, _ = db.Exec(`DELETE FROM user_access_tokens WHERE user_id IN (
+		SELECT id FROM users WHERE email LIKE '%@studio-account-test.example'
+	)`)
+	_, _ = db.Exec(`DELETE FROM users WHERE email LIKE '%@studio-account-test.example'`)
 }
 
 func insertBounceCastStudioAuthStreamer(t *testing.T, handle string, email string, status string, password string) int64 {
@@ -45,6 +50,22 @@ func insertBounceCastStudioAuthStreamer(t *testing.T, handle string, email strin
 		t.Fatalf("read streamer id: %v", err)
 	}
 	return id
+}
+
+func insertBounceCastStudioAuthPublicUser(t *testing.T, id string, displayName string, email string, scopes string, password string) {
+	t.Helper()
+
+	passwordHash, err := utils.HashPassword(password)
+	if err != nil {
+		t.Fatalf("hash public user password: %v", err)
+	}
+
+	if _, err := data.GetDatabase().Exec(`
+		INSERT INTO users(id, display_name, display_color, previous_names, created_at, authenticated_at, scopes, email, password_hash, profile_image_url, registered_at)
+		VALUES(?, ?, 1, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULLIF(?, ''), ?, ?, '/img/test-dj.png', CURRENT_TIMESTAMP)
+	`, id, displayName, displayName, scopes, email, passwordHash); err != nil {
+		t.Fatalf("insert public role user: %v", err)
+	}
 }
 
 func loginBounceCastStudioStreamer(t *testing.T, body string) (*httptest.ResponseRecorder, bounceCastStudioSessionResponse) {
@@ -184,5 +205,60 @@ func TestBounceCastStudioLoginRejectsDisabledOrInvalidStreamer(t *testing.T) {
 	recorder, _ = loginBounceCastStudioStreamer(t, `{"login":"active-dj","password":"wrong-password"}`)
 	if recorder.Code != http.StatusUnauthorized {
 		t.Fatalf("wrong password status = %d, want 401", recorder.Code)
+	}
+}
+
+func TestBounceCastStudioLoginAcceptsPublicDJAccountRole(t *testing.T) {
+	resetBounceCastStudioAuthTestTables(t)
+	insertBounceCastStudioAuthPublicUser(t, "studio-account-dj", "Studio Account DJ", "dj@studio-account-test.example", models.BounceCastDJScopeKey, "correct-password")
+
+	recorder, loginResponse := loginBounceCastStudioStreamer(t, `{"login":"dj@studio-account-test.example","password":"correct-password"}`)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("public dj login status = %d, want 200: %s", recorder.Code, recorder.Body.String())
+	}
+	if loginResponse.Token == "" {
+		t.Fatal("expected session token")
+	}
+	if loginResponse.Streamer.Email != "dj@studio-account-test.example" {
+		t.Fatalf("streamer email = %q, want dj@studio-account-test.example", loginResponse.Streamer.Email)
+	}
+	if loginResponse.Streamer.Handle != "studio-account-dj" {
+		t.Fatalf("streamer handle = %q, want studio-account-dj", loginResponse.Streamer.Handle)
+	}
+	if loginResponse.Streamer.AvatarURL != "/img/test-dj.png" {
+		t.Fatalf("avatar url = %q, want /img/test-dj.png", loginResponse.Streamer.AvatarURL)
+	}
+
+	var status string
+	if err := data.GetDatabase().QueryRow(`
+		SELECT status
+		FROM bouncecast_streamer_accounts
+		WHERE email = 'dj@studio-account-test.example'
+	`).Scan(&status); err != nil {
+		t.Fatalf("read provisioned streamer: %v", err)
+	}
+	if status != "active" {
+		t.Fatalf("provisioned streamer status = %q, want active", status)
+	}
+}
+
+func TestBounceCastStudioLoginRejectsPublicAccountWithoutDJRole(t *testing.T) {
+	resetBounceCastStudioAuthTestTables(t)
+	insertBounceCastStudioAuthPublicUser(t, "studio-account-viewer", "Studio Account Viewer", "viewer@studio-account-test.example", "", "correct-password")
+
+	recorder, _ := loginBounceCastStudioStreamer(t, `{"login":"viewer@studio-account-test.example","password":"correct-password"}`)
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("viewer public account studio login status = %d, want 401", recorder.Code)
+	}
+}
+
+func TestBounceCastStudioLoginDeniesLinkedStreamerWhenDJRoleRemoved(t *testing.T) {
+	resetBounceCastStudioAuthTestTables(t)
+	insertBounceCastStudioAuthStreamer(t, "linked-dj", "linked@studio-account-test.example", "active", "correct-password")
+	insertBounceCastStudioAuthPublicUser(t, "studio-account-linked", "Linked Viewer", "linked@studio-account-test.example", "", "correct-password")
+
+	recorder, _ := loginBounceCastStudioStreamer(t, `{"login":"linked-dj","password":"correct-password"}`)
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("linked streamer without dj role status = %d, want 401", recorder.Code)
 	}
 }

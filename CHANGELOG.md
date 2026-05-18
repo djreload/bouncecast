@@ -4,9 +4,6 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 
 ## Unreleased / Next
 
-- Continue wiring stored BounceCast account roles into real product permissions:
-  - `moderator` already maps to the existing Owncast moderator scope.
-  - `owner`, `admin`, and `dj` are stored and exposed, but do not yet replace Owncast basic admin auth or the Studio DJ login flow.
 - Add rate limiting and abuse protection around public account registration, login, profile updates, Stars checkout, and Stars sending before broader public launch.
 - Add profile image upload/storage support; current public profile images are URL/path based.
 - Continue live VPS deployment notes as production configuration changes.
@@ -21,10 +18,13 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 - Added a public Stars leaderboard, ranked by total Stars sent, so viewers can compete for 1st, 2nd, and 3rd place.
 - Added the Stars leaderboard to the admin Stars dashboard.
 - Added an admin-only Stars overlay test action for previewing effects without spending Stars or changing wallets.
+- Added owner/admin BounceCast account role login support for the admin dashboard while preserving the original Owncast admin credentials.
+- Added DJ BounceCast account role login support for Studio, including automatic active Studio account provisioning on successful DJ-role login.
 
 ### Changed
 
 - Upgraded Stars overlay effects so sparkle, fireworks, hearts, hype, and DJ drop selections trigger distinct on-screen animations instead of only changing the toast styling.
+- Updated linked Studio accounts so if a matching public BounceCast account exists, Studio access now requires that account to keep the `dj` role.
 
 ### Fixed
 

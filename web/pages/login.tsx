@@ -156,13 +156,13 @@ export default function Login() {
                     <Form form={adminForm} layout="vertical" initialValues={{ username: 'admin' }}>
                       <Form.Item
                         name="username"
-                        label="Admin username"
-                        rules={[{ required: true, message: 'Enter the admin username' }]}
+                        label="Admin username or account email"
+                        rules={[{ required: true, message: 'Enter admin or an owner/admin account email' }]}
                       >
                         <Input
                           autoComplete="username"
                           prefix={<SafetyCertificateOutlined />}
-                          placeholder="admin"
+                          placeholder="admin or owner@example.com"
                         />
                       </Form.Item>
                       <Form.Item

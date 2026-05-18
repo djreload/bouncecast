@@ -436,21 +436,11 @@ func upgradeBounceCastAccount(userID string, displayName string, email string, p
 }
 
 func getBounceCastAccountLogin(email string) (string, string, error) {
-	var userID string
-	var passwordHash sql.NullString
-	err := data.GetDatabase().QueryRow(`
-		SELECT id, password_hash
-		FROM users
-		WHERE LOWER(email) = ? AND disabled_at IS NULL
-		LIMIT 1
-	`, email).Scan(&userID, &passwordHash)
+	user, err := getBounceCastAccountRoleUserForLogin(email)
 	if err != nil {
 		return "", "", err
 	}
-	if !passwordHash.Valid {
-		return userID, "", nil
-	}
-	return userID, passwordHash.String, nil
+	return user.ID, user.PasswordHash, nil
 }
 
 func normalizeBounceCastAccountEmail(value string) (string, error) {

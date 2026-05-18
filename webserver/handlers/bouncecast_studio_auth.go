@@ -80,42 +80,28 @@ func BounceCastStudioLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	streamer, passwordHash, err := getBounceCastStudioStreamerForLogin(login)
-	if err != nil || streamer.Status != "active" || passwordHash == "" {
-		writeBounceCastStudioUnauthorized(w)
-		return
-	}
-	if err := utils.CompareHash(passwordHash, password); err != nil {
-		writeBounceCastStudioUnauthorized(w)
-		return
+	if err == nil && streamer.Status == "active" && passwordHash != "" {
+		if compareErr := utils.CompareHash(passwordHash, password); compareErr == nil {
+			allowed, allowErr := canBounceCastStudioStreamerUseStoredRole(streamer)
+			if allowErr != nil {
+				webutils.InternalErrorHandler(w, allowErr)
+				return
+			}
+			if !allowed {
+				writeBounceCastStudioUnauthorized(w)
+				return
+			}
+			writeBounceCastStudioSession(w, r, streamer)
+			return
+		}
 	}
 
-	token, err := utils.GenerateAccessToken()
+	accountStreamer, err := getBounceCastStudioStreamerFromAccountRole(login, password)
 	if err != nil {
-		webutils.InternalErrorHandler(w, err)
+		writeBounceCastStudioUnauthorized(w)
 		return
 	}
-	expiresAt := time.Now().UTC().Add(bounceCastStudioSessionDuration)
-	if _, err := data.GetDatabase().Exec(`
-		INSERT INTO bouncecast_streamer_sessions(streamer_id, token_hash, expires_at, user_agent, remote_addr)
-		VALUES(?, ?, ?, NULLIF(?, ''), NULLIF(?, ''))
-	`, streamer.ID, hashBounceCastStudioToken(token), expiresAt, r.UserAgent(), utils.GetIPAddressFromRequest(r)); err != nil {
-		webutils.InternalErrorHandler(w, err)
-		return
-	}
-	if _, err := data.GetDatabase().Exec(`
-		UPDATE bouncecast_streamer_accounts
-		SET last_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?
-	`, streamer.ID); err != nil {
-		webutils.InternalErrorHandler(w, err)
-		return
-	}
-
-	webutils.WriteResponse(w, bounceCastStudioSessionResponse{
-		Token:     token,
-		ExpiresAt: expiresAt,
-		Streamer:  streamer,
-	})
+	writeBounceCastStudioSession(w, r, accountStreamer)
 }
 
 // BounceCastStudioRegister creates an inactive DJ dashboard account for admin approval.
@@ -244,6 +230,176 @@ func getBounceCastStudioStreamerForLogin(login string) (bounceCastStudioStreamer
 		return streamer, "", nil
 	}
 	return streamer, passwordHash.String, nil
+}
+
+func getBounceCastStudioStreamerFromAccountRole(login string, password string) (bounceCastStudioStreamer, error) {
+	user, err := getBounceCastAccountRoleUserForLogin(login)
+	if err != nil || user.PasswordHash == "" || !user.canUseStudio() {
+		return bounceCastStudioStreamer{}, errors.New("public account is not an active DJ")
+	}
+	if err := utils.CompareHash(user.PasswordHash, password); err != nil {
+		return bounceCastStudioStreamer{}, err
+	}
+	return provisionBounceCastStudioStreamerFromRoleUser(user)
+}
+
+func canBounceCastStudioStreamerUseStoredRole(streamer bounceCastStudioStreamer) (bool, error) {
+	if strings.TrimSpace(streamer.Email) == "" {
+		return true, nil
+	}
+
+	user, err := getBounceCastAccountRoleUserByEmail(streamer.Email)
+	if errors.Is(err, sql.ErrNoRows) {
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return user.canUseStudio(), nil
+}
+
+func provisionBounceCastStudioStreamerFromRoleUser(user bounceCastAccountRoleUser) (bounceCastStudioStreamer, error) {
+	streamer, _, err := getBounceCastStudioStreamerForLogin(strings.ToLower(user.Email))
+	if err == nil {
+		if streamer.Status != "active" || streamer.DisplayName != user.DisplayName || streamer.AvatarURL != user.ProfileImageURL {
+			if _, updateErr := data.GetDatabase().Exec(`
+				UPDATE bouncecast_streamer_accounts
+				SET display_name = ?, password_hash = ?, role = 'streamer', status = 'active',
+					avatar_url = NULLIF(?, ''), updated_at = CURRENT_TIMESTAMP
+				WHERE id = ?
+			`, user.DisplayName, user.PasswordHash, user.ProfileImageURL, streamer.ID); updateErr != nil {
+				return bounceCastStudioStreamer{}, updateErr
+			}
+			streamer, _, err = getBounceCastStudioStreamerForLogin(strings.ToLower(user.Email))
+		}
+		return streamer, err
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return bounceCastStudioStreamer{}, err
+	}
+
+	handle, err := nextBounceCastStudioAccountHandle(user.DisplayName, user.ID)
+	if err != nil {
+		return bounceCastStudioStreamer{}, err
+	}
+	result, err := data.GetDatabase().Exec(`
+		INSERT INTO bouncecast_streamer_accounts(display_name, handle, email, password_hash, role, status, avatar_url)
+		VALUES(?, ?, ?, ?, 'streamer', 'active', NULLIF(?, ''))
+	`, user.DisplayName, handle, user.Email, user.PasswordHash, user.ProfileImageURL)
+	if err != nil {
+		return bounceCastStudioStreamer{}, err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return bounceCastStudioStreamer{}, err
+	}
+	return bounceCastStudioStreamer{
+		ID:          id,
+		DisplayName: user.DisplayName,
+		Handle:      handle,
+		Email:       user.Email,
+		Role:        "streamer",
+		Status:      "active",
+		AvatarURL:   user.ProfileImageURL,
+	}, nil
+}
+
+func nextBounceCastStudioAccountHandle(displayName string, userID string) (string, error) {
+	base := makeBounceCastStudioHandleCandidate(displayName)
+	if base == "" {
+		base = makeBounceCastStudioHandleCandidate(userID)
+	}
+	if base == "" {
+		base = "dj"
+	}
+
+	candidates := []string{base}
+	suffixSource := makeBounceCastStudioHandleCandidate(userID)
+	if suffixSource != "" {
+		if len(suffixSource) > 8 {
+			suffixSource = suffixSource[:8]
+		}
+		candidates = append(candidates, trimBounceCastStudioHandle(base, 23)+"-"+suffixSource)
+	}
+	for index := 2; index <= 50; index++ {
+		candidates = append(candidates, fmt.Sprintf("%s-%d", trimBounceCastStudioHandle(base, 28), index))
+	}
+
+	for _, candidate := range candidates {
+		var existingID int64
+		err := data.GetDatabase().QueryRow(`SELECT id FROM bouncecast_streamer_accounts WHERE LOWER(handle) = LOWER(?) LIMIT 1`, candidate).Scan(&existingID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return candidate, nil
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+	return "", errors.New("could not create a unique Studio handle")
+}
+
+func makeBounceCastStudioHandleCandidate(value string) string {
+	value = strings.TrimSpace(strings.ToLower(value))
+	builder := strings.Builder{}
+	lastDash := false
+	for _, char := range value {
+		isAllowed := (char >= 'a' && char <= 'z') || (char >= '0' && char <= '9')
+		if isAllowed {
+			builder.WriteRune(char)
+			lastDash = false
+			continue
+		}
+		if (char == '-' || char == '_' || char == ' ') && builder.Len() > 0 && !lastDash {
+			builder.WriteByte('-')
+			lastDash = true
+		}
+	}
+	return trimBounceCastStudioHandle(strings.Trim(builder.String(), "-_"), 32)
+}
+
+func trimBounceCastStudioHandle(handle string, maxLength int) string {
+	handle = strings.Trim(handle, "-_")
+	if len(handle) > maxLength {
+		handle = strings.Trim(handle[:maxLength], "-_")
+	}
+	if handle == "" {
+		return ""
+	}
+	if !bounceCastStudioHandlePattern.MatchString(handle) {
+		return ""
+	}
+	return handle
+}
+
+func writeBounceCastStudioSession(w http.ResponseWriter, r *http.Request, streamer bounceCastStudioStreamer) {
+	token, err := utils.GenerateAccessToken()
+	if err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+	expiresAt := time.Now().UTC().Add(bounceCastStudioSessionDuration)
+	if _, err := data.GetDatabase().Exec(`
+		INSERT INTO bouncecast_streamer_sessions(streamer_id, token_hash, expires_at, user_agent, remote_addr)
+		VALUES(?, ?, ?, NULLIF(?, ''), NULLIF(?, ''))
+	`, streamer.ID, hashBounceCastStudioToken(token), expiresAt, r.UserAgent(), utils.GetIPAddressFromRequest(r)); err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+	if _, err := data.GetDatabase().Exec(`
+		UPDATE bouncecast_streamer_accounts
+		SET last_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, streamer.ID); err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+
+	webutils.WriteResponse(w, bounceCastStudioSessionResponse{
+		Token:     token,
+		ExpiresAt: expiresAt,
+		Streamer:  streamer,
+	})
 }
 
 func authenticateBounceCastStudioRequest(r *http.Request) (bounceCastStudioSession, error) {
