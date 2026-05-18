@@ -15,6 +15,7 @@ import (
 	"github.com/owncast/owncast/core/chat"
 	"github.com/owncast/owncast/core/data"
 	"github.com/owncast/owncast/models"
+	"github.com/owncast/owncast/persistence/notificationsrepository"
 	"github.com/owncast/owncast/persistence/userrepository"
 	"github.com/owncast/owncast/utils"
 	webutils "github.com/owncast/owncast/webserver/utils"
@@ -22,12 +23,14 @@ import (
 )
 
 const bounceCastAccountPasswordMinLength = 8
+const bounceCastMessengerChannel = "messenger"
 
 type bounceCastAccountRegisterRequest struct {
-	DisplayName     string `json:"displayName"`
-	Email           string `json:"email"`
-	Password        string `json:"password"`
-	ProfileImageURL string `json:"profileImageUrl"`
+	DisplayName             string                                    `json:"displayName"`
+	Email                   string                                    `json:"email"`
+	Password                string                                    `json:"password"`
+	ProfileImageURL         string                                    `json:"profileImageUrl"`
+	NotificationPreferences *bounceCastNotificationPreferencesRequest `json:"notificationPreferences"`
 }
 
 type bounceCastAccountLoginRequest struct {
@@ -36,14 +39,31 @@ type bounceCastAccountLoginRequest struct {
 }
 
 type bounceCastAccountProfileRequest struct {
-	DisplayName     string `json:"displayName"`
-	ProfileImageURL string `json:"profileImageUrl"`
+	DisplayName             string                                    `json:"displayName"`
+	ProfileImageURL         string                                    `json:"profileImageUrl"`
+	NotificationPreferences *bounceCastNotificationPreferencesRequest `json:"notificationPreferences"`
 }
 
 type bounceCastAccountResponse struct {
-	User        *models.User `json:"user"`
-	AccessToken string       `json:"accessToken,omitempty"`
-	Message     string       `json:"message,omitempty"`
+	User                    *models.User                             `json:"user"`
+	NotificationPreferences bounceCastAccountNotificationPreferences `json:"notificationPreferences"`
+	AccessToken             string                                   `json:"accessToken,omitempty"`
+	Message                 string                                   `json:"message,omitempty"`
+}
+
+type bounceCastNotificationPreferencesRequest struct {
+	Email                bool   `json:"email"`
+	BrowserPush          bool   `json:"browserPush"`
+	Messenger            bool   `json:"messenger"`
+	MessengerDestination string `json:"messengerDestination"`
+	BrowserPushEndpoint  string `json:"browserPushEndpoint"`
+}
+
+type bounceCastAccountNotificationPreferences struct {
+	Email                bool   `json:"email"`
+	BrowserPush          bool   `json:"browserPush"`
+	Messenger            bool   `json:"messenger"`
+	MessengerDestination string `json:"messengerDestination,omitempty"`
 }
 
 // BounceCastAccountOptions handles CORS preflight for public account APIs.
@@ -84,6 +104,11 @@ func BounceCastAccountRegister(w http.ResponseWriter, r *http.Request) {
 		webutils.BadRequestHandler(w, err)
 		return
 	}
+	notificationPreferences, err := normalizeBounceCastNotificationPreferences(request.NotificationPreferences)
+	if err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
 	passwordHash, err := utils.HashPassword(strings.TrimSpace(request.Password))
 	if err != nil {
 		webutils.InternalErrorHandler(w, err)
@@ -99,11 +124,17 @@ func BounceCastAccountRegister(w http.ResponseWriter, r *http.Request) {
 				writeBounceCastAccountSaveError(w, err)
 				return
 			}
+			if err := saveBounceCastAccountNotificationPreferences(updatedUser, notificationPreferences); err != nil {
+				webutils.InternalErrorHandler(w, err)
+				return
+			}
+			notificationPreferences, _ = getBounceCastAccountNotificationPreferences(updatedUser.ID)
 			_ = chat.SendConnectedClientInfoToUser(user.ID)
 			webutils.WriteResponse(w, bounceCastAccountResponse{
-				User:        updatedUser,
-				AccessToken: accessToken,
-				Message:     "Account registered.",
+				User:                    updatedUser,
+				NotificationPreferences: notificationPreferences,
+				AccessToken:             accessToken,
+				Message:                 "Account registered.",
 			})
 			return
 		}
@@ -114,11 +145,17 @@ func BounceCastAccountRegister(w http.ResponseWriter, r *http.Request) {
 		writeBounceCastAccountSaveError(w, err)
 		return
 	}
+	if err := saveBounceCastAccountNotificationPreferences(user, notificationPreferences); err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+	notificationPreferences, _ = getBounceCastAccountNotificationPreferences(user.ID)
 
 	webutils.WriteResponse(w, bounceCastAccountResponse{
-		User:        user,
-		AccessToken: token,
-		Message:     "Account registered.",
+		User:                    user,
+		NotificationPreferences: notificationPreferences,
+		AccessToken:             token,
+		Message:                 "Account registered.",
 	})
 }
 
@@ -184,17 +221,20 @@ func BounceCastAccountLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := userrepository.Get().GetUserByID(userID)
+	notificationPreferences, _ := getBounceCastAccountNotificationPreferences(userID)
 	webutils.WriteResponse(w, bounceCastAccountResponse{
-		User:        user,
-		AccessToken: token,
-		Message:     "Logged in.",
+		User:                    user,
+		NotificationPreferences: notificationPreferences,
+		AccessToken:             token,
+		Message:                 "Logged in.",
 	})
 }
 
 // BounceCastAccountMe returns the authenticated chat account.
 func BounceCastAccountMe(user models.User, w http.ResponseWriter, r *http.Request) {
 	setBounceCastAccountHeaders(w)
-	webutils.WriteResponse(w, bounceCastAccountResponse{User: &user})
+	notificationPreferences, _ := getBounceCastAccountNotificationPreferences(user.ID)
+	webutils.WriteResponse(w, bounceCastAccountResponse{User: &user, NotificationPreferences: notificationPreferences})
 }
 
 // BounceCastAccountUpdateProfile updates public chat profile details for a
@@ -217,6 +257,18 @@ func BounceCastAccountUpdateProfile(user models.User, w http.ResponseWriter, r *
 	if err != nil {
 		webutils.BadRequestHandler(w, err)
 		return
+	}
+	notificationPreferences, err := getBounceCastAccountNotificationPreferences(user.ID)
+	if err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+	if request.NotificationPreferences != nil {
+		notificationPreferences, err = normalizeBounceCastNotificationPreferences(request.NotificationPreferences)
+		if err != nil {
+			webutils.BadRequestHandler(w, err)
+			return
+		}
 	}
 
 	if err := ensureBounceCastDisplayNameAvailable(user.ID, displayName); err != nil {
@@ -259,10 +311,53 @@ func BounceCastAccountUpdateProfile(user models.User, w http.ResponseWriter, r *
 	}
 
 	updatedUser := userrepository.Get().GetUserByID(user.ID)
+	if err := saveBounceCastAccountNotificationPreferences(updatedUser, notificationPreferences); err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+	notificationPreferences, _ = getBounceCastAccountNotificationPreferences(user.ID)
 	_ = chat.SendConnectedClientInfoToUser(user.ID)
 	webutils.WriteResponse(w, bounceCastAccountResponse{
-		User:    updatedUser,
-		Message: "Profile updated.",
+		User:                    updatedUser,
+		NotificationPreferences: notificationPreferences,
+		Message:                 "Profile updated.",
+	})
+}
+
+// BounceCastAccountUpdateNotifications updates opt-in preferences for the
+// current public viewer account. It does not grant admin or Studio access.
+func BounceCastAccountUpdateNotifications(user models.User, w http.ResponseWriter, r *http.Request) {
+	setBounceCastAccountHeaders(w)
+
+	var request bounceCastNotificationPreferencesRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+
+	notificationPreferences, err := normalizeBounceCastNotificationPreferences(&request)
+	if err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+	notificationPreferences.BrowserPush = request.BrowserPush
+
+	if err := saveBounceCastAccountNotificationPreferences(&user, notificationPreferences); err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+	if strings.TrimSpace(request.BrowserPushEndpoint) != "" {
+		if err := saveBounceCastBrowserPushDestination(request.BrowserPushEndpoint, request.BrowserPush); err != nil {
+			webutils.BadRequestHandler(w, err)
+			return
+		}
+	}
+
+	notificationPreferences, _ = getBounceCastAccountNotificationPreferences(user.ID)
+	webutils.WriteResponse(w, bounceCastAccountResponse{
+		User:                    &user,
+		NotificationPreferences: notificationPreferences,
+		Message:                 "Notification preferences updated.",
 	})
 }
 
@@ -393,6 +488,114 @@ func normalizeBounceCastProfileImageURL(value string) (string, error) {
 		return "", errors.New("profile image must be an http(s) URL or a local path")
 	}
 	return imageURL, nil
+}
+
+func normalizeBounceCastNotificationPreferences(request *bounceCastNotificationPreferencesRequest) (bounceCastAccountNotificationPreferences, error) {
+	if request == nil {
+		return bounceCastAccountNotificationPreferences{}, nil
+	}
+	messengerDestination := utils.MakeSafeStringOfLength(request.MessengerDestination, 500)
+	if request.Messenger && messengerDestination == "" {
+		return bounceCastAccountNotificationPreferences{}, errors.New("messenger destination is required when Messenger notifications are enabled")
+	}
+
+	return bounceCastAccountNotificationPreferences{
+		Email:                request.Email,
+		BrowserPush:          request.BrowserPush,
+		Messenger:            request.Messenger,
+		MessengerDestination: messengerDestination,
+	}, nil
+}
+
+func getBounceCastAccountNotificationPreferences(userID string) (bounceCastAccountNotificationPreferences, error) {
+	var emailOptIn int
+	var browserPushOptIn int
+	var messengerOptIn int
+	var messengerDestination sql.NullString
+	err := data.GetDatabase().QueryRow(`
+		SELECT notification_email_opt_in, notification_browser_push_opt_in,
+			notification_messenger_opt_in, notification_messenger_destination
+		FROM users
+		WHERE id = ?
+	`, userID).Scan(&emailOptIn, &browserPushOptIn, &messengerOptIn, &messengerDestination)
+	if err != nil {
+		return bounceCastAccountNotificationPreferences{}, err
+	}
+
+	return bounceCastAccountNotificationPreferences{
+		Email:                emailOptIn == 1,
+		BrowserPush:          browserPushOptIn == 1,
+		Messenger:            messengerOptIn == 1,
+		MessengerDestination: messengerDestination.String,
+	}, nil
+}
+
+func saveBounceCastAccountNotificationPreferences(user *models.User, preferences bounceCastAccountNotificationPreferences) error {
+	if user == nil {
+		return errors.New("user is required")
+	}
+
+	currentPreferences, _ := getBounceCastAccountNotificationPreferences(user.ID)
+	datastore := data.GetDatastore()
+	if err := func() error {
+		datastore.DbLock.Lock()
+		defer datastore.DbLock.Unlock()
+
+		_, err := datastore.DB.Exec(`
+			UPDATE users
+			SET notification_email_opt_in = ?,
+				notification_browser_push_opt_in = ?,
+				notification_messenger_opt_in = ?,
+				notification_messenger_destination = NULLIF(?, '')
+			WHERE id = ?
+		`, bounceCastBoolToInt(preferences.Email), bounceCastBoolToInt(preferences.BrowserPush), bounceCastBoolToInt(preferences.Messenger), preferences.MessengerDestination, user.ID)
+		return err
+	}(); err != nil {
+		return err
+	}
+
+	if user.Email != "" {
+		if err := syncBounceCastNotificationDestination("email", user.Email, preferences.Email); err != nil {
+			return err
+		}
+	}
+	if currentPreferences.MessengerDestination != "" && currentPreferences.MessengerDestination != preferences.MessengerDestination {
+		if err := notificationsrepository.Get().RemoveNotificationForChannel(bounceCastMessengerChannel, currentPreferences.MessengerDestination); err != nil {
+			return err
+		}
+	}
+	return syncBounceCastNotificationDestination(bounceCastMessengerChannel, preferences.MessengerDestination, preferences.Messenger)
+}
+
+func saveBounceCastBrowserPushDestination(endpoint string, enabled bool) error {
+	endpoint = utils.MakeSafeStringOfLength(endpoint, 2000)
+	if endpoint == "" {
+		return nil
+	}
+	return syncBounceCastNotificationDestination(notificationsrepository.BrowserPushNotification, endpoint, enabled)
+}
+
+func syncBounceCastNotificationDestination(channel string, destination string, enabled bool) error {
+	destination = strings.TrimSpace(destination)
+	if destination == "" {
+		return nil
+	}
+
+	repository := notificationsrepository.Get()
+	if err := repository.RemoveNotificationForChannel(channel, destination); err != nil {
+		return err
+	}
+	if !enabled {
+		return nil
+	}
+	return repository.AddNotification(channel, destination)
+}
+
+func bounceCastBoolToInt(value bool) int {
+	if value {
+		return 1
+	}
+	return 0
 }
 
 func ensureBounceCastDisplayNameAvailable(userID string, displayName string) error {

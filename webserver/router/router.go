@@ -129,6 +129,8 @@ func Start(enableVerboseLogging bool) error {
 	r.Get("/api/bouncecast/account/me", middleware.RequireUserAccessToken(handlers.BounceCastAccountMe))
 	r.Options("/api/bouncecast/account/profile", handlers.BounceCastAccountOptions)
 	r.Post("/api/bouncecast/account/profile", middleware.RequireUserAccessToken(handlers.BounceCastAccountUpdateProfile))
+	r.Options("/api/bouncecast/account/notifications", handlers.BounceCastAccountOptions)
+	r.Post("/api/bouncecast/account/notifications", middleware.RequireUserAccessToken(handlers.BounceCastAccountUpdateNotifications))
 
 	r.Options("/api/stars/config", handlers.GetStarsConfig)
 	r.Get("/api/stars/config", handlers.GetStarsConfig)

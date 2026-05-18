@@ -11,6 +11,17 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 - Add profile image upload/storage support; current public profile images are URL/path based.
 - Continue live VPS deployment notes as production configuration changes.
 
+## 2026-05-18
+
+### Added
+
+- Added database migration `00009_bouncecast_account_notifications.sql` for public account notification opt-in preferences.
+- Added public account notification preference persistence for email, browser push, and Messenger destinations.
+
+### Fixed
+
+- Fixed Stars overlay queue timing so every sent Stars event can dismiss cleanly and the next overlay plays instead of getting stuck behind the first animation.
+
 ## 2026-05-17
 
 ### Added

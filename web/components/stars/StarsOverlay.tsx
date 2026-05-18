@@ -1,5 +1,5 @@
 import classNames from 'classnames';
-import { FC, useEffect, useRef, useState } from 'react';
+import React, { FC, useEffect, useRef, useState } from 'react';
 import { useRecoilValue } from 'recoil';
 import { starsOverlayEventsAtom } from '../stores/ClientConfigStore';
 import { StarsSentSocketEvent } from '../../interfaces/socket-events';
@@ -56,15 +56,23 @@ export const StarsOverlay: FC = () => {
 
     const nextEvent = queue[0];
     setActiveEvent(nextEvent);
-    if (nextEvent.soundEnabled) {
+    setQueue(currentQueue => currentQueue.slice(1));
+    return undefined;
+  }, [activeEvent, queue]);
+
+  useEffect(() => {
+    if (!activeEvent) {
+      return undefined;
+    }
+
+    if (activeEvent.soundEnabled) {
       playStarSound();
     }
     const timer = window.setTimeout(() => {
       setActiveEvent(null);
-      setQueue(currentQueue => currentQueue.slice(1));
     }, 4200);
     return () => window.clearTimeout(timer);
-  }, [activeEvent, queue]);
+  }, [activeEvent]);
 
   if (!activeEvent) {
     return null;
@@ -73,7 +81,7 @@ export const StarsOverlay: FC = () => {
   return (
     <div className={styles.root} aria-live="polite">
       <div className={classNames(styles.toast, styles[activeEvent.effect] || styles.sparkle)}>
-        <span className={styles.amount}>{activeEvent.amount} Stars ⭐</span>
+        <span className={styles.amount}>{activeEvent.amount} Stars &#11088;</span>
         <span className={styles.sender}>{activeEvent.displayName}</span>
         {activeEvent.message && <p className={styles.message}>{activeEvent.message}</p>}
       </div>
