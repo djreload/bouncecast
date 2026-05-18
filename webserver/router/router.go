@@ -82,6 +82,7 @@ func Start(enableVerboseLogging bool) error {
 	r.Post("/api/admin/bouncecast/stars/settings", middleware.RequireAdminAuth(adminhandlers.SetStarsSettings))
 	r.Post("/api/admin/bouncecast/stars/packages", middleware.RequireAdminAuth(adminhandlers.UpsertStarPackage))
 	r.Post("/api/admin/bouncecast/stars/wallets/adjust", middleware.RequireAdminAuth(adminhandlers.AdjustStarWallet))
+	r.Post("/api/admin/bouncecast/stars/test-overlay", middleware.RequireAdminAuth(adminhandlers.TestStarsOverlay))
 	r.Options("/api/admin/bouncecast/users", middleware.RequireAdminAuth(adminhandlers.GetBounceCastUsers))
 	r.Get("/api/admin/bouncecast/users", middleware.RequireAdminAuth(adminhandlers.GetBounceCastUsers))
 	r.Post("/api/admin/bouncecast/users/permissions", middleware.RequireAdminAuth(adminhandlers.SetBounceCastUserPermissions))

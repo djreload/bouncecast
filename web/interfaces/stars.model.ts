@@ -69,6 +69,7 @@ export interface StarLeaderboardEntry {
 export interface StarAdminSummary {
   settings: StarSettings;
   packages: StarPackage[];
+  leaderboard: StarLeaderboardEntry[];
   orders: any[];
   sendEvents: StarSendEvent[];
   transactions: StarWalletTransaction[];

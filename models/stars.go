@@ -128,6 +128,7 @@ type StarWalletSummary struct {
 type StarAdminSummary struct {
 	Settings     StarSettings            `json:"settings"`
 	Packages     []StarPackage           `json:"packages"`
+	Leaderboard  []StarLeaderboardEntry  `json:"leaderboard"`
 	Orders       []StarPayPalOrder       `json:"orders"`
 	SendEvents   []StarSendEvent         `json:"sendEvents"`
 	Transactions []StarWalletTransaction `json:"transactions"`

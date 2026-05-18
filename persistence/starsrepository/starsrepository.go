@@ -633,6 +633,10 @@ func (r *SqlRepository) GetAdminSummary() (models.StarAdminSummary, error) {
 	if err != nil {
 		return models.StarAdminSummary{}, err
 	}
+	leaderboard, err := r.GetLeaderboard(10)
+	if err != nil {
+		return models.StarAdminSummary{}, err
+	}
 	transactions, err := r.listTransactions()
 	if err != nil {
 		return models.StarAdminSummary{}, err
@@ -645,6 +649,7 @@ func (r *SqlRepository) GetAdminSummary() (models.StarAdminSummary, error) {
 	return models.StarAdminSummary{
 		Settings:     settings,
 		Packages:     packages,
+		Leaderboard:  leaderboard,
 		Orders:       orders,
 		SendEvents:   sends,
 		Transactions: transactions,

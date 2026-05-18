@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/owncast/owncast/core/stars"
 	"github.com/owncast/owncast/models"
 	"github.com/owncast/owncast/persistence/starsrepository"
 	webutils "github.com/owncast/owncast/webserver/utils"
@@ -88,6 +89,38 @@ func AdjustStarWallet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, wallet)
+}
+
+func TestStarsOverlay(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		webutils.WriteSimpleResponse(w, false, r.Method+" not supported")
+		return
+	}
+
+	var request struct {
+		DisplayName  string `json:"displayName"`
+		Amount       int    `json:"amount"`
+		Message      string `json:"message"`
+		Effect       string `json:"effect"`
+		SoundEnabled *bool  `json:"soundEnabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		webutils.WriteSimpleResponse(w, false, "invalid overlay test")
+		return
+	}
+
+	soundEnabled := false
+	if request.SoundEnabled != nil {
+		soundEnabled = *request.SoundEnabled
+	} else if settings, err := starsrepository.Get().GetSettings(); err == nil {
+		soundEnabled = settings.SoundEffectsEnabled
+	}
+
+	if err := stars.GetService().BroadcastTestOverlay(request.DisplayName, request.Amount, request.Message, request.Effect, soundEnabled); err != nil {
+		webutils.WriteSimpleResponse(w, false, err.Error())
+		return
+	}
+	webutils.WriteSimpleResponse(w, true, "Stars overlay test sent")
 }
 
 func writeJSON(w http.ResponseWriter, payload interface{}) {

@@ -19,6 +19,8 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 - Added public account notification preference persistence for email, browser push, and Messenger destinations.
 - Added public account UI controls for email, browser push, and Facebook Messenger go-live opt-ins.
 - Added a public Stars leaderboard, ranked by total Stars sent, so viewers can compete for 1st, 2nd, and 3rd place.
+- Added the Stars leaderboard to the admin Stars dashboard.
+- Added an admin-only Stars overlay test action for previewing effects without spending Stars or changing wallets.
 
 ### Changed
 

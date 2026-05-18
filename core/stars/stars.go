@@ -276,19 +276,34 @@ func (s *Service) SendStars(user models.User, amount int, message string, effect
 	_ = chat.SendSystemAction(chatLine, false)
 
 	if settings.OverlayEffectsEnabled {
-		overlayEvent := events.StarsSentEvent{
-			Event:        events.Event{},
-			DisplayName:  user.DisplayName,
-			Amount:       amount,
-			Message:      message,
-			Effect:       effect,
-			SoundEnabled: settings.SoundEffectsEnabled,
-		}
-		overlayEvent.SetDefaults()
-		_ = chat.Broadcast(&overlayEvent)
+		_ = BroadcastStarsOverlay(user.DisplayName, amount, message, effect, settings.SoundEffectsEnabled)
 	}
 
 	return sendEvent, nil
+}
+
+func (s *Service) BroadcastTestOverlay(displayName string, amount int, message string, effect string, soundEnabled bool) error {
+	displayName = strings.TrimSpace(displayName)
+	if displayName == "" {
+		displayName = "BounceCast Test"
+	}
+	if amount <= 0 {
+		amount = 100
+	}
+	return BroadcastStarsOverlay(displayName, amount, sanitizeStarMessage(message), normalizeEffect(effect), soundEnabled)
+}
+
+func BroadcastStarsOverlay(displayName string, amount int, message string, effect string, soundEnabled bool) error {
+	overlayEvent := events.StarsSentEvent{
+		Event:        events.Event{},
+		DisplayName:  displayName,
+		Amount:       amount,
+		Message:      message,
+		Effect:       normalizeEffect(effect),
+		SoundEnabled: soundEnabled,
+	}
+	overlayEvent.SetDefaults()
+	return chat.Broadcast(&overlayEvent)
 }
 
 func sanitizeStarMessage(message string) string {

@@ -142,6 +142,8 @@ export const BOUNCECAST_STARS_PACKAGES = `${API_LOCATION}bouncecast/stars/packag
 
 export const BOUNCECAST_STARS_WALLET_ADJUST = `${API_LOCATION}bouncecast/stars/wallets/adjust`;
 
+export const BOUNCECAST_STARS_TEST_OVERLAY = `${API_LOCATION}bouncecast/stars/test-overlay`;
+
 export const BOUNCECAST_USERS = `${API_LOCATION}bouncecast/users`;
 
 export const BOUNCECAST_USER_PERMISSIONS = `${API_LOCATION}bouncecast/users/permissions`;
