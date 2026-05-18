@@ -148,6 +148,8 @@ export const BOUNCECAST_USER_PERMISSIONS = `${API_LOCATION}bouncecast/users/perm
 
 export const STARS_CONFIG = `${NEXT_PUBLIC_API_HOST}api/stars/config`;
 
+export const STARS_LEADERBOARD = `${NEXT_PUBLIC_API_HOST}api/stars/leaderboard`;
+
 export const STARS_WALLET = `${NEXT_PUBLIC_API_HOST}api/stars/wallet`;
 
 export const STARS_PAYPAL_ORDER = `${NEXT_PUBLIC_API_HOST}api/stars/paypal/order`;

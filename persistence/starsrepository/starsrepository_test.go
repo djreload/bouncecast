@@ -100,6 +100,49 @@ func TestSendingStarsDeductsAndPreventsNegativeBalance(t *testing.T) {
 	}
 }
 
+func TestLeaderboardRanksUsersByStarsSent(t *testing.T) {
+	repository := newTestRepository(t)
+	users := []string{"user-1", "user-2", "user-3"}
+	for _, userID := range users {
+		if _, err := repository.AdminAdjustWallet(userID, 1000, "leaderboard seed"); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if _, err := repository.SendStars("user-1", "Kevin", 100, "first", "sparkle"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.SendStars("user-2", "Jess", 350, "second", "hearts"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.SendStars("user-3", "Maya", 250, "third", "fireworks"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.SendStars("user-1", "Kevin", 100, "again", "hype"); err != nil {
+		t.Fatal(err)
+	}
+
+	leaderboard, err := repository.GetLeaderboard(3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(leaderboard) != 3 {
+		t.Fatalf("expected 3 leaderboard entries, got %d", len(leaderboard))
+	}
+	if leaderboard[0].Rank != 1 || leaderboard[0].UserID != "user-2" || leaderboard[0].TotalSent != 350 {
+		t.Fatalf("unexpected first place entry: %+v", leaderboard[0])
+	}
+	if leaderboard[1].Rank != 2 || leaderboard[1].UserID != "user-3" || leaderboard[1].TotalSent != 250 {
+		t.Fatalf("unexpected second place entry: %+v", leaderboard[1])
+	}
+	if leaderboard[2].Rank != 3 || leaderboard[2].UserID != "user-1" || leaderboard[2].TotalSent != 200 || leaderboard[2].SendCount != 2 {
+		t.Fatalf("unexpected third place entry: %+v", leaderboard[2])
+	}
+	if leaderboard[0].LastSentAt.IsZero() {
+		t.Fatal("expected leaderboard timestamp to be parsed")
+	}
+}
+
 func TestAdminAdjustmentReturnsUpdatedWallet(t *testing.T) {
 	repository := newTestRepository(t)
 

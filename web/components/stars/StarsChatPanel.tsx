@@ -3,7 +3,12 @@ import classNames from 'classnames';
 import { FC, useEffect, useRef, useState } from 'react';
 import { useRecoilValue } from 'recoil';
 import { accessTokenAtom } from '../stores/ClientConfigStore';
-import { StarPackage, StarSettings, StarWalletSummary } from '../../interfaces/stars.model';
+import {
+  StarLeaderboardEntry,
+  StarPackage,
+  StarSettings,
+  StarWalletSummary,
+} from '../../interfaces/stars.model';
 import { StarsService } from '../../services/stars-service';
 import styles from './StarsChatPanel.module.scss';
 
@@ -28,13 +33,28 @@ function formatPrice(pkg: StarPackage): string {
   }).format(pkg.priceCents / 100);
 }
 
+function rankLabel(rank: number): string {
+  if (rank === 1) {
+    return '1st';
+  }
+  if (rank === 2) {
+    return '2nd';
+  }
+  if (rank === 3) {
+    return '3rd';
+  }
+  return `${rank}th`;
+}
+
 function loadPayPalScript(config: StarSettings): Promise<void> {
   if (window.paypal) {
     return Promise.resolve();
   }
 
   return new Promise((resolve, reject) => {
-    const existingScript = document.querySelector<HTMLScriptElement>('script[data-bouncecast-paypal]');
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      'script[data-bouncecast-paypal]',
+    );
     if (existingScript) {
       existingScript.addEventListener('load', () => resolve());
       existingScript.addEventListener('error', reject);
@@ -57,6 +77,8 @@ export const StarsChatPanel: FC = () => {
   const accessToken = useRecoilValue<string>(accessTokenAtom);
   const [config, setConfig] = useState<StarSettings>(null);
   const [wallet, setWallet] = useState<StarWalletSummary>(null);
+  const [leaderboard, setLeaderboard] = useState<StarLeaderboardEntry[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [buyOpen, setBuyOpen] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
   const [selectedPackageId, setSelectedPackageId] = useState<number>(null);
@@ -77,11 +99,25 @@ export const StarsChatPanel: FC = () => {
     }
   };
 
+  const refreshLeaderboard = async () => {
+    setLeaderboardLoading(true);
+    try {
+      setLeaderboard(await StarsService.getLeaderboard());
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLeaderboardLoading(false);
+    }
+  };
+
   useEffect(() => {
     StarsService.getConfig()
       .then(nextConfig => {
         setConfig(nextConfig);
         setSelectedPackageId(nextConfig.packages?.[0]?.id || null);
+        if (nextConfig.enabled) {
+          refreshLeaderboard();
+        }
       })
       .catch(error => console.error(error));
   }, []);
@@ -89,12 +125,19 @@ export const StarsChatPanel: FC = () => {
   useEffect(() => {
     if (config?.enabled) {
       refreshWallet();
+      refreshLeaderboard();
     }
   }, [accessToken, config?.enabled]);
 
   useEffect(() => {
+    if (buyOpen && config?.enabled) {
+      refreshLeaderboard();
+    }
+  }, [buyOpen, config?.enabled]);
+
+  useEffect(() => {
     if (!buyOpen || !config?.paypalClientId || !selectedPackageId || !paypalRef.current) {
-      return;
+      return undefined;
     }
 
     let cancelled = false;
@@ -148,10 +191,44 @@ export const StarsChatPanel: FC = () => {
       setSendOpen(false);
       setSendMessage('');
       refreshWallet();
+      refreshLeaderboard();
     } catch (error) {
       message.error(error instanceof Error ? error.message : 'Unable to send Stars');
     }
   };
+
+  const renderLeaderboard = () => (
+    <div className={styles.leaderboardPanel}>
+      <p className={styles.leaderboardIntro}>
+        Send Stars to climb the board. The top three supporters get the spotlight.
+      </p>
+      {leaderboard.length === 0 ? (
+        <Alert
+          type={leaderboardLoading ? 'info' : 'success'}
+          message={leaderboardLoading ? 'Loading leaderboard' : 'No Stars sent yet'}
+          showIcon
+        />
+      ) : (
+        leaderboard.map(entry => (
+          <div
+            key={entry.userId}
+            className={classNames(styles.leaderboardRow, {
+              [styles.leaderboardFirst]: entry.rank === 1,
+              [styles.leaderboardSecond]: entry.rank === 2,
+              [styles.leaderboardThird]: entry.rank === 3,
+            })}
+          >
+            <span className={styles.rankBadge}>{rankLabel(entry.rank)}</span>
+            <span className={styles.leaderName}>{entry.displayName || 'Anonymous'}</span>
+            <span className={styles.leaderStats}>
+              <strong>{entry.totalSent}</strong> Stars
+              <small>{entry.sendCount} sends</small>
+            </span>
+          </div>
+        ))
+      )}
+    </div>
+  );
 
   return (
     <>
@@ -207,6 +284,11 @@ export const StarsChatPanel: FC = () => {
               ),
             },
             {
+              key: 'leaderboard',
+              label: 'Leaderboard',
+              children: renderLeaderboard(),
+            },
+            {
               key: 'send',
               label: 'Send',
               children: (
@@ -227,7 +309,11 @@ export const StarsChatPanel: FC = () => {
                   />
                   <Select value={effect} options={effectOptions} onChange={setEffect} />
                   <Space>
-                    <Button type="primary" onClick={handleSendStars} disabled={balance < sendAmount}>
+                    <Button
+                      type="primary"
+                      onClick={handleSendStars}
+                      disabled={balance < sendAmount}
+                    >
                       Send Stars
                     </Button>
                     <Button onClick={() => setSendOpen(true)}>History</Button>
@@ -238,12 +324,7 @@ export const StarsChatPanel: FC = () => {
           ]}
         />
       </Modal>
-      <Modal
-        title="Star history"
-        open={sendOpen}
-        onCancel={() => setSendOpen(false)}
-        footer={null}
-      >
+      <Modal title="Star history" open={sendOpen} onCancel={() => setSendOpen(false)} footer={null}>
         <List
           dataSource={wallet?.transactions || []}
           locale={{ emptyText: 'No Star transactions yet' }}

@@ -1,12 +1,18 @@
 import {
   getUnauthedData,
   STARS_CONFIG,
+  STARS_LEADERBOARD,
   STARS_WALLET,
   STARS_PAYPAL_ORDER,
   STARS_PAYPAL_CAPTURE,
   STARS_SEND,
 } from '../utils/apis';
-import { StarSettings, StarWalletSummary, StarSendEvent } from '../interfaces/stars.model';
+import {
+  StarSettings,
+  StarWalletSummary,
+  StarSendEvent,
+  StarLeaderboardEntry,
+} from '../interfaces/stars.model';
 
 function withAccessToken(url: string, accessToken: string): string {
   const separator = url.includes('?') ? '&' : '?';
@@ -16,6 +22,10 @@ function withAccessToken(url: string, accessToken: string): string {
 export class StarsService {
   public static async getConfig(): Promise<StarSettings> {
     return getUnauthedData(STARS_CONFIG);
+  }
+
+  public static async getLeaderboard(): Promise<StarLeaderboardEntry[]> {
+    return getUnauthedData(STARS_LEADERBOARD);
   }
 
   public static async getWallet(accessToken: string): Promise<StarWalletSummary> {
@@ -48,3 +58,5 @@ export class StarsService {
     });
   }
 }
+
+export default StarsService;

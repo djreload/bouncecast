@@ -5,14 +5,16 @@ import { StarsOverlay } from '../components/stars/StarsOverlay';
 import { starsOverlayEventsAtom } from '../components/stores/ClientConfigStore';
 import { MessageType, StarsSentSocketEvent } from '../interfaces/socket-events';
 
-jest.mock('../components/stars/StarsOverlay.module.scss', () => {
-  return new Proxy(
-    {},
-    {
-      get: (_, property) => String(property),
-    },
-  );
-});
+jest.mock(
+  '../components/stars/StarsOverlay.module.scss',
+  () =>
+    new Proxy(
+      {},
+      {
+        get: (_, property) => String(property),
+      },
+    ),
+);
 
 declare global {
   interface Window {
@@ -28,7 +30,7 @@ const baseEvent = {
   soundEnabled: false,
 };
 
-function StarsOverlayHarness() {
+const StarsOverlayHarness = () => {
   const setStarsOverlayEvents = useSetRecoilState(starsOverlayEventsAtom);
 
   useEffect(() => {
@@ -38,7 +40,7 @@ function StarsOverlayHarness() {
   }, [setStarsOverlayEvents]);
 
   return <StarsOverlay />;
-}
+};
 
 describe('StarsOverlay', () => {
   beforeEach(() => {
@@ -46,7 +48,9 @@ describe('StarsOverlay', () => {
   });
 
   afterEach(() => {
-    jest.runOnlyPendingTimers();
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
     jest.useRealTimers();
     delete window.pushStarsOverlayEvent;
   });
@@ -84,5 +88,26 @@ describe('StarsOverlay', () => {
 
     expect(screen.getByText(/200 Stars/)).toBeInTheDocument();
     expect(screen.getByText('Second drop')).toBeInTheDocument();
+  });
+
+  it('renders the selected effect layer', () => {
+    render(
+      <RecoilRoot>
+        <StarsOverlayHarness />
+      </RecoilRoot>,
+    );
+
+    act(() => {
+      window.pushStarsOverlayEvent({
+        ...baseEvent,
+        id: 'stars-fireworks',
+        amount: 300,
+        effect: 'fireworks',
+        message: 'Light it up',
+      });
+    });
+
+    expect(screen.getByTestId('stars-overlay-toast')).toHaveAttribute('data-effect', 'fireworks');
+    expect(document.querySelectorAll('[data-effect-particle="fireworks"]')).toHaveLength(24);
   });
 });

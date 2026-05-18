@@ -108,6 +108,16 @@ type StarSendEvent struct {
 	CreatedAt   time.Time `json:"createdAt"`
 }
 
+// StarLeaderboardEntry is a public ranking of viewers by lifetime Stars sent.
+type StarLeaderboardEntry struct {
+	Rank        int       `json:"rank"`
+	UserID      string    `json:"userId"`
+	DisplayName string    `json:"displayName"`
+	TotalSent   int       `json:"totalSent"`
+	SendCount   int       `json:"sendCount"`
+	LastSentAt  time.Time `json:"lastSentAt"`
+}
+
 // StarWalletSummary combines wallet balance and recent transactions.
 type StarWalletSummary struct {
 	Wallet       StarWallet              `json:"wallet"`

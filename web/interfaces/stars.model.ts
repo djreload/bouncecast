@@ -57,6 +57,15 @@ export interface StarSendEvent {
   createdAt: string;
 }
 
+export interface StarLeaderboardEntry {
+  rank: number;
+  userId: string;
+  displayName: string;
+  totalSent: number;
+  sendCount: number;
+  lastSentAt: string;
+}
+
 export interface StarAdminSummary {
   settings: StarSettings;
   packages: StarPackage[];

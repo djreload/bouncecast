@@ -32,6 +32,7 @@ type Repository interface {
 	RefundPayPalCapture(captureID string, rawStatus string) error
 	SendStars(userID string, displayName string, amount int, message string, effect string) (models.StarSendEvent, error)
 	GetLastSendTime(userID string) (*time.Time, error)
+	GetLeaderboard(limit int) ([]models.StarLeaderboardEntry, error)
 	AdminAdjustWallet(userID string, amount int, notes string) (models.StarWallet, error)
 	RecordWebhookEvent(eventID string, eventType string, resourceID string, status string, errText string) error
 	GetAdminSummary() (models.StarAdminSummary, error)
@@ -499,6 +500,57 @@ func (r *SqlRepository) GetLastSendTime(userID string) (*time.Time, error) {
 	return &createdAt, nil
 }
 
+func (r *SqlRepository) GetLeaderboard(limit int) ([]models.StarLeaderboardEntry, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 10
+	}
+
+	rows, err := r.datastore.DB.Query(`
+		SELECT
+			summary.user_id,
+			COALESCE(
+				NULLIF(TRIM((
+					SELECT latest.display_name
+					FROM star_send_events latest
+					WHERE latest.user_id = summary.user_id
+					ORDER BY latest.created_at DESC, latest.id DESC
+					LIMIT 1
+				)), ''),
+				'Anonymous'
+			) AS display_name,
+			summary.total_sent,
+			summary.send_count,
+			summary.last_sent_at
+		FROM (
+			SELECT
+				user_id,
+				SUM(amount) AS total_sent,
+				COUNT(*) AS send_count,
+				MAX(created_at) AS last_sent_at
+			FROM star_send_events
+			GROUP BY user_id
+		) summary
+		ORDER BY total_sent DESC, send_count DESC, last_sent_at ASC
+		LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	entries := []models.StarLeaderboardEntry{}
+	for rows.Next() {
+		var entry models.StarLeaderboardEntry
+		var lastSentAt string
+		if err := rows.Scan(&entry.UserID, &entry.DisplayName, &entry.TotalSent, &entry.SendCount, &lastSentAt); err != nil {
+			return nil, err
+		}
+		entry.Rank = len(entries) + 1
+		entry.LastSentAt = parseLeaderboardTime(lastSentAt)
+		entries = append(entries, entry)
+	}
+	return entries, rows.Err()
+}
+
 func (r *SqlRepository) AdminAdjustWallet(userID string, amount int, notes string) (models.StarWallet, error) {
 	updatedAt := time.Now().UTC()
 
@@ -890,6 +942,23 @@ func parseInt(value string, fallback int) int {
 		return fallback
 	}
 	return parsed
+}
+
+func parseLeaderboardTime(value string) time.Time {
+	value = strings.TrimSpace(value)
+	for _, layout := range []string{
+		time.RFC3339Nano,
+		"2006-01-02 15:04:05.999999999-07:00",
+		"2006-01-02 15:04:05.999999999Z07:00",
+		"2006-01-02 15:04:05.999999999",
+		"2006-01-02 15:04:05",
+	} {
+		parsed, err := time.Parse(layout, value)
+		if err == nil {
+			return parsed
+		}
+	}
+	return time.Time{}
 }
 
 func boolToInt(value bool) int {

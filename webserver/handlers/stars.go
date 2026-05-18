@@ -28,6 +28,32 @@ func GetStarsConfig(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, config)
 }
 
+func GetStarsLeaderboard(w http.ResponseWriter, r *http.Request) {
+	middleware.EnableCors(w)
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	repository := starsrepository.Get()
+	settings, err := repository.GetSettings()
+	if err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+	if !settings.Enabled {
+		writeJSON(w, []models.StarLeaderboardEntry{})
+		return
+	}
+
+	leaderboard, err := repository.GetLeaderboard(10)
+	if err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+	writeJSON(w, leaderboard)
+}
+
 func GetStarsWallet(user models.User, w http.ResponseWriter, r *http.Request) {
 	middleware.EnableCors(w)
 	summary, err := starsrepository.Get().GetWalletSummary(user.ID)

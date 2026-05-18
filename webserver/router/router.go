@@ -134,6 +134,8 @@ func Start(enableVerboseLogging bool) error {
 
 	r.Options("/api/stars/config", handlers.GetStarsConfig)
 	r.Get("/api/stars/config", handlers.GetStarsConfig)
+	r.Options("/api/stars/leaderboard", handlers.GetStarsLeaderboard)
+	r.Get("/api/stars/leaderboard", handlers.GetStarsLeaderboard)
 	r.Get("/api/stars/wallet", middleware.RequireUserAccessToken(handlers.GetStarsWallet))
 	r.Post("/api/stars/paypal/order", middleware.RequireUserAccessToken(handlers.CreateStarsPayPalOrder))
 	r.Post("/api/stars/paypal/capture", middleware.RequireUserAccessToken(handlers.CaptureStarsPayPalOrder))
