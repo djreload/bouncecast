@@ -194,6 +194,8 @@ export const BOUNCECAST_ACCOUNT_ME = `${ACCOUNT_API_LOCATION}me`;
 
 export const BOUNCECAST_ACCOUNT_PROFILE = `${ACCOUNT_API_LOCATION}profile`;
 
+export const BOUNCECAST_ACCOUNT_PROFILE_IMAGE = `${ACCOUNT_API_LOCATION}profile-image`;
+
 export const BOUNCECAST_ACCOUNT_NOTIFICATIONS = `${ACCOUNT_API_LOCATION}notifications`;
 
 export const API_YP_RESET = `${API_LOCATION}yp/reset`;
@@ -260,6 +262,22 @@ export async function getUnauthedData(url: string, options?: FetchOptions) {
     ...options,
   };
   return fetchData(url, opts);
+}
+
+export async function postUnauthedFormData(url: string, data: FormData) {
+  const response = await fetch(getCredentialSafeFetchURL(url), {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+    },
+    body: data,
+  });
+  const json = await response.json();
+  if (!response.ok) {
+    const message = json.message || json.error || `An error has occurred: ${response.status}`;
+    throw new Error(message);
+  }
+  return json;
 }
 
 export async function fetchStudioData(url: string, token?: string, options?: FetchOptions) {

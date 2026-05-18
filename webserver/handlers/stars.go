@@ -70,6 +70,9 @@ func CreateStarsPayPalOrder(user models.User, w http.ResponseWriter, r *http.Req
 		webutils.WriteSimpleResponse(w, false, r.Method+" not supported")
 		return
 	}
+	if !enforceBounceCastRateLimit(w, r, bounceCastStarsCheckoutRateLimit, bounceCastRateLimitUserSubject(user.ID), bounceCastRateLimitIPSubject(r)) {
+		return
+	}
 
 	var request struct {
 		PackageID int64 `json:"packageId"`
@@ -93,6 +96,9 @@ func CaptureStarsPayPalOrder(user models.User, w http.ResponseWriter, r *http.Re
 		webutils.WriteSimpleResponse(w, false, r.Method+" not supported")
 		return
 	}
+	if !enforceBounceCastRateLimit(w, r, bounceCastStarsCaptureRateLimit, bounceCastRateLimitUserSubject(user.ID), bounceCastRateLimitIPSubject(r)) {
+		return
+	}
 
 	var request struct {
 		PayPalOrderID string `json:"paypalOrderId"`
@@ -114,6 +120,9 @@ func SendStars(user models.User, w http.ResponseWriter, r *http.Request) {
 	middleware.EnableCors(w)
 	if r.Method != http.MethodPost {
 		webutils.WriteSimpleResponse(w, false, r.Method+" not supported")
+		return
+	}
+	if !enforceBounceCastRateLimit(w, r, bounceCastStarsSendRateLimit, bounceCastRateLimitUserSubject(user.ID), bounceCastRateLimitIPSubject(r)) {
 		return
 	}
 

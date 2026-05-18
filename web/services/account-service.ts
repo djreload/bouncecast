@@ -3,8 +3,10 @@ import {
   BOUNCECAST_ACCOUNT_ME,
   BOUNCECAST_ACCOUNT_NOTIFICATIONS,
   BOUNCECAST_ACCOUNT_PROFILE,
+  BOUNCECAST_ACCOUNT_PROFILE_IMAGE,
   BOUNCECAST_ACCOUNT_REGISTER,
   getUnauthedData,
+  postUnauthedFormData,
 } from '../utils/apis';
 
 function withAccessToken(url: string, accessToken?: string): string {
@@ -55,6 +57,12 @@ export class AccountService {
       method: 'POST',
       data: payload,
     });
+  }
+
+  public static async uploadProfileImage(accessToken: string, file: File) {
+    const data = new FormData();
+    data.append('image', file);
+    return postUnauthedFormData(withAccessToken(BOUNCECAST_ACCOUNT_PROFILE_IMAGE, accessToken), data);
   }
 
   public static async updateNotifications(

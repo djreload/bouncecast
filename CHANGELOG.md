@@ -4,8 +4,6 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 
 ## Unreleased / Next
 
-- Add rate limiting and abuse protection around public account registration, login, profile updates, Stars checkout, and Stars sending before broader public launch.
-- Add profile image upload/storage support; current public profile images are URL/path based.
 - Continue live VPS deployment notes as production configuration changes.
 
 ## 2026-05-18
@@ -20,11 +18,15 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 - Added an admin-only Stars overlay test action for previewing effects without spending Stars or changing wallets.
 - Added owner/admin BounceCast account role login support for the admin dashboard while preserving the original Owncast admin credentials.
 - Added DJ BounceCast account role login support for Studio, including automatic active Studio account provisioning on successful DJ-role login.
+- Added in-memory rate limiting for public account registration, account login, profile updates, profile image uploads, Stars checkout, Stars payment capture, and Stars sending.
+- Added local profile image uploads for public accounts, storing validated PNG/JPG/GIF images under `data/public/profiles`.
 
 ### Changed
 
 - Upgraded Stars overlay effects so sparkle, fireworks, hearts, hype, and DJ drop selections trigger distinct on-screen animations instead of only changing the toast styling.
 - Updated linked Studio accounts so if a matching public BounceCast account exists, Studio access now requires that account to keep the `dj` role.
+- Updated the public account modal so users can upload a profile picture or keep using an external profile picture URL.
+- Updated Debian 13/Plesk live server notes with profile image storage and rate-limit deployment guidance.
 
 ### Fixed
 

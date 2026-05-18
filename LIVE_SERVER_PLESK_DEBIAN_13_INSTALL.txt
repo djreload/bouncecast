@@ -437,6 +437,50 @@ Recommended DNS records for email deliverability:
 These records are managed in Plesk DNS or your external DNS provider.
 
 
+Public account hardening and profile image uploads
+==================================================
+
+BounceCast includes application-level rate limits for public account
+registration, account login, profile updates, profile image uploads, Stars
+checkout, Stars payment capture, and Stars sending. These limits are in-memory
+per running container. They are intended to slow abuse before broader public
+launch, but they are not a substitute for a real edge WAF if the site becomes
+large.
+
+When running behind Plesk/nginx or Cloudflare, make sure the reverse proxy sends
+the real client IP headers so the app does not see every visitor as the proxy:
+
+  proxy_set_header X-Real-IP $remote_addr;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
+
+Uploaded public account profile images are stored inside the persistent data
+volume:
+
+  /var/lib/bouncecast/data/public/profiles
+
+They are served by BounceCast as:
+
+  https://live.example.com/public/profiles/FILE_NAME.png
+
+Supported upload formats:
+
+- PNG
+- JPG/JPEG
+- GIF
+
+Current upload limits:
+
+- Maximum file size: 2 MB
+- Maximum decoded dimensions: 4096 x 4096 pixels
+
+Because profile images live under /var/lib/bouncecast/data, the backup and
+restore commands in this guide already include them. To inspect uploaded
+profile images on the VPS:
+
+  ls -lh /var/lib/bouncecast/data/public/profiles
+
+
 Step 15 - Operational commands
 ==============================
 
@@ -644,4 +688,3 @@ https://docs.docker.com/engine/install/debian/
 
 BounceCast repository:
 https://github.com/djreload/bouncecast
-

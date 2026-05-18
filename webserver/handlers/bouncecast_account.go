@@ -77,6 +77,9 @@ func BounceCastAccountOptions(w http.ResponseWriter, r *http.Request) {
 // place so chat history, color, wallet, and moderation state are preserved.
 func BounceCastAccountRegister(w http.ResponseWriter, r *http.Request) {
 	setBounceCastAccountHeaders(w)
+	if !enforceBounceCastRateLimit(w, r, bounceCastAccountRegisterIPRateLimit, bounceCastRateLimitIPSubject(r)) {
+		return
+	}
 
 	var request bounceCastAccountRegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
@@ -93,6 +96,9 @@ func BounceCastAccountRegister(w http.ResponseWriter, r *http.Request) {
 	email, err := normalizeBounceCastAccountEmail(request.Email)
 	if err != nil {
 		webutils.BadRequestHandler(w, err)
+		return
+	}
+	if !enforceBounceCastRateLimit(w, r, bounceCastAccountRegisterEmailRateLimit, bounceCastRateLimitEmailSubject(email)) {
 		return
 	}
 	if err := validateBounceCastAccountPassword(request.Password); err != nil {
@@ -163,6 +169,9 @@ func BounceCastAccountRegister(w http.ResponseWriter, r *http.Request) {
 // access token for the existing user.
 func BounceCastAccountLogin(w http.ResponseWriter, r *http.Request) {
 	setBounceCastAccountHeaders(w)
+	if !enforceBounceCastRateLimit(w, r, bounceCastAccountLoginIPRateLimit, bounceCastRateLimitIPSubject(r)) {
+		return
+	}
 
 	var request bounceCastAccountLoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
@@ -173,6 +182,9 @@ func BounceCastAccountLogin(w http.ResponseWriter, r *http.Request) {
 	email, err := normalizeBounceCastAccountEmail(request.Email)
 	if err != nil {
 		writeBounceCastAccountUnauthorized(w)
+		return
+	}
+	if !enforceBounceCastRateLimit(w, r, bounceCastAccountLoginEmailRateLimit, bounceCastRateLimitEmailSubject(email)) {
 		return
 	}
 	password := strings.TrimSpace(request.Password)
@@ -241,6 +253,9 @@ func BounceCastAccountMe(user models.User, w http.ResponseWriter, r *http.Reques
 // connected chat identity.
 func BounceCastAccountUpdateProfile(user models.User, w http.ResponseWriter, r *http.Request) {
 	setBounceCastAccountHeaders(w)
+	if !enforceBounceCastRateLimit(w, r, bounceCastAccountProfileRateLimit, bounceCastRateLimitUserSubject(user.ID), bounceCastRateLimitIPSubject(r)) {
+		return
+	}
 
 	var request bounceCastAccountProfileRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {

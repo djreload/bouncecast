@@ -9,9 +9,11 @@ import {
   Tabs,
   Tag,
   Typography,
+  Upload,
   message as toast,
 } from 'antd';
 import { useRecoilState, useRecoilValue } from 'recoil';
+import type { FormInstance } from 'antd/es/form';
 import { AccountService, NotificationPreferencesPayload } from '../../../services/account-service';
 import { registerWebPushNotifications } from '../../../services/notifications-service';
 import {
@@ -69,6 +71,7 @@ export const AccountModal: FC<AccountModalProps> = ({ closeModal }) => {
   const [notificationPreferences, setNotificationPreferences] =
     useState<NotificationPreferencesPayload>(defaultNotificationPreferences);
   const [savingNotifications, setSavingNotifications] = useState(false);
+  const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
   const [registerForm] = Form.useForm();
   const [loginForm] = Form.useForm();
   const [profileForm] = Form.useForm();
@@ -170,6 +173,42 @@ export const AccountModal: FC<AccountModalProps> = ({ closeModal }) => {
       toast.error(error instanceof Error ? error.message : 'Unable to update profile');
     }
   };
+
+  const handleProfileImageUpload = async (file: File, form: FormInstance) => {
+    if (!accessToken) {
+      toast.error('Join chat first, then upload a profile picture');
+      return;
+    }
+
+    try {
+      setUploadingProfileImage(true);
+      const result = await AccountService.uploadProfileImage(accessToken, file);
+      applyAccountResponse(result);
+      form.setFieldsValue({ profileImageUrl: result?.user?.profileImageUrl });
+      toast.success('Profile picture uploaded');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to upload profile picture');
+    } finally {
+      setUploadingProfileImage(false);
+    }
+  };
+
+  const profileImageUploadControl = (form: FormInstance) => (
+    <div className={styles.imageActions}>
+      <Upload
+        accept="image/png,image/jpeg,image/gif"
+        beforeUpload={file => {
+          void handleProfileImageUpload(file as File, form);
+          return false;
+        }}
+        maxCount={1}
+        showUploadList={false}
+      >
+        <Button loading={uploadingProfileImage}>Upload picture</Button>
+      </Upload>
+      <Text type="secondary">PNG, JPG, or GIF up to 2 MB.</Text>
+    </div>
+  );
 
   const handleNotificationSave = async () => {
     try {
@@ -279,6 +318,7 @@ export const AccountModal: FC<AccountModalProps> = ({ closeModal }) => {
         <Form.Item name="profileImageUrl" label="Profile picture URL">
           <Input placeholder="https://example.com/avatar.png" maxLength={500} />
         </Form.Item>
+        {profileImageUploadControl(registerForm)}
         <div className={styles.notificationBox}>
           <Text strong>Go-live notifications</Text>
           <Text type="secondary">
@@ -336,6 +376,7 @@ export const AccountModal: FC<AccountModalProps> = ({ closeModal }) => {
         <Form.Item name="profileImageUrl" label="Profile picture URL">
           <Input placeholder="https://example.com/avatar.png" maxLength={500} />
         </Form.Item>
+        {profileImageUploadControl(profileForm)}
         <div className={styles.formActions}>
           <Button type="primary" onClick={handleProfileSave}>
             Save profile
