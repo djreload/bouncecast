@@ -1,4 +1,5 @@
 import React, { ReactElement, useEffect, useMemo, useState } from 'react';
+import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
@@ -90,7 +91,7 @@ function DJCard({ dj, active }: { dj: BounceCastPublicDJ; active: boolean }) {
             ? `Next: ${dj.upcomingSet} at ${formatDate(dj.upcomingStarts)}`
             : 'No upcoming public set yet.'}
         </Text>
-        <Link href={`/djs?handle=${encodeURIComponent(dj.handle)}`}>
+        <Link href={`/djs/${encodeURIComponent(dj.handle)}`}>
           <Button type={active ? 'primary' : 'default'} block>
             View profile
           </Button>
@@ -111,8 +112,17 @@ export default function DJsPage() {
 
   const selectedHandle = useMemo(() => {
     const queryHandle = router.query.handle;
-    return Array.isArray(queryHandle) ? queryHandle[0] : queryHandle || djs[0]?.handle || '';
-  }, [djs, router.query.handle]);
+    const pathHandle =
+      typeof router.asPath === 'string' && router.asPath.startsWith('/djs/')
+        ? router.asPath
+            .split('?')[0]
+            .replace(/^\/djs\//, '')
+            .replace(/\/$/, '')
+        : '';
+    return Array.isArray(queryHandle)
+      ? queryHandle[0]
+      : queryHandle || decodeURIComponent(pathHandle) || djs[0]?.handle || '';
+  }, [djs, router.asPath, router.query.handle]);
 
   useEffect(() => {
     BounceCastService.getDJs()
@@ -142,6 +152,22 @@ export default function DJsPage() {
 
   return (
     <main className={styles.page}>
+      <Head>
+        <title>
+          {profile ? `${profile.dj.displayName} on BounceCast` : 'BounceCast DJ profiles'}
+        </title>
+        <meta
+          name="description"
+          content={
+            profile?.dj.bio ||
+            'Browse BounceCast DJs, public lineup filters, and upcoming live DJ sets.'
+          }
+        />
+        {profile?.dj.heroImageUrl && <meta property="og:image" content={profile.dj.heroImageUrl} />}
+        {profile && (
+          <meta property="og:title" content={`${profile.dj.displayName} on BounceCast`} />
+        )}
+      </Head>
       <div className={styles.shell}>
         <header className={styles.topbar}>
           <Link href="/" className={styles.brand}>

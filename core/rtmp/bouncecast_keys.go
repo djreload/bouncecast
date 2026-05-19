@@ -43,6 +43,13 @@ type bounceCastEmailSettings struct {
 	subject     string
 }
 
+type bounceCastMessengerSettings struct {
+	enabled         bool
+	graphAPIVersion string
+	pageAccessToken string
+	messageTemplate string
+}
+
 type bounceCastNotificationSubscriberTarget struct {
 	id          int64
 	channel     string
@@ -52,30 +59,36 @@ type bounceCastNotificationSubscriberTarget struct {
 type bounceCastQueuedDelivery struct {
 	id          int64
 	destination string
+	reminderID  sql.NullInt64
 }
 
 const (
-	bounceCastEmailProviderKey    = "email_provider"
-	bounceCastEmailEnabledKey     = "email_enabled"
-	bounceCastEmailHostKey        = "email_host"
-	bounceCastEmailPortKey        = "email_port"
-	bounceCastEmailUsernameKey    = "email_username"
-	bounceCastEmailPasswordKey    = "email_password"
-	bounceCastEmailFromAddressKey = "email_from_address"
-	bounceCastEmailFromNameKey    = "email_from_name"
-	bounceCastEmailStartTLSKey    = "email_start_tls"
-	bounceCastEmailSubjectKey     = "email_subject"
-	bounceCastPushDeliveryChannel = "push"
-	bounceCastEmailProviderBrevo  = "brevo"
-	bounceCastEmailProviderCustom = "custom"
-	bounceCastBrevoSMTPHost       = "smtp-relay.brevo.com"
-	bounceCastBrevoSMTPPort       = 587
+	bounceCastEmailProviderKey            = "email_provider"
+	bounceCastEmailEnabledKey             = "email_enabled"
+	bounceCastEmailHostKey                = "email_host"
+	bounceCastEmailPortKey                = "email_port"
+	bounceCastEmailUsernameKey            = "email_username"
+	bounceCastEmailPasswordKey            = "email_password"
+	bounceCastEmailFromAddressKey         = "email_from_address"
+	bounceCastEmailFromNameKey            = "email_from_name"
+	bounceCastEmailStartTLSKey            = "email_start_tls"
+	bounceCastEmailSubjectKey             = "email_subject"
+	bounceCastPushDeliveryChannel         = "push"
+	bounceCastEmailProviderBrevo          = "brevo"
+	bounceCastEmailProviderCustom         = "custom"
+	bounceCastBrevoSMTPHost               = "smtp-relay.brevo.com"
+	bounceCastBrevoSMTPPort               = 587
+	bounceCastMessengerEnabledKey         = "messenger_enabled"
+	bounceCastMessengerAPIVersionKey      = "messenger_graph_api_version"
+	bounceCastMessengerPageAccessTokenKey = "messenger_page_access_token"
+	bounceCastMessengerMessageTemplateKey = "messenger_message_template"
 )
 
 var sendBounceCastQueuedDeliveries = func(goLiveEventID int64) {
 	go sendBounceCastWebhookDeliveries(goLiveEventID)
 	go sendBounceCastEmailDeliveries(goLiveEventID)
 	go sendBounceCastBrowserPushDeliveries(goLiveEventID)
+	go sendBounceCastMessengerDeliveries(goLiveEventID)
 }
 
 func validateBounceCastStreamerKey(path string) *bounceCastStreamerKeyMatch {
@@ -297,8 +310,8 @@ func queueBounceCastGoLiveNotifications(goLiveEventID int64, scheduleID sql.Null
 		queuedCount++
 	}
 
-	if scheduleID.Valid && enabledChannels["email"] {
-		queuedCount += queueBounceCastScheduleReminderDeliveries(db, goLiveEventID, scheduleID.Int64)
+	if scheduleID.Valid {
+		queuedCount += queueBounceCastScheduleReminderDeliveries(db, goLiveEventID, scheduleID.Int64, enabledChannels)
 	}
 
 	if enabledChannels[bounceCastPushDeliveryChannel] {
@@ -318,32 +331,46 @@ func queueBounceCastGoLiveNotifications(goLiveEventID int64, scheduleID sql.Null
 	}
 }
 
-func queueBounceCastScheduleReminderDeliveries(db *sql.DB, goLiveEventID int64, scheduleID int64) int {
+func queueBounceCastScheduleReminderDeliveries(db *sql.DB, goLiveEventID int64, scheduleID int64, enabledChannels map[string]bool) int {
 	rows, err := db.Query(`
-		SELECT email
+		SELECT r.id, COALESCE(r.email, ''), r.notify_email, r.notify_push, r.notify_messenger,
+			COALESCE(r.messenger_destination, ''),
+			COALESCE(r.browser_push_endpoint, ''),
+			COALESCE((
+				SELECT p.subscription_json
+				FROM bouncecast_account_push_subscriptions p
+				WHERE p.user_id = r.user_id AND p.enabled = 1 AND p.disabled_at IS NULL
+				ORDER BY p.last_seen_at DESC
+				LIMIT 1
+			), '')
 		FROM bouncecast_schedule_reminders
+		r
 		WHERE schedule_id = ?
 			AND disabled_at IS NULL
-			AND notify_email = 1
-			AND COALESCE(email, '') != ''
 	`, scheduleID)
 	if err != nil {
 		log.Debugln("unable to query BounceCast schedule reminders", err)
 		return 0
 	}
 
-	destinations := []string{}
+	type reminderTarget struct {
+		id                   int64
+		email                string
+		notifyEmail          bool
+		notifyPush           bool
+		notifyMessenger      bool
+		messengerDestination string
+		browserPushEndpoint  string
+		storedPushEndpoint   string
+	}
+	targets := []reminderTarget{}
 	for rows.Next() {
-		var destination string
-		if err := rows.Scan(&destination); err != nil {
+		var target reminderTarget
+		if err := rows.Scan(&target.id, &target.email, &target.notifyEmail, &target.notifyPush, &target.notifyMessenger, &target.messengerDestination, &target.browserPushEndpoint, &target.storedPushEndpoint); err != nil {
 			log.Debugln("unable to scan BounceCast schedule reminder", err)
 			continue
 		}
-		destination = strings.TrimSpace(destination)
-		if destination == "" {
-			continue
-		}
-		destinations = append(destinations, destination)
+		targets = append(targets, target)
 	}
 	if err := rows.Close(); err != nil {
 		log.Debugln("unable to close BounceCast schedule reminder rows", err)
@@ -353,25 +380,62 @@ func queueBounceCastScheduleReminderDeliveries(db *sql.DB, goLiveEventID int64, 
 	}
 
 	queuedCount := 0
-	for _, destination := range destinations {
-		result, err := db.Exec(`
-			INSERT INTO bouncecast_notification_deliveries(go_live_event_id, channel, destination)
-			SELECT ?, 'email', ?
-			WHERE NOT EXISTS (
-				SELECT 1
-				FROM bouncecast_notification_deliveries
-				WHERE go_live_event_id = ? AND channel = 'email' AND destination = ?
-			)
-		`, goLiveEventID, destination, goLiveEventID, destination)
-		if err != nil {
-			log.Debugln("unable to queue BounceCast schedule reminder delivery", err)
-			continue
+	for _, target := range targets {
+		if target.notifyEmail && enabledChannels["email"] && strings.TrimSpace(target.email) != "" {
+			if queueBounceCastReminderDelivery(db, goLiveEventID, target.id, "email", target.email) {
+				queuedCount++
+			}
 		}
-		if rowsAffected, _ := result.RowsAffected(); rowsAffected > 0 {
-			queuedCount++
+		if target.notifyPush && enabledChannels[bounceCastPushDeliveryChannel] {
+			pushDestination := strings.TrimSpace(target.browserPushEndpoint)
+			if pushDestination == "" {
+				pushDestination = strings.TrimSpace(target.storedPushEndpoint)
+			}
+			if pushDestination != "" && queueBounceCastReminderDelivery(db, goLiveEventID, target.id, bounceCastPushDeliveryChannel, pushDestination) {
+				queuedCount++
+			}
+		}
+		if target.notifyMessenger && strings.TrimSpace(target.messengerDestination) != "" {
+			if queueBounceCastReminderDelivery(db, goLiveEventID, target.id, "messenger", target.messengerDestination) {
+				queuedCount++
+			}
 		}
 	}
 	return queuedCount
+}
+
+func queueBounceCastReminderDelivery(db *sql.DB, goLiveEventID int64, reminderID int64, channel string, destination string) bool {
+	destination = strings.TrimSpace(destination)
+	if destination == "" {
+		return false
+	}
+	result, err := db.Exec(`
+			INSERT INTO bouncecast_notification_deliveries(go_live_event_id, channel, destination, reminder_id)
+			SELECT ?, ?, ?, ?
+			WHERE NOT EXISTS (
+				SELECT 1
+				FROM bouncecast_notification_deliveries
+				WHERE go_live_event_id = ? AND channel = ? AND destination = ?
+			)
+		`, goLiveEventID, channel, destination, reminderID, goLiveEventID, channel, destination)
+	if err != nil {
+		log.Debugln("unable to queue BounceCast schedule reminder delivery", err)
+		return false
+	}
+	if rowsAffected, _ := result.RowsAffected(); rowsAffected == 0 {
+		return false
+	}
+	if _, err := db.Exec(`
+		UPDATE bouncecast_schedule_reminders
+		SET last_queued_at = CURRENT_TIMESTAMP,
+			last_delivery_status = 'queued',
+			last_delivery_error = NULL,
+			updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, reminderID); err != nil {
+		log.Debugln("unable to update BounceCast schedule reminder queued status", err)
+	}
+	return true
 }
 
 func queueBounceCastBrowserPushDeliveries(db *sql.DB, goLiveEventID int64) int {
@@ -406,14 +470,22 @@ func queueBounceCastBrowserPushDeliveries(db *sql.DB, goLiveEventID int64) int {
 
 	queuedCount := 0
 	for _, destination := range destinations {
-		if _, err := db.Exec(`
+		result, err := db.Exec(`
 			INSERT INTO bouncecast_notification_deliveries(go_live_event_id, channel, destination)
-			VALUES(?, ?, ?)
-		`, goLiveEventID, bounceCastPushDeliveryChannel, destination); err != nil {
+			SELECT ?, ?, ?
+			WHERE NOT EXISTS (
+				SELECT 1
+				FROM bouncecast_notification_deliveries
+				WHERE go_live_event_id = ? AND channel = ? AND destination = ?
+			)
+		`, goLiveEventID, bounceCastPushDeliveryChannel, destination, goLiveEventID, bounceCastPushDeliveryChannel, destination)
+		if err != nil {
 			log.Debugln("unable to queue BounceCast browser push delivery", err)
 			continue
 		}
-		queuedCount++
+		if rowsAffected, _ := result.RowsAffected(); rowsAffected > 0 {
+			queuedCount++
+		}
 	}
 
 	return queuedCount
@@ -443,7 +515,7 @@ func sendBounceCastWebhookDeliveries(goLiveEventID int64) {
 	}
 
 	rows, err := db.Query(`
-		SELECT id, destination
+		SELECT id, destination, reminder_id
 		FROM bouncecast_notification_deliveries
 		WHERE go_live_event_id = ? AND channel = 'webhook' AND status = 'queued'
 	`, goLiveEventID)
@@ -455,7 +527,7 @@ func sendBounceCastWebhookDeliveries(goLiveEventID int64) {
 	deliveries := []bounceCastQueuedDelivery{}
 	for rows.Next() {
 		var delivery bounceCastQueuedDelivery
-		if err := rows.Scan(&delivery.id, &delivery.destination); err != nil {
+		if err := rows.Scan(&delivery.id, &delivery.destination, &delivery.reminderID); err != nil {
 			log.Debugln("unable to scan BounceCast webhook delivery", err)
 			continue
 		}
@@ -477,6 +549,7 @@ func sendBounceCastWebhookDeliveries(goLiveEventID int64) {
 			`, err.Error(), delivery.id); updateErr != nil {
 				log.Debugln("unable to mark BounceCast webhook delivery failed", updateErr)
 			}
+			markBounceCastReminderDeliveryStatus(db, delivery.reminderID, "failed", err.Error())
 			continue
 		}
 		if _, err := db.Exec(`
@@ -486,6 +559,7 @@ func sendBounceCastWebhookDeliveries(goLiveEventID int64) {
 		`, delivery.id); err != nil {
 			log.Debugln("unable to mark BounceCast webhook delivery sent", err)
 		}
+		markBounceCastReminderDeliveryStatus(db, delivery.reminderID, "sent", "")
 	}
 }
 
@@ -582,7 +656,7 @@ func sendBounceCastBrowserPushDeliveries(goLiveEventID int64) {
 	}
 
 	rows, err := db.Query(`
-		SELECT id, destination
+		SELECT id, destination, reminder_id
 		FROM bouncecast_notification_deliveries
 		WHERE go_live_event_id = ? AND channel = ? AND status = 'queued'
 	`, goLiveEventID, bounceCastPushDeliveryChannel)
@@ -594,7 +668,7 @@ func sendBounceCastBrowserPushDeliveries(goLiveEventID int64) {
 	deliveries := []bounceCastQueuedDelivery{}
 	for rows.Next() {
 		var delivery bounceCastQueuedDelivery
-		if err := rows.Scan(&delivery.id, &delivery.destination); err != nil {
+		if err := rows.Scan(&delivery.id, &delivery.destination, &delivery.reminderID); err != nil {
 			log.Debugln("unable to scan BounceCast browser push delivery", err)
 			continue
 		}
@@ -624,6 +698,7 @@ func sendBounceCastBrowserPushDeliveries(goLiveEventID int64) {
 			`, err.Error(), delivery.id); updateErr != nil {
 				log.Debugln("unable to mark BounceCast browser push delivery failed", updateErr)
 			}
+			markBounceCastReminderDeliveryStatus(db, delivery.reminderID, "failed", err.Error())
 			continue
 		}
 
@@ -634,6 +709,7 @@ func sendBounceCastBrowserPushDeliveries(goLiveEventID int64) {
 		`, delivery.id); err != nil {
 			log.Debugln("unable to mark BounceCast browser push delivery sent", err)
 		}
+		markBounceCastReminderDeliveryStatus(db, delivery.reminderID, "sent", "")
 	}
 }
 
@@ -687,6 +763,141 @@ func markQueuedBounceCastDeliveriesFailed(db *sql.DB, goLiveEventID int64, chann
 	`, deliveryErr.Error(), goLiveEventID, channel); err != nil {
 		log.Debugln("unable to mark BounceCast notification deliveries failed", err)
 	}
+	if _, err := db.Exec(`
+		UPDATE bouncecast_schedule_reminders
+		SET last_delivery_status = 'failed',
+			last_delivery_error = ?,
+			updated_at = CURRENT_TIMESTAMP
+		WHERE id IN (
+			SELECT reminder_id
+			FROM bouncecast_notification_deliveries
+			WHERE go_live_event_id = ? AND channel = ? AND reminder_id IS NOT NULL
+		)
+	`, deliveryErr.Error(), goLiveEventID, channel); err != nil {
+		log.Debugln("unable to mark BounceCast reminder deliveries failed", err)
+	}
+}
+
+func markBounceCastReminderDeliveryStatus(db *sql.DB, reminderID sql.NullInt64, status string, lastError string) {
+	if !reminderID.Valid || reminderID.Int64 == 0 {
+		return
+	}
+	if _, err := db.Exec(`
+		UPDATE bouncecast_schedule_reminders
+		SET last_delivery_status = ?,
+			last_delivery_error = NULLIF(?, ''),
+			updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, status, strings.TrimSpace(lastError), reminderID.Int64); err != nil {
+		log.Debugln("unable to update BounceCast reminder delivery status", err)
+	}
+}
+
+func sendBounceCastMessengerDeliveries(goLiveEventID int64) {
+	db := data.GetDatabase()
+	if db == nil {
+		return
+	}
+
+	payload, err := getBounceCastWebhookPayload(goLiveEventID)
+	if err != nil {
+		log.Debugln("unable to build BounceCast Messenger payload", err)
+		return
+	}
+
+	settings := readBounceCastMessengerSettings()
+	rows, err := db.Query(`
+		SELECT id, destination, reminder_id
+		FROM bouncecast_notification_deliveries
+		WHERE go_live_event_id = ? AND channel = 'messenger' AND status = 'queued'
+	`, goLiveEventID)
+	if err != nil {
+		log.Debugln("unable to query BounceCast Messenger deliveries", err)
+		return
+	}
+
+	deliveries := []bounceCastQueuedDelivery{}
+	for rows.Next() {
+		var delivery bounceCastQueuedDelivery
+		if err := rows.Scan(&delivery.id, &delivery.destination, &delivery.reminderID); err != nil {
+			log.Debugln("unable to scan BounceCast Messenger delivery", err)
+			continue
+		}
+		deliveries = append(deliveries, delivery)
+	}
+	if err := rows.Close(); err != nil {
+		log.Debugln("unable to close BounceCast Messenger delivery rows", err)
+	}
+	if err := rows.Err(); err != nil {
+		log.Debugln("unable to iterate BounceCast Messenger deliveries", err)
+	}
+
+	for _, delivery := range deliveries {
+		if err := sendBounceCastMessenger(settings, delivery.destination, payload); err != nil {
+			if _, updateErr := db.Exec(`
+				UPDATE bouncecast_notification_deliveries
+				SET status = 'failed', attempt_count = attempt_count + 1, last_error = ?
+				WHERE id = ?
+			`, err.Error(), delivery.id); updateErr != nil {
+				log.Debugln("unable to mark BounceCast Messenger delivery failed", updateErr)
+			}
+			markBounceCastReminderDeliveryStatus(db, delivery.reminderID, "failed", err.Error())
+			continue
+		}
+
+		if _, err := db.Exec(`
+			UPDATE bouncecast_notification_deliveries
+			SET status = 'sent', attempt_count = attempt_count + 1, sent_at = CURRENT_TIMESTAMP, last_error = NULL
+			WHERE id = ?
+		`, delivery.id); err != nil {
+			log.Debugln("unable to mark BounceCast Messenger delivery sent", err)
+		}
+		markBounceCastReminderDeliveryStatus(db, delivery.reminderID, "sent", "")
+	}
+}
+
+func sendBounceCastMessenger(settings bounceCastMessengerSettings, destination string, payload bounceCastWebhookPayload) error {
+	if !settings.enabled {
+		return fmt.Errorf("Messenger delivery is not enabled")
+	}
+	if strings.TrimSpace(settings.pageAccessToken) == "" {
+		return fmt.Errorf("Messenger page access token is not configured")
+	}
+	destination = strings.TrimSpace(destination)
+	if destination == "" {
+		return fmt.Errorf("Messenger destination is required")
+	}
+
+	version := strings.TrimSpace(settings.graphAPIVersion)
+	if version == "" {
+		version = "v20.0"
+	}
+	message := buildBounceCastMessengerMessage(settings, payload)
+	requestBody, err := json.Marshal(map[string]interface{}{
+		"recipient": map[string]string{"id": destination},
+		"message":   map[string]string{"text": message},
+	})
+	if err != nil {
+		return err
+	}
+
+	endpoint := fmt.Sprintf("https://graph.facebook.com/%s/me/messages?access_token=%s", version, url.QueryEscape(settings.pageAccessToken))
+	request, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(requestBody))
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	response, err := client.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return fmt.Errorf("Messenger API returned HTTP %d", response.StatusCode)
+	}
+	return nil
 }
 
 func sendBounceCastEmailDeliveries(goLiveEventID int64) {
@@ -703,7 +914,7 @@ func sendBounceCastEmailDeliveries(goLiveEventID int64) {
 
 	settings := readBounceCastEmailSettings()
 	rows, err := db.Query(`
-		SELECT id, destination
+		SELECT id, destination, reminder_id
 		FROM bouncecast_notification_deliveries
 		WHERE go_live_event_id = ? AND channel = 'email' AND status = 'queued'
 	`, goLiveEventID)
@@ -715,7 +926,7 @@ func sendBounceCastEmailDeliveries(goLiveEventID int64) {
 	deliveries := []bounceCastQueuedDelivery{}
 	for rows.Next() {
 		var delivery bounceCastQueuedDelivery
-		if err := rows.Scan(&delivery.id, &delivery.destination); err != nil {
+		if err := rows.Scan(&delivery.id, &delivery.destination, &delivery.reminderID); err != nil {
 			log.Debugln("unable to scan BounceCast email delivery", err)
 			continue
 		}
@@ -737,6 +948,7 @@ func sendBounceCastEmailDeliveries(goLiveEventID int64) {
 			`, err.Error(), delivery.id); updateErr != nil {
 				log.Debugln("unable to mark BounceCast email delivery failed", updateErr)
 			}
+			markBounceCastReminderDeliveryStatus(db, delivery.reminderID, "failed", err.Error())
 			continue
 		}
 
@@ -747,6 +959,7 @@ func sendBounceCastEmailDeliveries(goLiveEventID int64) {
 		`, delivery.id); err != nil {
 			log.Debugln("unable to mark BounceCast email delivery sent", err)
 		}
+		markBounceCastReminderDeliveryStatus(db, delivery.reminderID, "sent", "")
 	}
 }
 
@@ -884,6 +1097,44 @@ func readBounceCastEmailSettings() bounceCastEmailSettings {
 		startTLS:    startTLS,
 		subject:     subject,
 	}
+}
+
+func readBounceCastMessengerSettings() bounceCastMessengerSettings {
+	graphVersion := getBounceCastNotificationSetting(bounceCastMessengerAPIVersionKey)
+	if graphVersion == "" {
+		graphVersion = "v20.0"
+	}
+	template := getBounceCastNotificationSetting(bounceCastMessengerMessageTemplateKey)
+	if template == "" {
+		template = "{{streamer}} is live on BounceCast: {{schedule}}"
+	}
+	return bounceCastMessengerSettings{
+		enabled:         getBounceCastNotificationSetting(bounceCastMessengerEnabledKey) == "true",
+		graphAPIVersion: graphVersion,
+		pageAccessToken: getBounceCastNotificationSetting(bounceCastMessengerPageAccessTokenKey),
+		messageTemplate: template,
+	}
+}
+
+func buildBounceCastMessengerMessage(settings bounceCastMessengerSettings, payload bounceCastWebhookPayload) string {
+	streamer := strings.TrimSpace(payload.Streamer)
+	if streamer == "" {
+		streamer = "A DJ"
+	}
+	schedule := strings.TrimSpace(payload.ScheduleTitle)
+	if schedule == "" {
+		schedule = "the live stream"
+	}
+	message := strings.TrimSpace(settings.messageTemplate)
+	if message == "" {
+		message = "{{streamer}} is live on BounceCast: {{schedule}}"
+	}
+	message = strings.ReplaceAll(message, "{{streamer}}", streamer)
+	message = strings.ReplaceAll(message, "{{schedule}}", schedule)
+	if len(message) > 240 {
+		message = message[:240]
+	}
+	return message
 }
 
 func normalizeBounceCastEmailProvider(provider string) string {

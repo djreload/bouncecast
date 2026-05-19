@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -115,6 +117,10 @@ func BounceCastAccountRegister(w http.ResponseWriter, r *http.Request) {
 		webutils.BadRequestHandler(w, err)
 		return
 	}
+	browserPushEndpoint := ""
+	if request.NotificationPreferences != nil {
+		browserPushEndpoint = request.NotificationPreferences.BrowserPushEndpoint
+	}
 	passwordHash, err := utils.HashPassword(strings.TrimSpace(request.Password))
 	if err != nil {
 		webutils.InternalErrorHandler(w, err)
@@ -130,7 +136,7 @@ func BounceCastAccountRegister(w http.ResponseWriter, r *http.Request) {
 				writeBounceCastAccountSaveError(w, err)
 				return
 			}
-			if err := saveBounceCastAccountNotificationPreferences(updatedUser, notificationPreferences); err != nil {
+			if err := saveBounceCastAccountNotificationPreferences(updatedUser, notificationPreferences, browserPushEndpoint); err != nil {
 				webutils.InternalErrorHandler(w, err)
 				return
 			}
@@ -151,7 +157,7 @@ func BounceCastAccountRegister(w http.ResponseWriter, r *http.Request) {
 		writeBounceCastAccountSaveError(w, err)
 		return
 	}
-	if err := saveBounceCastAccountNotificationPreferences(user, notificationPreferences); err != nil {
+	if err := saveBounceCastAccountNotificationPreferences(user, notificationPreferences, browserPushEndpoint); err != nil {
 		webutils.InternalErrorHandler(w, err)
 		return
 	}
@@ -326,7 +332,11 @@ func BounceCastAccountUpdateProfile(user models.User, w http.ResponseWriter, r *
 	}
 
 	updatedUser := userrepository.Get().GetUserByID(user.ID)
-	if err := saveBounceCastAccountNotificationPreferences(updatedUser, notificationPreferences); err != nil {
+	endpoint := ""
+	if request.NotificationPreferences != nil {
+		endpoint = request.NotificationPreferences.BrowserPushEndpoint
+	}
+	if err := saveBounceCastAccountNotificationPreferences(updatedUser, notificationPreferences, endpoint); err != nil {
 		webutils.InternalErrorHandler(w, err)
 		return
 	}
@@ -357,15 +367,9 @@ func BounceCastAccountUpdateNotifications(user models.User, w http.ResponseWrite
 	}
 	notificationPreferences.BrowserPush = request.BrowserPush
 
-	if err := saveBounceCastAccountNotificationPreferences(&user, notificationPreferences); err != nil {
+	if err := saveBounceCastAccountNotificationPreferences(&user, notificationPreferences, request.BrowserPushEndpoint); err != nil {
 		webutils.InternalErrorHandler(w, err)
 		return
-	}
-	if strings.TrimSpace(request.BrowserPushEndpoint) != "" {
-		if err := saveBounceCastBrowserPushDestination(request.BrowserPushEndpoint, request.BrowserPush); err != nil {
-			webutils.BadRequestHandler(w, err)
-			return
-		}
 	}
 
 	notificationPreferences, _ = getBounceCastAccountNotificationPreferences(user.ID)
@@ -535,7 +539,7 @@ func getBounceCastAccountNotificationPreferences(userID string) (bounceCastAccou
 	}, nil
 }
 
-func saveBounceCastAccountNotificationPreferences(user *models.User, preferences bounceCastAccountNotificationPreferences) error {
+func saveBounceCastAccountNotificationPreferences(user *models.User, preferences bounceCastAccountNotificationPreferences, browserPushEndpoint string) error {
 	if user == nil {
 		return errors.New("user is required")
 	}
@@ -569,15 +573,58 @@ func saveBounceCastAccountNotificationPreferences(user *models.User, preferences
 			return err
 		}
 	}
-	return syncBounceCastNotificationDestination(bounceCastMessengerChannel, preferences.MessengerDestination, preferences.Messenger)
+	if err := syncBounceCastNotificationDestination(bounceCastMessengerChannel, preferences.MessengerDestination, preferences.Messenger); err != nil {
+		return err
+	}
+	return saveBounceCastBrowserPushDestination(user.ID, browserPushEndpoint, preferences.BrowserPush)
 }
 
-func saveBounceCastBrowserPushDestination(endpoint string, enabled bool) error {
+func saveBounceCastBrowserPushDestination(userID string, endpoint string, enabled bool) error {
+	userID = strings.TrimSpace(userID)
 	endpoint = utils.MakeSafeStringOfLength(endpoint, 2000)
+	if userID == "" {
+		return errors.New("user is required for browser push registration")
+	}
 	if endpoint == "" {
+		if !enabled {
+			_, err := data.GetDatabase().Exec(`
+				UPDATE bouncecast_account_push_subscriptions
+				SET enabled = 0, disabled_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+				WHERE user_id = ?
+			`, userID)
+			return err
+		}
 		return nil
 	}
+	endpointHash := hashBounceCastBrowserPushEndpoint(endpoint)
+	if enabled {
+		if _, err := data.GetDatabase().Exec(`
+			INSERT INTO bouncecast_account_push_subscriptions(user_id, endpoint_hash, subscription_json, enabled, disabled_at, last_seen_at, updated_at)
+			VALUES(?, ?, ?, 1, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+			ON CONFLICT(user_id, endpoint_hash) DO UPDATE SET
+				subscription_json = excluded.subscription_json,
+				enabled = 1,
+				disabled_at = NULL,
+				last_seen_at = CURRENT_TIMESTAMP,
+				updated_at = CURRENT_TIMESTAMP
+		`, userID, endpointHash, endpoint); err != nil {
+			return err
+		}
+	} else {
+		if _, err := data.GetDatabase().Exec(`
+			UPDATE bouncecast_account_push_subscriptions
+			SET enabled = 0, disabled_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+			WHERE user_id = ? AND endpoint_hash = ?
+		`, userID, endpointHash); err != nil {
+			return err
+		}
+	}
 	return syncBounceCastNotificationDestination(notificationsrepository.BrowserPushNotification, endpoint, enabled)
+}
+
+func hashBounceCastBrowserPushEndpoint(endpoint string) string {
+	sum := sha256.Sum256([]byte(strings.TrimSpace(endpoint)))
+	return hex.EncodeToString(sum[:])
 }
 
 func syncBounceCastNotificationDestination(channel string, destination string, enabled bool) error {

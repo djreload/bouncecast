@@ -6,16 +6,24 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 
 ### Planned
 
-- Add admin reminder management views and visible reminder status in Account Hub.
-- Add per-account browser push endpoint mapping and Messenger delivery transport for schedule reminders.
-- Extend role-aware UI hiding, audit logs, and owner/admin separation across more admin actions.
-- Add richer public DJ profile URLs and share metadata.
+- Add admin retry/export tools for failed reminder deliveries and notification deliveries.
+- Add webhook verification/testing helpers for Facebook Messenger Page setup.
+- Continue expanding owner/admin UI hiding and audit coverage across older Owncast-compatible admin pages.
+- Add per-DJ public profile customization for SEO titles, share images, and featured schedule cards.
 - Continue live VPS deployment notes as production configuration changes.
 
 ## 2026-05-19
 
 ### Added
 
+- Added database migration `00011_bouncecast_reminder_delivery_management.sql` for account-bound browser push subscriptions, reminder delivery status, notification delivery reminder links, and product audit events.
+- Added admin schedule reminder management at `/admin/schedule/`, including viewer, channel, delivery status, and disable controls.
+- Added Account Hub reminder status cards so viewers can see saved reminder channels and delivery state.
+- Added per-account browser push endpoint mapping for schedule reminders, while keeping the existing global Owncast browser notification table in sync for compatibility.
+- Added Messenger delivery settings for schedule reminders, storing the Page Access Token server-side only.
+- Added Messenger reminder delivery transport through the Facebook Graph API when enabled.
+- Added owner-only audit event viewing and audit records for sensitive BounceCast streamer, stream key, schedule, email, Messenger, and reminder actions.
+- Added shareable public DJ profile URLs like `/djs/{handle}` with bot-facing metadata for profile name, bio, image, and genre tags.
 - Added database migration `00010_bouncecast_profiles_permissions_reminders.sql` for rich DJ profile metadata and per-schedule viewer reminders.
 - Added public DJ profile fields for bio, genres, social links, and hero artwork.
 - Added Studio and admin profile editing for DJ public profile metadata.
@@ -26,6 +34,10 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 
 ### Changed
 
+- Changed more BounceCast admin writes, including streamer account changes, stream key changes, schedule creation, and reminder disabling, to require owner/admin product roles.
+- Changed `/admin/schedule/` to include Messenger settings and account reminder management alongside email, push, subscribers, live events, and delivery logs.
+- Changed Account Hub reminder saving so browser push reminders attempt to capture the browser push subscription endpoint at the point of opt-in.
+- Changed public DJ profile links to prefer `/djs/{handle}` while keeping the existing `?handle=` path working.
 - Changed sensitive admin writes for account permission changes, Stars payment settings/packages/manual wallet adjustments, and SMTP settings to require owner-level access while preserving the original Owncast admin password as owner-level compatibility access.
 - Updated `/djs` with richer DJ cards, profile artwork, social links, public lineup filters, and a filtered lineup panel.
 - Updated `/admin/streamers/` and `/studio` so DJ public profiles can be managed without direct database edits.

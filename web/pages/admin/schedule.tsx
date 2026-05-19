@@ -21,12 +21,16 @@ import {
 import { AdminLayout } from '../../components/layouts/AdminLayout';
 import {
   BOUNCECAST_EMAIL_SETTINGS,
+  BOUNCECAST_ADMIN_SESSION,
+  BOUNCECAST_MESSENGER_SETTINGS,
   BOUNCECAST_LIVE_EVENTS,
   BOUNCECAST_NOTIFICATION_DELIVERIES,
   BOUNCECAST_NOTIFICATION_SUBSCRIBERS,
   BOUNCECAST_NOTIFICATION_SUBSCRIBER_DISABLE,
   BOUNCECAST_PUSH_SETTINGS,
   BOUNCECAST_SCHEDULE,
+  BOUNCECAST_SCHEDULE_REMINDER_DISABLE,
+  BOUNCECAST_SCHEDULE_REMINDERS,
   BOUNCECAST_STREAMERS,
   fetchData,
 } from '../../utils/apis';
@@ -113,6 +117,38 @@ type PushSettings = {
   goLiveMessage: string;
 };
 
+type MessengerSettings = {
+  enabled: boolean;
+  graphApiVersion: string;
+  pageAccessTokenSet: boolean;
+  messageTemplate: string;
+};
+
+type ScheduleReminder = {
+  id: number;
+  scheduleId: number;
+  scheduleTitle: string;
+  streamer: string;
+  displayName: string;
+  email: string;
+  notifyEmail: boolean;
+  notifyPush: boolean;
+  notifyMessenger: boolean;
+  messengerDestination: string;
+  browserPushLinked: boolean;
+  lastQueuedAt?: string;
+  lastDeliveryStatus: string;
+  lastDeliveryError: string;
+  disabledAt?: string;
+  updatedAt: string;
+};
+
+type AdminSession = {
+  role: string;
+  owner: boolean;
+  admin: boolean;
+};
+
 const columns = [
   {
     title: 'Set',
@@ -172,16 +208,21 @@ export default function Schedule() {
   const [liveEvents, setLiveEvents] = useState<GoLiveEvent[]>([]);
   const [subscribers, setSubscribers] = useState<NotificationSubscriber[]>([]);
   const [deliveries, setDeliveries] = useState<NotificationDelivery[]>([]);
+  const [reminders, setReminders] = useState<ScheduleReminder[]>([]);
   const [emailSettings, setEmailSettings] = useState<EmailSettings | null>(null);
   const [pushSettings, setPushSettings] = useState<PushSettings | null>(null);
+  const [messengerSettings, setMessengerSettings] = useState<MessengerSettings | null>(null);
+  const [adminSession, setAdminSession] = useState<AdminSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [subscriberModalOpen, setSubscriberModalOpen] = useState(false);
   const [emailSettingsModalOpen, setEmailSettingsModalOpen] = useState(false);
+  const [messengerSettingsModalOpen, setMessengerSettingsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
   const [subscriberForm] = Form.useForm();
   const [emailSettingsForm] = Form.useForm();
+  const [messengerSettingsForm] = Form.useForm();
 
   const loadStudioData = async () => {
     setLoading(true);
@@ -192,25 +233,35 @@ export default function Schedule() {
         liveEventsResult,
         subscriberResult,
         deliveryResult,
+        reminderResult,
         emailSettingsResult,
         pushSettingsResult,
+        messengerSettingsResult,
+        adminSessionResult,
       ] = await Promise.all([
         fetchData(BOUNCECAST_SCHEDULE),
         fetchData(BOUNCECAST_STREAMERS),
         fetchData(BOUNCECAST_LIVE_EVENTS),
         fetchData(BOUNCECAST_NOTIFICATION_SUBSCRIBERS),
         fetchData(BOUNCECAST_NOTIFICATION_DELIVERIES),
+        fetchData(BOUNCECAST_SCHEDULE_REMINDERS),
         fetchData(BOUNCECAST_EMAIL_SETTINGS),
         fetchData(BOUNCECAST_PUSH_SETTINGS),
+        fetchData(BOUNCECAST_MESSENGER_SETTINGS),
+        fetchData(BOUNCECAST_ADMIN_SESSION),
       ]);
       setSchedule(scheduleResult || []);
       setStreamers(streamerResult || []);
       setLiveEvents(liveEventsResult || []);
       setSubscribers(subscriberResult || []);
       setDeliveries(deliveryResult || []);
+      setReminders(reminderResult || []);
       setEmailSettings(emailSettingsResult || null);
       setPushSettings(pushSettingsResult || null);
+      setMessengerSettings(messengerSettingsResult || null);
+      setAdminSession(adminSessionResult || null);
       emailSettingsForm.setFieldsValue(emailSettingsResult || {});
+      messengerSettingsForm.setFieldsValue(messengerSettingsResult || {});
     } catch (error) {
       console.error(error);
     } finally {
@@ -287,6 +338,30 @@ export default function Schedule() {
     }
   };
 
+  const saveMessengerSettings = async () => {
+    const values = await messengerSettingsForm.validateFields();
+    setSaving(true);
+    try {
+      await fetchData(BOUNCECAST_MESSENGER_SETTINGS, {
+        method: 'POST',
+        data: values,
+      });
+      setMessengerSettingsModalOpen(false);
+      messengerSettingsForm.resetFields(['pageAccessToken']);
+      await loadStudioData();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const disableReminder = async (id: number) => {
+    await fetchData(BOUNCECAST_SCHEDULE_REMINDER_DISABLE, {
+      method: 'POST',
+      data: { id },
+    });
+    await loadStudioData();
+  };
+
   const applyEmailProviderPreset = (provider: string) => {
     if (provider === 'brevo') {
       emailSettingsForm.setFieldsValue({
@@ -300,7 +375,13 @@ export default function Schedule() {
   const pushReady = Boolean(
     pushSettings?.enabled && pushSettings.publicKeySet && pushSettings.privateKeySet,
   );
-  const activeAutomationCount = [emailSettings?.enabled, pushReady].filter(Boolean).length;
+  const messengerReady = Boolean(
+    messengerSettings?.enabled && messengerSettings.pageAccessTokenSet,
+  );
+  const activeAutomationCount = [emailSettings?.enabled, pushReady, messengerReady].filter(
+    Boolean,
+  ).length;
+  const canEditSensitiveDeliverySettings = Boolean(adminSession?.owner);
   const activeSubscriberCount =
     subscribers.filter(subscriber => !subscriber.disabledAt).length +
     (pushSettings?.subscriberCount || 0);
@@ -336,7 +417,7 @@ export default function Schedule() {
             <Statistic
               title="Automation channels"
               value={activeAutomationCount}
-              suffix="/ 2"
+              suffix="/ 3"
               prefix={<ThunderboltOutlined />}
             />
           </Card>
@@ -373,6 +454,10 @@ export default function Schedule() {
               </Timeline.Item>
               <Timeline.Item color="green">
                 Browser push, email, webhook, and federation alerts are queued
+              </Timeline.Item>
+              <Timeline.Item color="magenta">
+                Account reminders can target email, mapped browser push subscriptions, and Messenger
+                contacts
               </Timeline.Item>
             </Timeline>
           </Card>
@@ -426,9 +511,16 @@ export default function Schedule() {
             <Tag color={pushReady ? 'green' : 'default'}>
               Browser push {pushReady ? 'ready' : 'off'}: {pushSettings?.subscriberCount || 0}
             </Tag>
-            <Button size="small" onClick={() => setEmailSettingsModalOpen(true)}>
-              Email settings
-            </Button>
+            {canEditSensitiveDeliverySettings && (
+              <>
+                <Button size="small" onClick={() => setEmailSettingsModalOpen(true)}>
+                  Email settings
+                </Button>
+                <Button size="small" onClick={() => setMessengerSettingsModalOpen(true)}>
+                  Messenger settings
+                </Button>
+              </>
+            )}
             <Button
               size="small"
               icon={<BellOutlined />}
@@ -476,6 +568,82 @@ export default function Schedule() {
               render: (_, subscriber) =>
                 subscriber.disabledAt ? null : (
                   <Button size="small" danger onClick={() => disableSubscriber(subscriber.id)}>
+                    Disable
+                  </Button>
+                ),
+            },
+          ]}
+        />
+      </Card>
+
+      <Card title="Account schedule reminders" className="studio-panel">
+        <Table
+          dataSource={reminders}
+          rowKey="id"
+          pagination={{ pageSize: 10 }}
+          columns={[
+            {
+              title: 'Set',
+              dataIndex: 'scheduleTitle',
+              key: 'scheduleTitle',
+              render: (title, record) => (
+                <Space direction="vertical" size={0}>
+                  <Text strong>{title}</Text>
+                  <Text type="secondary">{record.streamer || 'Unassigned'}</Text>
+                </Space>
+              ),
+            },
+            {
+              title: 'Viewer',
+              key: 'viewer',
+              render: (_, reminder) => (
+                <Space direction="vertical" size={0}>
+                  <Text>{reminder.displayName || 'Viewer'}</Text>
+                  <Text type="secondary">
+                    {reminder.email || reminder.messengerDestination || 'No direct destination'}
+                  </Text>
+                </Space>
+              ),
+            },
+            {
+              title: 'Channels',
+              key: 'channels',
+              render: (_, reminder) => (
+                <Space wrap>
+                  {reminder.notifyEmail && <Tag color="blue">email</Tag>}
+                  {reminder.notifyPush && (
+                    <Tag color={reminder.browserPushLinked ? 'green' : 'gold'}>browser push</Tag>
+                  )}
+                  {reminder.notifyMessenger && <Tag color="magenta">Messenger</Tag>}
+                </Space>
+              ),
+            },
+            {
+              title: 'Delivery',
+              key: 'delivery',
+              render: (_, reminder) => (
+                <Space direction="vertical" size={0}>
+                  <Tag
+                    color={
+                      reminder.disabledAt
+                        ? 'default'
+                        : deliveryStatusColor(reminder.lastDeliveryStatus || 'queued')
+                    }
+                  >
+                    {reminder.disabledAt ? 'disabled' : reminder.lastDeliveryStatus || 'scheduled'}
+                  </Tag>
+                  {reminder.lastDeliveryError && (
+                    <Text type="secondary">{reminder.lastDeliveryError}</Text>
+                  )}
+                </Space>
+              ),
+            },
+            {
+              title: 'Action',
+              key: 'action',
+              render: (_, reminder) =>
+                reminder.disabledAt ? null : (
+                  <Button size="small" danger onClick={() => disableReminder(reminder.id)}>
                     Disable
                   </Button>
                 ),
@@ -733,6 +901,50 @@ export default function Schedule() {
           </Form.Item>
           <Form.Item name="startTls" valuePropName="checked">
             <Checkbox>Use STARTTLS</Checkbox>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="Messenger settings"
+        open={messengerSettingsModalOpen}
+        onCancel={() => setMessengerSettingsModalOpen(false)}
+        onOk={saveMessengerSettings}
+        confirmLoading={saving}
+      >
+        <Form
+          form={messengerSettingsForm}
+          layout="vertical"
+          initialValues={{
+            enabled: false,
+            graphApiVersion: 'v20.0',
+            messageTemplate: '{{streamer}} is live on BounceCast: {{schedule}}',
+          }}
+        >
+          <Form.Item name="enabled" valuePropName="checked">
+            <Checkbox>Enable Messenger schedule reminder delivery</Checkbox>
+          </Form.Item>
+          <Form.Item name="graphApiVersion" label="Graph API version">
+            <Input placeholder="v20.0" />
+          </Form.Item>
+          <Form.Item
+            name="pageAccessToken"
+            label={
+              messengerSettings?.pageAccessTokenSet
+                ? 'Page access token (saved)'
+                : 'Page access token'
+            }
+          >
+            <Input.Password
+              placeholder={
+                messengerSettings?.pageAccessTokenSet
+                  ? 'Leave blank to keep saved token'
+                  : 'Facebook Page Access Token'
+              }
+            />
+          </Form.Item>
+          <Form.Item name="messageTemplate" label="Message template">
+            <Input maxLength={240} />
           </Form.Item>
         </Form>
       </Modal>

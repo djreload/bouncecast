@@ -499,10 +499,17 @@ DJ profiles and public schedule reminders
 =========================================
 
 Migration `00010_bouncecast_profiles_permissions_reminders.sql` adds public DJ
-profile fields and schedule reminder storage. After updating, verify the
-container logs show goose migration version 10 and check:
+profile fields and schedule reminder storage.
+
+Migration `00011_bouncecast_reminder_delivery_management.sql` adds account-bound
+browser push subscriptions, reminder delivery status fields, reminder-linked
+delivery rows, Messenger delivery settings, and product audit events.
+
+After updating, verify the container logs show goose migration version 11 and
+check:
 
   curl -s https://live.example.com/api/bouncecast/djs | jq .
+  curl -I https://live.example.com/djs/example-dj
   curl -s "https://live.example.com/api/bouncecast/schedule?limit=5&status=planned" | jq .
 
 DJ profile fields can be edited from:
@@ -518,11 +525,44 @@ Current reminder behavior:
 
 - Email reminders are queued when the related schedule goes live and the set
   has email notifications enabled.
-- Browser push and Messenger preferences are stored for the account/reminder,
-  but per-account push routing and Messenger delivery transport still need a
-  future production pass.
+- Browser push reminders map the logged-in account to the browser subscription
+  endpoint captured by Account Hub. The existing global Owncast browser push
+  table is still synced for compatibility.
+- Messenger reminders queue to the viewer's Messenger destination when
+  Messenger delivery is enabled and a Facebook Page Access Token is saved in
+  the admin schedule settings.
+- Reminder delivery status is visible to admins at:
+
+  https://live.example.com/admin/schedule/
+
+- Viewers can see their saved reminder status at:
+
+  https://live.example.com/account
+
 - Global notification subscribers and existing browser push subscribers still
   behave as before.
+
+Messenger setup notes:
+
+1. In Meta/Facebook developer tools, create or reuse an app with Messenger API
+   access for the Facebook Page that will send alerts.
+2. Generate a Page Access Token for the Page.
+3. In BounceCast, open:
+
+   https://live.example.com/admin/schedule/
+
+4. Click Messenger settings, enable delivery, set the Graph API version such as
+   `v20.0`, and paste the Page Access Token.
+5. Viewers must save a Messenger destination/contact in Account Hub and choose
+   Messenger when saving a schedule reminder.
+
+Security notes:
+
+- Page Access Tokens are never exposed to the public frontend.
+- Owner/admin product roles are now required for streamer account changes,
+  stream keys, schedule creation, and reminder disabling.
+- Owner-only access is required for email settings, Messenger settings, Stars
+  payment settings, account permission changes, and audit logs.
 
 
 Step 15 - Operational commands

@@ -88,6 +88,24 @@ export type BounceCastAccountHub = {
   leaderboard: StarLeaderboardEntry[];
   djProfile?: BounceCastDJProfile;
   upcomingSchedule: BounceCastScheduleItem[];
+  reminders: BounceCastReminderStatus[];
+};
+
+export type BounceCastReminderStatus = {
+  id: number;
+  scheduleId: number;
+  title: string;
+  streamer?: string;
+  startsAt: string;
+  email: boolean;
+  browserPush: boolean;
+  messenger: boolean;
+  lastQueuedAt?: string;
+  lastDeliveryStatus?: string;
+  lastDeliveryError?: string;
+  disabledAt?: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export class BounceCastService {
@@ -136,7 +154,12 @@ export class BounceCastService {
   public static async setScheduleReminder(
     accessToken: string,
     scheduleId: number,
-    channels: { email?: boolean; browserPush?: boolean; messenger?: boolean },
+    channels: {
+      email?: boolean;
+      browserPush?: boolean;
+      browserPushEndpoint?: string;
+      messenger?: boolean;
+    },
   ) {
     return fetchData(withAccessToken(BOUNCECAST_PUBLIC_SCHEDULE_REMINDERS, accessToken), {
       method: 'POST',
@@ -145,6 +168,7 @@ export class BounceCastService {
         scheduleId,
         email: Boolean(channels.email),
         browserPush: Boolean(channels.browserPush),
+        browserPushEndpoint: channels.browserPushEndpoint || '',
         messenger: Boolean(channels.messenger),
       },
     });

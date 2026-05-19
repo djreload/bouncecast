@@ -18,6 +18,7 @@ import (
 	"github.com/owncast/owncast/persistence/configrepository"
 	"github.com/owncast/owncast/persistence/notificationsrepository"
 	"github.com/owncast/owncast/utils"
+	"github.com/owncast/owncast/webserver/router/middleware"
 	webutils "github.com/owncast/owncast/webserver/utils"
 )
 
@@ -126,6 +127,54 @@ type BounceCastPushSettings struct {
 	GoLiveMessage   string `json:"goLiveMessage"`
 }
 
+type BounceCastMessengerSettings struct {
+	Enabled            bool   `json:"enabled"`
+	GraphAPIVersion    string `json:"graphApiVersion"`
+	PageAccessToken    string `json:"pageAccessToken,omitempty"`
+	PageAccessTokenSet bool   `json:"pageAccessTokenSet"`
+	MessageTemplate    string `json:"messageTemplate"`
+}
+
+type BounceCastAdminSessionInfo struct {
+	UserID string `json:"userId"`
+	Role   string `json:"role"`
+	Owner  bool   `json:"owner"`
+	Admin  bool   `json:"admin"`
+}
+
+type BounceCastScheduleReminderAdminItem struct {
+	ID                   int64      `json:"id"`
+	ScheduleID           int64      `json:"scheduleId"`
+	ScheduleTitle        string     `json:"scheduleTitle"`
+	Streamer             string     `json:"streamer"`
+	UserID               string     `json:"userId"`
+	DisplayName          string     `json:"displayName"`
+	Email                string     `json:"email"`
+	NotifyEmail          bool       `json:"notifyEmail"`
+	NotifyPush           bool       `json:"notifyPush"`
+	NotifyMessenger      bool       `json:"notifyMessenger"`
+	MessengerDestination string     `json:"messengerDestination"`
+	BrowserPushLinked    bool       `json:"browserPushLinked"`
+	LastQueuedAt         *time.Time `json:"lastQueuedAt,omitempty"`
+	LastDeliveryStatus   string     `json:"lastDeliveryStatus"`
+	LastDeliveryError    string     `json:"lastDeliveryError"`
+	DisabledAt           *time.Time `json:"disabledAt,omitempty"`
+	CreatedAt            time.Time  `json:"createdAt"`
+	UpdatedAt            time.Time  `json:"updatedAt"`
+}
+
+type BounceCastAuditEvent struct {
+	ID          int64     `json:"id"`
+	ActorUserID string    `json:"actorUserId"`
+	ActorRole   string    `json:"actorRole"`
+	Action      string    `json:"action"`
+	TargetType  string    `json:"targetType"`
+	TargetID    string    `json:"targetId"`
+	Metadata    string    `json:"metadata"`
+	RemoteAddr  string    `json:"remoteAddr"`
+	CreatedAt   time.Time `json:"createdAt"`
+}
+
 type createStreamerRequest struct {
 	DisplayName  string                        `json:"displayName"`
 	Handle       string                        `json:"handle"`
@@ -192,21 +241,29 @@ type disableNotificationSubscriberRequest struct {
 	ID int64 `json:"id"`
 }
 
+type disableScheduleReminderRequest struct {
+	ID int64 `json:"id"`
+}
+
 const (
-	bounceCastEmailProviderKey    = "email_provider"
-	bounceCastEmailEnabledKey     = "email_enabled"
-	bounceCastEmailHostKey        = "email_host"
-	bounceCastEmailPortKey        = "email_port"
-	bounceCastEmailUsernameKey    = "email_username"
-	bounceCastEmailPasswordKey    = "email_password"
-	bounceCastEmailFromAddressKey = "email_from_address"
-	bounceCastEmailFromNameKey    = "email_from_name"
-	bounceCastEmailStartTLSKey    = "email_start_tls"
-	bounceCastEmailSubjectKey     = "email_subject"
-	bounceCastEmailProviderBrevo  = "brevo"
-	bounceCastEmailProviderCustom = "custom"
-	bounceCastBrevoSMTPHost       = "smtp-relay.brevo.com"
-	bounceCastBrevoSMTPPort       = 587
+	bounceCastEmailProviderKey            = "email_provider"
+	bounceCastEmailEnabledKey             = "email_enabled"
+	bounceCastEmailHostKey                = "email_host"
+	bounceCastEmailPortKey                = "email_port"
+	bounceCastEmailUsernameKey            = "email_username"
+	bounceCastEmailPasswordKey            = "email_password"
+	bounceCastEmailFromAddressKey         = "email_from_address"
+	bounceCastEmailFromNameKey            = "email_from_name"
+	bounceCastEmailStartTLSKey            = "email_start_tls"
+	bounceCastEmailSubjectKey             = "email_subject"
+	bounceCastEmailProviderBrevo          = "brevo"
+	bounceCastEmailProviderCustom         = "custom"
+	bounceCastBrevoSMTPHost               = "smtp-relay.brevo.com"
+	bounceCastBrevoSMTPPort               = 587
+	bounceCastMessengerEnabledKey         = "messenger_enabled"
+	bounceCastMessengerAPIVersionKey      = "messenger_graph_api_version"
+	bounceCastMessengerPageAccessTokenKey = "messenger_page_access_token"
+	bounceCastMessengerMessageTemplateKey = "messenger_message_template"
 )
 
 var bounceCastHandlePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$`)
@@ -361,6 +418,7 @@ func CreateBounceCastStreamer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id, _ := result.LastInsertId()
+	recordBounceCastAuditEvent(r, "streamer_created", "streamer", strconv.FormatInt(id, 10), map[string]interface{}{"handle": handle, "role": role, "status": status})
 	webutils.WriteResponse(w, map[string]interface{}{"id": id})
 }
 
@@ -429,6 +487,7 @@ func UpdateBounceCastStreamer(w http.ResponseWriter, r *http.Request) {
 		webutils.BadRequestHandler(w, errors.New("streamer not found"))
 		return
 	}
+	recordBounceCastAuditEvent(r, "streamer_updated", "streamer", strconv.FormatInt(request.ID, 10), map[string]interface{}{"handle": handle, "role": role, "status": status})
 
 	webutils.WriteSimpleResponse(w, true, "updated streamer")
 }
@@ -468,6 +527,7 @@ func SetBounceCastStreamerPassword(w http.ResponseWriter, r *http.Request) {
 		webutils.BadRequestHandler(w, errors.New("streamer not found"))
 		return
 	}
+	recordBounceCastAuditEvent(r, "streamer_password_updated", "streamer", strconv.FormatInt(request.ID, 10), nil)
 
 	webutils.WriteSimpleResponse(w, true, "updated streamer password")
 }
@@ -539,6 +599,7 @@ func CreateBounceCastStreamKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id, _ := result.LastInsertId()
+	recordBounceCastAuditEvent(r, "stream_key_created", "stream_key", strconv.FormatInt(id, 10), map[string]interface{}{"streamerId": request.StreamerID})
 	webutils.WriteResponse(w, map[string]interface{}{
 		"id":        id,
 		"streamKey": rawKey,
@@ -565,6 +626,7 @@ func RevokeBounceCastStreamKey(w http.ResponseWriter, r *http.Request) {
 		webutils.InternalErrorHandler(w, err)
 		return
 	}
+	recordBounceCastAuditEvent(r, "stream_key_revoked", "stream_key", strconv.FormatInt(request.ID, 10), nil)
 
 	webutils.WriteSimpleResponse(w, true, "revoked stream key")
 }
@@ -701,6 +763,7 @@ func CreateBounceCastNotificationSubscriber(w http.ResponseWriter, r *http.Reque
 	}
 
 	id, _ := result.LastInsertId()
+	recordBounceCastAuditEvent(r, "notification_subscriber_created", "notification_subscriber", strconv.FormatInt(id, 10), map[string]interface{}{"channel": channel})
 	webutils.WriteResponse(w, map[string]interface{}{"id": id})
 }
 
@@ -879,6 +942,7 @@ func SetBounceCastEmailSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	recordBounceCastAuditEvent(r, "email_settings_updated", "notification_settings", "email", map[string]interface{}{"enabled": request.Enabled, "provider": provider})
 
 	savedSettings := readBounceCastEmailSettings()
 	savedSettings.Password = ""
@@ -1123,6 +1187,216 @@ func GetBounceCastPushSettings(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GetBounceCastAdminSession returns the BounceCast product role attached to the
+// current admin session so the admin UI can hide owner-only actions.
+func GetBounceCastAdminSession(w http.ResponseWriter, r *http.Request) {
+	identity, ok := middleware.CurrentAdminIdentity(r)
+	if !ok {
+		webutils.WriteResponse(w, BounceCastAdminSessionInfo{})
+		return
+	}
+	webutils.WriteResponse(w, BounceCastAdminSessionInfo{
+		UserID: identity.UserID,
+		Role:   identity.Role,
+		Owner:  identity.Role == "owner",
+		Admin:  identity.Role == "admin" || identity.Role == "owner",
+	})
+}
+
+// GetBounceCastMessengerSettings returns Messenger transport configuration
+// without exposing the saved Page Access Token.
+func GetBounceCastMessengerSettings(w http.ResponseWriter, r *http.Request) {
+	settings := readBounceCastMessengerSettings()
+	settings.PageAccessToken = ""
+	webutils.WriteResponse(w, settings)
+}
+
+// SetBounceCastMessengerSettings saves Facebook Messenger Graph API delivery
+// settings for schedule reminder notifications.
+func SetBounceCastMessengerSettings(w http.ResponseWriter, r *http.Request) {
+	var request BounceCastMessengerSettings
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+
+	version := strings.TrimSpace(request.GraphAPIVersion)
+	if version == "" {
+		version = "v20.0"
+	}
+	if !regexp.MustCompile(`^v[0-9]+(\.[0-9]+)?$`).MatchString(version) {
+		webutils.BadRequestHandler(w, errors.New("graphApiVersion must look like v20.0"))
+		return
+	}
+
+	template := strings.TrimSpace(request.MessageTemplate)
+	if template == "" {
+		template = "{{streamer}} is live on BounceCast: {{schedule}}"
+	}
+	if strings.ContainsAny(template, "\r\n") {
+		webutils.BadRequestHandler(w, errors.New("messageTemplate cannot contain line breaks"))
+		return
+	}
+
+	token := strings.TrimSpace(request.PageAccessToken)
+	if request.Enabled && token == "" && getBounceCastNotificationSetting(bounceCastMessengerPageAccessTokenKey) == "" {
+		webutils.BadRequestHandler(w, errors.New("pageAccessToken is required when Messenger delivery is enabled"))
+		return
+	}
+
+	values := map[string]string{
+		bounceCastMessengerEnabledKey:         strconv.FormatBool(request.Enabled),
+		bounceCastMessengerAPIVersionKey:      version,
+		bounceCastMessengerMessageTemplateKey: template,
+	}
+	if token != "" {
+		values[bounceCastMessengerPageAccessTokenKey] = token
+	}
+	for key, value := range values {
+		if err := setBounceCastNotificationSetting(key, value); err != nil {
+			webutils.InternalErrorHandler(w, err)
+			return
+		}
+	}
+	recordBounceCastAuditEvent(r, "messenger_settings_updated", "notification_settings", "messenger", map[string]interface{}{"enabled": request.Enabled, "graphApiVersion": version})
+
+	response := readBounceCastMessengerSettings()
+	response.PageAccessToken = ""
+	webutils.WriteResponse(w, response)
+}
+
+// GetBounceCastScheduleReminders returns public account schedule reminder
+// registrations with delivery status for admin review.
+func GetBounceCastScheduleReminders(w http.ResponseWriter, r *http.Request) {
+	rows, err := data.GetDatabase().Query(`
+		SELECT r.id, r.schedule_id, s.title, COALESCE(a.display_name, ''), r.user_id,
+			COALESCE(u.display_name, ''), COALESCE(r.email, ''),
+			r.notify_email, r.notify_push, r.notify_messenger, COALESCE(r.messenger_destination, ''),
+			CASE WHEN COALESCE(r.browser_push_endpoint, '') != '' OR EXISTS (
+				SELECT 1 FROM bouncecast_account_push_subscriptions p
+				WHERE p.user_id = r.user_id AND p.enabled = 1 AND p.disabled_at IS NULL
+			) THEN 1 ELSE 0 END AS browser_push_linked,
+			r.last_queued_at, COALESCE(r.last_delivery_status, ''), COALESCE(r.last_delivery_error, ''),
+			r.disabled_at, r.created_at, r.updated_at
+		FROM bouncecast_schedule_reminders r
+		INNER JOIN bouncecast_stream_schedule s ON s.id = r.schedule_id
+		LEFT JOIN bouncecast_streamer_accounts a ON a.id = s.streamer_id
+		LEFT JOIN users u ON u.id = r.user_id
+		ORDER BY r.updated_at DESC
+		LIMIT 100
+	`)
+	if err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+	defer rows.Close()
+
+	reminders := []BounceCastScheduleReminderAdminItem{}
+	for rows.Next() {
+		var reminder BounceCastScheduleReminderAdminItem
+		var lastQueuedAt sql.NullTime
+		var disabledAt sql.NullTime
+		if err := rows.Scan(
+			&reminder.ID,
+			&reminder.ScheduleID,
+			&reminder.ScheduleTitle,
+			&reminder.Streamer,
+			&reminder.UserID,
+			&reminder.DisplayName,
+			&reminder.Email,
+			&reminder.NotifyEmail,
+			&reminder.NotifyPush,
+			&reminder.NotifyMessenger,
+			&reminder.MessengerDestination,
+			&reminder.BrowserPushLinked,
+			&lastQueuedAt,
+			&reminder.LastDeliveryStatus,
+			&reminder.LastDeliveryError,
+			&disabledAt,
+			&reminder.CreatedAt,
+			&reminder.UpdatedAt,
+		); err != nil {
+			webutils.InternalErrorHandler(w, err)
+			return
+		}
+		if lastQueuedAt.Valid {
+			reminder.LastQueuedAt = &lastQueuedAt.Time
+		}
+		if disabledAt.Valid {
+			reminder.DisabledAt = &disabledAt.Time
+		}
+		reminders = append(reminders, reminder)
+	}
+	if err := rows.Err(); err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+
+	webutils.WriteResponse(w, reminders)
+}
+
+// DisableBounceCastScheduleReminder disables a viewer's reminder without
+// deleting the audit trail around when it was created or last queued.
+func DisableBounceCastScheduleReminder(w http.ResponseWriter, r *http.Request) {
+	var request disableScheduleReminderRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+	if request.ID == 0 {
+		webutils.BadRequestHandler(w, errors.New("id is required"))
+		return
+	}
+
+	result, err := data.GetDatabase().Exec(`
+		UPDATE bouncecast_schedule_reminders
+		SET disabled_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, request.ID)
+	if err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+	if rowsAffected, _ := result.RowsAffected(); rowsAffected == 0 {
+		webutils.BadRequestHandler(w, errors.New("reminder not found"))
+		return
+	}
+	recordBounceCastAuditEvent(r, "schedule_reminder_disabled", "schedule_reminder", strconv.FormatInt(request.ID, 10), nil)
+
+	webutils.WriteSimpleResponse(w, true, "disabled schedule reminder")
+}
+
+// GetBounceCastAuditEvents returns recent product-level admin actions.
+func GetBounceCastAuditEvents(w http.ResponseWriter, r *http.Request) {
+	rows, err := data.GetDatabase().Query(`
+		SELECT id, COALESCE(actor_user_id, ''), COALESCE(actor_role, ''), action, target_type,
+			COALESCE(target_id, ''), COALESCE(metadata, ''), COALESCE(remote_addr, ''), created_at
+		FROM bouncecast_audit_events
+		ORDER BY created_at DESC
+		LIMIT 100
+	`)
+	if err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+	defer rows.Close()
+
+	events := []BounceCastAuditEvent{}
+	for rows.Next() {
+		var event BounceCastAuditEvent
+		if err := rows.Scan(&event.ID, &event.ActorUserID, &event.ActorRole, &event.Action, &event.TargetType, &event.TargetID, &event.Metadata, &event.RemoteAddr, &event.CreatedAt); err != nil {
+			webutils.InternalErrorHandler(w, err)
+			return
+		}
+		events = append(events, event)
+	}
+	if err := rows.Err(); err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+	webutils.WriteResponse(w, events)
+}
+
 func readBounceCastEmailSettings() BounceCastEmailSettings {
 	provider, _ := normalizeBounceCastEmailProvider(getBounceCastNotificationSetting(bounceCastEmailProviderKey))
 	port, err := strconv.Atoi(getBounceCastNotificationSetting(bounceCastEmailPortKey))
@@ -1160,6 +1434,50 @@ func readBounceCastEmailSettings() BounceCastEmailSettings {
 		FromName:    fromName,
 		StartTLS:    startTLS,
 		Subject:     subject,
+	}
+}
+
+func readBounceCastMessengerSettings() BounceCastMessengerSettings {
+	graphVersion := getBounceCastNotificationSetting(bounceCastMessengerAPIVersionKey)
+	if graphVersion == "" {
+		graphVersion = "v20.0"
+	}
+	template := getBounceCastNotificationSetting(bounceCastMessengerMessageTemplateKey)
+	if template == "" {
+		template = "{{streamer}} is live on BounceCast: {{schedule}}"
+	}
+	token := getBounceCastNotificationSetting(bounceCastMessengerPageAccessTokenKey)
+	return BounceCastMessengerSettings{
+		Enabled:            getBounceCastNotificationSetting(bounceCastMessengerEnabledKey) == "true",
+		GraphAPIVersion:    graphVersion,
+		PageAccessTokenSet: token != "",
+		MessageTemplate:    template,
+	}
+}
+
+func recordBounceCastAuditEvent(r *http.Request, action string, targetType string, targetID string, metadata map[string]interface{}) {
+	action = strings.TrimSpace(action)
+	targetType = strings.TrimSpace(targetType)
+	if action == "" || targetType == "" {
+		return
+	}
+	identity, _ := middleware.CurrentAdminIdentity(r)
+	metadataJSON := ""
+	if len(metadata) > 0 {
+		if encoded, err := json.Marshal(metadata); err == nil {
+			metadataJSON = string(encoded)
+		}
+	}
+	remoteAddr := ""
+	if r != nil {
+		remoteAddr = r.RemoteAddr
+	}
+	if _, err := data.GetDatabase().Exec(`
+		INSERT INTO bouncecast_audit_events(actor_user_id, actor_role, action, target_type, target_id, metadata, remote_addr)
+		VALUES(NULLIF(?, ''), NULLIF(?, ''), ?, ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''))
+	`, identity.UserID, identity.Role, action, targetType, strings.TrimSpace(targetID), metadataJSON, remoteAddr); err != nil {
+		// Audit logging should never block the product action.
+		return
 	}
 }
 
@@ -1316,5 +1634,6 @@ func CreateBounceCastSchedule(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id, _ := result.LastInsertId()
+	recordBounceCastAuditEvent(r, "schedule_created", "schedule", strconv.FormatInt(id, 10), map[string]interface{}{"status": status, "visibility": visibility})
 	webutils.WriteResponse(w, map[string]interface{}{"id": id})
 }

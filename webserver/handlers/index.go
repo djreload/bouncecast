@@ -58,6 +58,101 @@ func IndexHandler(w http.ResponseWriter, r *http.Request) {
 	serveWeb(w, r)
 }
 
+// BounceCastDJProfilePageHandler serves shareable public DJ profile URLs such
+// as /djs/dj-name while keeping the static Next.js app as the client runtime.
+func BounceCastDJProfilePageHandler(w http.ResponseWriter, r *http.Request) {
+	nonceRandom, _ := utils.GenerateRandomString(5)
+	middleware.SetHeaders(w, fmt.Sprintf("nonce-%s", nonceRandom))
+
+	if utils.IsUserAgentABot(r.UserAgent()) {
+		handleBounceCastDJScraperMetadataPage(w, r)
+		return
+	}
+
+	djsRequest := r.Clone(r.Context())
+	djsURL := *r.URL
+	djsURL.Path = "/djs/index.html"
+	djsRequest.URL = &djsURL
+	serveWeb(w, djsRequest)
+}
+
+func handleBounceCastDJScraperMetadataPage(w http.ResponseWriter, r *http.Request) {
+	handle := strings.Trim(strings.TrimPrefix(r.URL.Path, "/djs/"), "/")
+	if decoded, err := url.PathUnescape(handle); err == nil {
+		handle = decoded
+	}
+	handle = normalizeBounceCastPublicHandle(handle)
+
+	configRepository := configrepository.Get()
+	metadata := MetadataPage{
+		Name:          configRepository.GetServerName(),
+		Summary:       configRepository.GetServerSummary(),
+		Image:         buildBounceCastAbsoluteURL(r, "/logo/external"),
+		Thumbnail:     buildBounceCastAbsoluteURL(r, "/logo/external"),
+		RequestedURL:  buildBounceCastAbsoluteURL(r, r.URL.Path),
+		TagsString:    strings.Join(configRepository.GetServerMetadataTags(), ","),
+		Tags:          configRepository.GetServerMetadataTags(),
+		SocialHandles: configRepository.GetSocialHandles(),
+	}
+
+	if handle != "" {
+		if djs, err := queryBounceCastPublicDJs(handle); err == nil && len(djs) > 0 {
+			dj := djs[0]
+			metadata.Name = fmt.Sprintf("%s on BounceCast", dj.DisplayName)
+			metadata.Summary = dj.Bio
+			if metadata.Summary == "" {
+				metadata.Summary = fmt.Sprintf("Upcoming sets and public profile for %s on BounceCast.", dj.DisplayName)
+			}
+			if dj.HeroImageURL != "" {
+				metadata.Image = buildBounceCastAbsoluteURL(r, dj.HeroImageURL)
+				metadata.Thumbnail = metadata.Image
+			} else if dj.AvatarURL != "" {
+				metadata.Image = buildBounceCastAbsoluteURL(r, dj.AvatarURL)
+				metadata.Thumbnail = metadata.Image
+			}
+			if len(dj.Genres) > 0 {
+				metadata.Tags = dj.Genres
+				metadata.TagsString = strings.Join(dj.Genres, ",")
+			}
+		}
+	}
+
+	tmpl, err := static.GetBotMetadataTemplate()
+	if err != nil {
+		log.Errorln(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	var b bytes.Buffer
+	if err := tmpl.Execute(&b, metadata); err != nil {
+		log.Errorln(err)
+	}
+	middleware.SetCachingHeaders(w, r)
+	w.Header().Set("ETag", fmt.Sprintf("%x", md5.Sum(b.Bytes()))) // nolint:gosec
+	w.Header().Set("Content-Type", "text/html")
+	if _, err = w.Write(b.Bytes()); err != nil {
+		log.Errorln(err)
+	}
+}
+
+func buildBounceCastAbsoluteURL(r *http.Request, path string) string {
+	if parsed, err := url.Parse(path); err == nil && parsed.IsAbs() {
+		return parsed.String()
+	}
+	scheme := "http"
+	configRepository := configrepository.Get()
+	if siteURL := configRepository.GetServerURL(); siteURL != "" {
+		if parsed, err := url.Parse(siteURL); err == nil && parsed.Scheme != "" {
+			scheme = parsed.Scheme
+		}
+	}
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	return fmt.Sprintf("%s://%s%s", scheme, r.Host, path)
+}
+
 func renderIndexHtml(w http.ResponseWriter, nonce string) {
 	type serverSideContent struct {
 		Name             string

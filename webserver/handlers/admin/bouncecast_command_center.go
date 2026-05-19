@@ -33,8 +33,9 @@ type BounceCastCommandCenterStreamers struct {
 }
 
 type BounceCastCommandCenterSchedule struct {
-	Upcoming int `json:"upcoming"`
-	Live     int `json:"live"`
+	Upcoming  int `json:"upcoming"`
+	Live      int `json:"live"`
+	Reminders int `json:"reminders"`
 }
 
 type BounceCastCommandCenterStars struct {
@@ -66,8 +67,9 @@ func GetBounceCastCommandCenter(w http.ResponseWriter, r *http.Request) {
 			Disabled: queryBounceCastCommandCount(db, `SELECT COUNT(*) FROM bouncecast_streamer_accounts WHERE status = 'disabled'`),
 		},
 		Schedule: BounceCastCommandCenterSchedule{
-			Upcoming: queryBounceCastCommandCount(db, `SELECT COUNT(*) FROM bouncecast_stream_schedule WHERE visibility = 'public' AND status = 'planned' AND starts_at >= datetime('now', '-30 minutes')`),
-			Live:     queryBounceCastCommandCount(db, `SELECT COUNT(*) FROM bouncecast_go_live_events WHERE status = 'live' AND ended_at IS NULL`),
+			Upcoming:  queryBounceCastCommandCount(db, `SELECT COUNT(*) FROM bouncecast_stream_schedule WHERE visibility = 'public' AND status = 'planned' AND starts_at >= datetime('now', '-30 minutes')`),
+			Live:      queryBounceCastCommandCount(db, `SELECT COUNT(*) FROM bouncecast_go_live_events WHERE status = 'live' AND ended_at IS NULL`),
+			Reminders: queryBounceCastCommandCount(db, `SELECT COUNT(*) FROM bouncecast_schedule_reminders WHERE disabled_at IS NULL`),
 		},
 		Stars: BounceCastCommandCenterStars{
 			Enabled:         queryBounceCastStarsEnabled(db),

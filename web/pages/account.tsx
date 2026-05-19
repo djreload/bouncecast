@@ -17,6 +17,7 @@ import {
   message,
 } from 'antd';
 import { AccountPayload, AccountService } from '../services/account-service';
+import { registerWebPushNotifications } from '../services/notifications-service';
 import {
   BounceCastAccountHub,
   BounceCastDestination,
@@ -27,6 +28,22 @@ import { ACCESS_TOKEN_KEY } from '../components/stores/ClientConfigStore';
 import styles from '../styles/bouncecast-public.module.scss';
 
 const { Text } = Typography;
+
+async function getBrowserPushEndpoint(enabled: boolean) {
+  if (!enabled) {
+    return '';
+  }
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    throw new Error('Browser push notifications are not supported by this browser');
+  }
+  const response = await fetch('/api/config');
+  const config = await response.json();
+  const publicKey = config?.notifications?.browser?.publicKey;
+  if (!config?.notifications?.browser?.enabled || !publicKey) {
+    throw new Error('Browser push notifications are not enabled on this server yet');
+  }
+  return registerWebPushNotifications(publicKey);
+}
 
 function formatDate(value?: string) {
   if (!value) {
@@ -67,7 +84,13 @@ function ScheduleList({
       return;
     }
     try {
-      await BounceCastService.setScheduleReminder(accessToken, item.id, reminderChannels);
+      const browserPushEndpoint = await getBrowserPushEndpoint(
+        Boolean(reminderChannels.browserPush),
+      );
+      await BounceCastService.setScheduleReminder(accessToken, item.id, {
+        ...reminderChannels,
+        browserPushEndpoint,
+      });
       message.success(`Reminder saved for ${item.title}`);
     } catch (error) {
       message.error(error instanceof Error ? error.message : 'Unable to save reminder');
@@ -208,7 +231,10 @@ export default function AccountPage() {
     const values = await notificationForm.validateFields();
     setSaving(true);
     try {
-      const result = await AccountService.updateNotifications(token, values);
+      const result = await AccountService.updateNotifications(token, {
+        ...values,
+        browserPushEndpoint: await getBrowserPushEndpoint(Boolean(values.browserPush)),
+      });
       await applyAccountResponse(result);
       message.success('Notifications saved');
     } catch (error) {
@@ -431,6 +457,48 @@ export default function AccountPage() {
                     Save notifications
                   </Button>
                 </Form>
+              </Card>
+
+              <Card className={styles.panel} title="Reminder status">
+                {hub.reminders?.length ? (
+                  <div className={styles.scheduleList}>
+                    {hub.reminders.map(reminder => (
+                      <article className={styles.scheduleItem} key={reminder.id}>
+                        <p className={styles.scheduleTime}>{formatDate(reminder.startsAt)}</p>
+                        <p className={styles.scheduleTitle}>{reminder.title}</p>
+                        <Text className={styles.muted}>
+                          {[
+                            reminder.email && 'email',
+                            reminder.browserPush && 'browser push',
+                            reminder.messenger && 'Messenger',
+                          ]
+                            .filter(Boolean)
+                            .join(', ') || 'No channels'}
+                        </Text>
+                        <Tag
+                          color={
+                            reminder.disabledAt
+                              ? 'default'
+                              : reminder.lastDeliveryStatus === 'sent'
+                                ? 'green'
+                                : reminder.lastDeliveryStatus === 'failed'
+                                  ? 'red'
+                                  : 'blue'
+                          }
+                        >
+                          {reminder.disabledAt
+                            ? 'disabled'
+                            : reminder.lastDeliveryStatus || 'scheduled'}
+                        </Tag>
+                        {reminder.lastDeliveryError && (
+                          <Text className={styles.muted}>{reminder.lastDeliveryError}</Text>
+                        )}
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <Text className={styles.muted}>No saved schedule reminders yet.</Text>
+                )}
               </Card>
             </section>
 

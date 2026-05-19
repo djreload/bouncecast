@@ -32,6 +32,13 @@ type adminIdentityPayload struct {
 	Role      string `json:"role"`
 }
 
+// AdminIdentity is the BounceCast product-level identity attached to an admin
+// request. Basic Owncast admin auth is represented as owner access.
+type AdminIdentity struct {
+	UserID string `json:"userId"`
+	Role   string `json:"role"`
+}
+
 // ExternalAccessTokenHandlerFunc is a function that is called after validing access.
 type ExternalAccessTokenHandlerFunc func(models.ExternalAPIUser, http.ResponseWriter, *http.Request)
 
@@ -117,6 +124,34 @@ func CheckAdminCredentials(username string, plainPassword string) bool {
 	adminPasswordHash := configrepository.Get().GetAdminPassword()
 	return subtle.ConstantTimeCompare([]byte(strings.TrimSpace(username)), []byte("admin")) == 1 &&
 		utils.CompareHash(adminPasswordHash, plainPassword) == nil
+}
+
+// CurrentAdminIdentity returns the product role for the current admin request,
+// if the request has valid Owncast basic auth or a signed BounceCast admin
+// session/identity cookie.
+func CurrentAdminIdentity(r *http.Request) (AdminIdentity, bool) {
+	adminPasswordHash := configrepository.Get().GetAdminPassword()
+	if isValidAdminBasicAuth(r, "admin", adminPasswordHash) {
+		return AdminIdentity{UserID: "owncast-admin", Role: "owner"}, true
+	}
+	if !isValidAdminSessionCookie(r, adminPasswordHash) {
+		return AdminIdentity{}, false
+	}
+	identity, ok := getValidAdminIdentity(r, adminPasswordHash)
+	if !ok {
+		return AdminIdentity{}, false
+	}
+	return AdminIdentity{UserID: identity.UserID, Role: identity.Role}, true
+}
+
+// RequestAdminHasRole checks the current admin request against allowed
+// BounceCast product roles.
+func RequestAdminHasRole(r *http.Request, roles ...string) bool {
+	identity, ok := CurrentAdminIdentity(r)
+	if !ok {
+		return false
+	}
+	return adminRoleAllowed(identity.Role, roles...)
 }
 
 func SetAdminSessionCookie(w http.ResponseWriter, r *http.Request) {

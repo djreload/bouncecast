@@ -18,6 +18,7 @@ import {
 } from 'antd';
 import { AdminLayout } from '../../components/layouts/AdminLayout';
 import {
+  BOUNCECAST_ADMIN_SESSION,
   BOUNCECAST_STREAMERS,
   BOUNCECAST_STREAMER_PASSWORD,
   BOUNCECAST_STREAMER_UPDATE,
@@ -65,6 +66,12 @@ type StreamKey = {
   createdAt: string;
   lastUsedAt?: string;
   revokedAt?: string;
+};
+
+type AdminSession = {
+  role: string;
+  owner: boolean;
+  admin: boolean;
 };
 
 const statusColor = {
@@ -225,6 +232,7 @@ type StreamerKeysTableProps = {
   streamKeys: StreamKey[];
   openKeyModal: (streamer: Streamer) => void;
   revokeStreamKey: (id: number) => void;
+  canManage: boolean;
 };
 
 const StreamerKeysTable = ({
@@ -232,17 +240,24 @@ const StreamerKeysTable = ({
   streamKeys,
   openKeyModal,
   revokeStreamKey,
+  canManage,
 }: StreamerKeysTableProps) => {
   const keys = streamKeys.filter(key => key.streamerId === streamer.id);
   return (
     <div className="studio-nested-table">
-      <Space className="studio-table-actions">
-        <Button size="small" icon={<KeyOutlined />} onClick={() => openKeyModal(streamer)}>
-          Create stream key
-        </Button>
-      </Space>
+      {canManage && (
+        <Space className="studio-table-actions">
+          <Button size="small" icon={<KeyOutlined />} onClick={() => openKeyModal(streamer)}>
+            Create stream key
+          </Button>
+        </Space>
+      )}
       <Table
-        columns={streamKeyColumns(revokeStreamKey)}
+        columns={
+          canManage
+            ? streamKeyColumns(revokeStreamKey)
+            : streamKeyColumns(revokeStreamKey).filter(column => column.key !== 'action')
+        }
         dataSource={keys}
         rowKey="id"
         pagination={false}
@@ -255,6 +270,7 @@ const StreamerKeysTable = ({
 export default function Streamers() {
   const [streamers, setStreamers] = useState<Streamer[]>([]);
   const [streamKeys, setStreamKeys] = useState<StreamKey[]>([]);
+  const [adminSession, setAdminSession] = useState<AdminSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [keyModalOpen, setKeyModalOpen] = useState(false);
@@ -273,12 +289,14 @@ export default function Streamers() {
   const loadStreamers = async () => {
     setLoading(true);
     try {
-      const [streamerResult, keyResult] = await Promise.all([
+      const [streamerResult, keyResult, adminSessionResult] = await Promise.all([
         fetchData(BOUNCECAST_STREAMERS),
         fetchData(BOUNCECAST_STREAM_KEYS),
+        fetchData(BOUNCECAST_ADMIN_SESSION),
       ]);
       setStreamers(streamerResult || []);
       setStreamKeys(keyResult || []);
+      setAdminSession(adminSessionResult || null);
     } catch (error) {
       console.error(error);
     } finally {
@@ -303,6 +321,8 @@ export default function Streamers() {
       setSaving(false);
     }
   };
+
+  const canManageStreamerAccess = Boolean(adminSession?.admin);
 
   const revokeStreamKey = async (id: number) => {
     await fetchData(BOUNCECAST_STREAM_KEY_REVOKE, {
@@ -441,14 +461,16 @@ export default function Streamers() {
             access, and go-live notification ownership.
           </Text>
         </div>
-        <Space>
-          <Button icon={<KeyOutlined />} onClick={() => openKeyModal()}>
-            New key
-          </Button>
-          <Button type="primary" icon={<UserAddOutlined />} onClick={() => setModalOpen(true)}>
-            Add streamer
-          </Button>
-        </Space>
+        {canManageStreamerAccess && (
+          <Space>
+            <Button icon={<KeyOutlined />} onClick={() => openKeyModal()}>
+              New key
+            </Button>
+            <Button type="primary" icon={<UserAddOutlined />} onClick={() => setModalOpen(true)}>
+              Add streamer
+            </Button>
+          </Space>
+        )}
       </div>
 
       <Row gutter={[16, 16]} className="studio-stat-row">
@@ -483,7 +505,13 @@ export default function Streamers() {
 
       <Card title="Streamer accounts" className="studio-panel">
         <Table
-          columns={columns(openPasswordModal, openProfileModal, updateStreamerStatus)}
+          columns={
+            canManageStreamerAccess
+              ? columns(openPasswordModal, openProfileModal, updateStreamerStatus)
+              : columns(openPasswordModal, openProfileModal, updateStreamerStatus).filter(
+                  column => column.key !== 'actions',
+                )
+          }
           dataSource={streamers}
           loading={loading}
           rowKey="id"
@@ -495,8 +523,9 @@ export default function Streamers() {
               <StreamerKeysTable
                 streamer={streamer}
                 streamKeys={streamKeys}
-                openKeyModal={openKeyModal}
-                revokeStreamKey={revokeStreamKey}
+                openKeyModal={canManageStreamerAccess ? openKeyModal : () => undefined}
+                revokeStreamKey={canManageStreamerAccess ? revokeStreamKey : () => undefined}
+                canManage={canManageStreamerAccess}
               />
             ),
           }}

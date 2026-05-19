@@ -13,6 +13,7 @@ import (
 	"github.com/owncast/owncast/core/data"
 	"github.com/owncast/owncast/models"
 	"github.com/owncast/owncast/persistence/starsrepository"
+	"github.com/owncast/owncast/utils"
 	webutils "github.com/owncast/owncast/webserver/utils"
 )
 
@@ -82,13 +83,15 @@ type bounceCastAccountHubResponse struct {
 	Leaderboard             []models.StarLeaderboardEntry            `json:"leaderboard"`
 	DJProfile               *bounceCastPublicDJProfile               `json:"djProfile,omitempty"`
 	UpcomingSchedule        []bounceCastPublicScheduleItem           `json:"upcomingSchedule"`
+	Reminders               []bounceCastAccountReminderStatus        `json:"reminders"`
 }
 
 type bounceCastScheduleReminderRequest struct {
-	ScheduleID  int64 `json:"scheduleId"`
-	Email       bool  `json:"email"`
-	BrowserPush bool  `json:"browserPush"`
-	Messenger   bool  `json:"messenger"`
+	ScheduleID          int64  `json:"scheduleId"`
+	Email               bool   `json:"email"`
+	BrowserPush         bool   `json:"browserPush"`
+	BrowserPushEndpoint string `json:"browserPushEndpoint"`
+	Messenger           bool   `json:"messenger"`
 }
 
 type bounceCastScheduleReminderResponse struct {
@@ -97,6 +100,23 @@ type bounceCastScheduleReminderResponse struct {
 	BrowserPush bool   `json:"browserPush"`
 	Messenger   bool   `json:"messenger"`
 	Message     string `json:"message"`
+}
+
+type bounceCastAccountReminderStatus struct {
+	ID                 int64      `json:"id"`
+	ScheduleID         int64      `json:"scheduleId"`
+	Title              string     `json:"title"`
+	Streamer           string     `json:"streamer,omitempty"`
+	StartsAt           time.Time  `json:"startsAt"`
+	Email              bool       `json:"email"`
+	BrowserPush        bool       `json:"browserPush"`
+	Messenger          bool       `json:"messenger"`
+	LastQueuedAt       *time.Time `json:"lastQueuedAt,omitempty"`
+	LastDeliveryStatus string     `json:"lastDeliveryStatus,omitempty"`
+	LastDeliveryError  string     `json:"lastDeliveryError,omitempty"`
+	DisabledAt         *time.Time `json:"disabledAt,omitempty"`
+	CreatedAt          time.Time  `json:"createdAt"`
+	UpdatedAt          time.Time  `json:"updatedAt"`
 }
 
 // BounceCastPublicOptions handles preflight for public BounceCast discovery APIs.
@@ -198,6 +218,11 @@ func BounceCastAccountHub(user models.User, w http.ResponseWriter, r *http.Reque
 		webutils.InternalErrorHandler(w, err)
 		return
 	}
+	reminders, err := queryBounceCastAccountReminderStatuses(user.ID)
+	if err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
 
 	var djProfile *bounceCastPublicDJProfile
 	if user.Email != "" && user.IsDJ() {
@@ -220,6 +245,7 @@ func BounceCastAccountHub(user models.User, w http.ResponseWriter, r *http.Reque
 		Leaderboard:             leaderboard,
 		DJProfile:               djProfile,
 		UpcomingSchedule:        upcomingSchedule,
+		Reminders:               reminders,
 	})
 }
 
@@ -287,18 +313,27 @@ func SetBounceCastScheduleReminder(user models.User, w http.ResponseWriter, r *h
 		return
 	}
 
+	browserPushEndpoint := utils.MakeSafeStringOfLength(request.BrowserPushEndpoint, 2000)
+	if request.BrowserPush && browserPushEndpoint != "" {
+		if err := saveBounceCastBrowserPushDestination(user.ID, browserPushEndpoint, true); err != nil {
+			webutils.BadRequestHandler(w, err)
+			return
+		}
+	}
+
 	if _, err := data.GetDatabase().Exec(`
-		INSERT INTO bouncecast_schedule_reminders(schedule_id, user_id, email, notify_email, notify_push, notify_messenger, messenger_destination)
-		VALUES(?, ?, NULLIF(?, ''), ?, ?, ?, NULLIF(?, ''))
+		INSERT INTO bouncecast_schedule_reminders(schedule_id, user_id, email, notify_email, notify_push, notify_messenger, messenger_destination, browser_push_endpoint)
+		VALUES(?, ?, NULLIF(?, ''), ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''))
 		ON CONFLICT(schedule_id, user_id) DO UPDATE SET
 			email = excluded.email,
 			notify_email = excluded.notify_email,
 			notify_push = excluded.notify_push,
 			notify_messenger = excluded.notify_messenger,
 			messenger_destination = excluded.messenger_destination,
+			browser_push_endpoint = excluded.browser_push_endpoint,
 			disabled_at = NULL,
 			updated_at = CURRENT_TIMESTAMP
-	`, request.ScheduleID, user.ID, user.Email, bounceCastBoolToInt(request.Email), bounceCastBoolToInt(request.BrowserPush), bounceCastBoolToInt(request.Messenger), notificationPreferences.MessengerDestination); err != nil {
+	`, request.ScheduleID, user.ID, user.Email, bounceCastBoolToInt(request.Email), bounceCastBoolToInt(request.BrowserPush), bounceCastBoolToInt(request.Messenger), notificationPreferences.MessengerDestination, browserPushEndpoint); err != nil {
 		webutils.InternalErrorHandler(w, err)
 		return
 	}
@@ -514,6 +549,58 @@ func queryBounceCastDJProfileForAccountEmail(email string) (bounceCastPublicDJPr
 		return bounceCastPublicDJProfile{}, err
 	}
 	return bounceCastPublicDJProfile{DJ: djs[0], Schedule: schedule}, nil
+}
+
+func queryBounceCastAccountReminderStatuses(userID string) ([]bounceCastAccountReminderStatus, error) {
+	rows, err := data.GetDatabase().Query(`
+		SELECT r.id, r.schedule_id, s.title, COALESCE(a.display_name, ''), s.starts_at,
+			r.notify_email, r.notify_push, r.notify_messenger,
+			r.last_queued_at, COALESCE(r.last_delivery_status, ''), COALESCE(r.last_delivery_error, ''),
+			r.disabled_at, r.created_at, r.updated_at
+		FROM bouncecast_schedule_reminders r
+		INNER JOIN bouncecast_stream_schedule s ON s.id = r.schedule_id
+		LEFT JOIN bouncecast_streamer_accounts a ON a.id = s.streamer_id
+		WHERE r.user_id = ?
+		ORDER BY s.starts_at ASC
+		LIMIT 50
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	reminders := []bounceCastAccountReminderStatus{}
+	for rows.Next() {
+		var reminder bounceCastAccountReminderStatus
+		var lastQueuedAt sql.NullTime
+		var disabledAt sql.NullTime
+		if err := rows.Scan(
+			&reminder.ID,
+			&reminder.ScheduleID,
+			&reminder.Title,
+			&reminder.Streamer,
+			&reminder.StartsAt,
+			&reminder.Email,
+			&reminder.BrowserPush,
+			&reminder.Messenger,
+			&lastQueuedAt,
+			&reminder.LastDeliveryStatus,
+			&reminder.LastDeliveryError,
+			&disabledAt,
+			&reminder.CreatedAt,
+			&reminder.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		if lastQueuedAt.Valid {
+			reminder.LastQueuedAt = &lastQueuedAt.Time
+		}
+		if disabledAt.Valid {
+			reminder.DisabledAt = &disabledAt.Time
+		}
+		reminders = append(reminders, reminder)
+	}
+	return reminders, rows.Err()
 }
 
 func bounceCastPermissionsFromUserScopes(scopes []string) []string {

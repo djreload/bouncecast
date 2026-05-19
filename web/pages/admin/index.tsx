@@ -61,6 +61,7 @@ type CommandCenterSummary = {
   schedule: {
     upcoming: number;
     live: number;
+    reminders: number;
   };
   stars: {
     enabled: boolean;
@@ -111,6 +112,7 @@ function CommandCenter({ summary }: { summary?: CommandCenterSummary }) {
             <Statistic
               title="Upcoming sets"
               value={summary.schedule.upcoming}
+              suffix={`${summary.schedule.reminders} reminders`}
               prefix={<CalendarOutlined />}
             />
           </Card>

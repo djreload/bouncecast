@@ -130,9 +130,19 @@ export const BOUNCECAST_NOTIFICATION_DELIVERIES = `${API_LOCATION}bouncecast/not
 
 export const BOUNCECAST_EMAIL_SETTINGS = `${API_LOCATION}bouncecast/email-settings`;
 
+export const BOUNCECAST_MESSENGER_SETTINGS = `${API_LOCATION}bouncecast/messenger-settings`;
+
 export const BOUNCECAST_PUSH_SETTINGS = `${API_LOCATION}bouncecast/push-settings`;
 
+export const BOUNCECAST_ADMIN_SESSION = `${API_LOCATION}bouncecast/session`;
+
 export const BOUNCECAST_SCHEDULE = `${API_LOCATION}bouncecast/schedule`;
+
+export const BOUNCECAST_SCHEDULE_REMINDERS = `${API_LOCATION}bouncecast/schedule/reminders`;
+
+export const BOUNCECAST_SCHEDULE_REMINDER_DISABLE = `${API_LOCATION}bouncecast/schedule/reminders/disable`;
+
+export const BOUNCECAST_AUDIT_EVENTS = `${API_LOCATION}bouncecast/audit-events`;
 
 export const BOUNCECAST_STARS_ADMIN = `${API_LOCATION}bouncecast/stars`;
 
