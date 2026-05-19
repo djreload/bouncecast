@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/owncast/owncast/core/data"
+	"github.com/owncast/owncast/models"
 	"github.com/owncast/owncast/utils"
 	webutils "github.com/owncast/owncast/webserver/utils"
 )
@@ -35,13 +36,17 @@ type bounceCastStudioRegisterRequest struct {
 }
 
 type bounceCastStudioStreamer struct {
-	ID          int64  `json:"id"`
-	DisplayName string `json:"displayName"`
-	Handle      string `json:"handle"`
-	Email       string `json:"email"`
-	Role        string `json:"role"`
-	Status      string `json:"status"`
-	AvatarURL   string `json:"avatarUrl"`
+	ID           int64                         `json:"id"`
+	DisplayName  string                        `json:"displayName"`
+	Handle       string                        `json:"handle"`
+	Email        string                        `json:"email"`
+	Role         string                        `json:"role"`
+	Status       string                        `json:"status"`
+	AvatarURL    string                        `json:"avatarUrl"`
+	Bio          string                        `json:"bio"`
+	Genres       []string                      `json:"genres"`
+	SocialLinks  []models.BounceCastSocialLink `json:"socialLinks"`
+	HeroImageURL string                        `json:"heroImageUrl"`
 }
 
 type bounceCastStudioSessionResponse struct {
@@ -208,8 +213,11 @@ func BounceCastStudioLogout(w http.ResponseWriter, r *http.Request) {
 func getBounceCastStudioStreamerForLogin(login string) (bounceCastStudioStreamer, string, error) {
 	var streamer bounceCastStudioStreamer
 	var passwordHash sql.NullString
+	var genresJSON string
+	var socialLinksJSON string
 	if err := data.GetDatabase().QueryRow(`
-		SELECT id, display_name, handle, COALESCE(email, ''), role, status, COALESCE(avatar_url, ''), password_hash
+		SELECT id, display_name, handle, COALESCE(email, ''), role, status, COALESCE(avatar_url, ''),
+			COALESCE(bio, ''), COALESCE(genres, ''), COALESCE(social_links, ''), COALESCE(hero_image_url, ''), password_hash
 		FROM bouncecast_streamer_accounts
 		WHERE LOWER(handle) = ? OR LOWER(COALESCE(email, '')) = ?
 		LIMIT 1
@@ -221,10 +229,16 @@ func getBounceCastStudioStreamerForLogin(login string) (bounceCastStudioStreamer
 		&streamer.Role,
 		&streamer.Status,
 		&streamer.AvatarURL,
+		&streamer.Bio,
+		&genresJSON,
+		&socialLinksJSON,
+		&streamer.HeroImageURL,
 		&passwordHash,
 	); err != nil {
 		return bounceCastStudioStreamer{}, "", err
 	}
+	streamer.Genres = parseBounceCastGenres(genresJSON)
+	streamer.SocialLinks = parseBounceCastSocialLinks(socialLinksJSON)
 
 	if !passwordHash.Valid {
 		return streamer, "", nil

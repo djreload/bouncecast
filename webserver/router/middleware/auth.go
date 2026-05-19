@@ -4,7 +4,9 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -20,8 +22,15 @@ import (
 )
 
 const AdminSessionCookieName = "bouncecast_admin_session"
+const AdminIdentityCookieName = "bouncecast_admin_identity"
 
 const adminSessionDuration = 30 * 24 * time.Hour
+
+type adminIdentityPayload struct {
+	ExpiresAt int64  `json:"exp"`
+	UserID    string `json:"userId"`
+	Role      string `json:"role"`
+}
 
 // ExternalAccessTokenHandlerFunc is a function that is called after validing access.
 type ExternalAccessTokenHandlerFunc func(models.ExternalAPIUser, http.ResponseWriter, *http.Request)
@@ -62,6 +71,48 @@ func RequireAdminAuth(handler http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// RequireAdminRole wraps a handler and requires the authenticated admin session
+// to carry one of the supplied BounceCast product roles. The legacy Owncast
+// admin password is treated as owner-level access for compatibility.
+func RequireAdminRole(handler http.HandlerFunc, roles ...string) http.HandlerFunc {
+	configRepository := configrepository.Get()
+	return func(w http.ResponseWriter, r *http.Request) {
+		username := "admin"
+		password := configRepository.GetAdminPassword()
+		realm := "Owncast Authenticated Request"
+
+		validAdminHost := "http://localhost:3000"
+		w.Header().Set("Access-Control-Allow-Origin", validAdminHost)
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		role := ""
+		if isValidAdminBasicAuth(r, username, password) {
+			role = "owner"
+		} else if isValidAdminSessionCookie(r, password) {
+			identity, ok := getValidAdminIdentity(r, password)
+			if ok {
+				role = identity.Role
+			}
+		}
+
+		if role == "" || !adminRoleAllowed(role, roles...) {
+			w.Header().Set("WWW-Authenticate", `Basic realm="`+realm+`"`)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			log.Debugln("Failed admin role authentication")
+			return
+		}
+
+		handler(w, r)
+	}
+}
+
 func CheckAdminCredentials(username string, plainPassword string) bool {
 	adminPasswordHash := configrepository.Get().GetAdminPassword()
 	return subtle.ConstantTimeCompare([]byte(strings.TrimSpace(username)), []byte("admin")) == 1 &&
@@ -69,6 +120,14 @@ func CheckAdminCredentials(username string, plainPassword string) bool {
 }
 
 func SetAdminSessionCookie(w http.ResponseWriter, r *http.Request) {
+	setAdminSessionCookie(w, r, "owncast-admin", "owner")
+}
+
+func SetAdminRoleSessionCookie(w http.ResponseWriter, r *http.Request, userID string, role string) {
+	setAdminSessionCookie(w, r, userID, role)
+}
+
+func setAdminSessionCookie(w http.ResponseWriter, r *http.Request, userID string, role string) {
 	adminPasswordHash := configrepository.Get().GetAdminPassword()
 	expiresAt := time.Now().Add(adminSessionDuration)
 	expiresUnix := expiresAt.Unix()
@@ -85,6 +144,12 @@ func SetAdminSessionCookie(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 		Secure:   r.TLS != nil,
 	})
+
+	setAdminIdentityCookie(w, r, adminIdentityPayload{
+		ExpiresAt: expiresUnix,
+		UserID:    strings.TrimSpace(userID),
+		Role:      strings.ToLower(strings.TrimSpace(role)),
+	}, adminPasswordHash)
 }
 
 func isValidAdminBasicAuth(r *http.Request, username string, passwordHash string) bool {
@@ -112,6 +177,63 @@ func isValidAdminSessionCookie(r *http.Request, adminPasswordHash string) bool {
 
 	expectedSignature := signAdminSession(parts[0], adminPasswordHash)
 	return hmac.Equal([]byte(parts[1]), []byte(expectedSignature))
+}
+
+func setAdminIdentityCookie(w http.ResponseWriter, r *http.Request, identity adminIdentityPayload, adminPasswordHash string) {
+	body, err := json.Marshal(identity)
+	if err != nil {
+		return
+	}
+	payload := base64.RawURLEncoding.EncodeToString(body)
+	signature := signAdminSession("identity:"+payload, adminPasswordHash)
+	http.SetCookie(w, &http.Cookie{
+		Name:     AdminIdentityCookieName,
+		Value:    payload + "." + signature,
+		Path:     "/",
+		Expires:  time.Unix(identity.ExpiresAt, 0),
+		MaxAge:   int(adminSessionDuration.Seconds()),
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   r.TLS != nil,
+	})
+}
+
+func getValidAdminIdentity(r *http.Request, adminPasswordHash string) (adminIdentityPayload, bool) {
+	cookie, err := r.Cookie(AdminIdentityCookieName)
+	if err != nil {
+		return adminIdentityPayload{}, false
+	}
+	parts := strings.Split(cookie.Value, ".")
+	if len(parts) != 2 {
+		return adminIdentityPayload{}, false
+	}
+	expectedSignature := signAdminSession("identity:"+parts[0], adminPasswordHash)
+	if !hmac.Equal([]byte(parts[1]), []byte(expectedSignature)) {
+		return adminIdentityPayload{}, false
+	}
+	body, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		return adminIdentityPayload{}, false
+	}
+	var identity adminIdentityPayload
+	if err := json.Unmarshal(body, &identity); err != nil {
+		return adminIdentityPayload{}, false
+	}
+	if time.Now().Unix() > identity.ExpiresAt {
+		return adminIdentityPayload{}, false
+	}
+	identity.Role = strings.ToLower(strings.TrimSpace(identity.Role))
+	return identity, identity.Role != ""
+}
+
+func adminRoleAllowed(role string, allowedRoles ...string) bool {
+	role = strings.ToLower(strings.TrimSpace(role))
+	for _, allowedRole := range allowedRoles {
+		if role == strings.ToLower(strings.TrimSpace(allowedRole)) {
+			return true
+		}
+	}
+	return false
 }
 
 func signAdminSession(payload string, adminPasswordHash string) string {

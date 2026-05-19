@@ -4,6 +4,39 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 
 ## Unreleased / Next
 
+### Planned
+
+- Add admin reminder management views and visible reminder status in Account Hub.
+- Add per-account browser push endpoint mapping and Messenger delivery transport for schedule reminders.
+- Extend role-aware UI hiding, audit logs, and owner/admin separation across more admin actions.
+- Add richer public DJ profile URLs and share metadata.
+- Continue live VPS deployment notes as production configuration changes.
+
+## 2026-05-19
+
+### Added
+
+- Added database migration `00010_bouncecast_profiles_permissions_reminders.sql` for rich DJ profile metadata and per-schedule viewer reminders.
+- Added public DJ profile fields for bio, genres, social links, and hero artwork.
+- Added Studio and admin profile editing for DJ public profile metadata.
+- Added public schedule filtering by status, search query, handle, date range, and past inclusion.
+- Added Account Hub "Remind me" actions for logged-in viewers to save per-set reminder preferences.
+- Added go-live email delivery queuing for saved schedule reminders.
+- Added signed BounceCast admin identity cookies so owner/admin account roles can be enforced on specific admin actions.
+
+### Changed
+
+- Changed sensitive admin writes for account permission changes, Stars payment settings/packages/manual wallet adjustments, and SMTP settings to require owner-level access while preserving the original Owncast admin password as owner-level compatibility access.
+- Updated `/djs` with richer DJ cards, profile artwork, social links, public lineup filters, and a filtered lineup panel.
+- Updated `/admin/streamers/` and `/studio` so DJ public profiles can be managed without direct database edits.
+- Updated `/admin/schedule/` so new sets can be marked public/private and planned/live at creation time.
+- Updated the generated static web bundle so Docker serves the new Account Hub, DJ profile, schedule, Studio, and admin UI.
+- Updated Debian 13/Plesk live server notes with the profile/reminder migration, owner-only settings behavior, and deployment checks.
+
+## 2026-05-18
+
+### Added
+
 - Added public BounceCast discovery APIs for active DJ profiles, individual DJ profiles, and public schedule lineup.
 - Added a protected unified Account Hub API that combines profile, notification preferences, roles, dashboard destinations, Stars wallet summary, leaderboard, and linked DJ schedule context.
 - Added `/account` as a public Account Hub page for login/register, profile pictures, notification opt-ins, Stars wallet status, role destinations, and linked DJ schedule.
@@ -11,13 +44,6 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 - Added an upcoming lineup panel to the public stream homepage.
 - Added Account Hub and DJ lineup entries to the public user menu.
 - Added an admin command-center summary for accounts, DJ access, public schedule, and Stars activity.
-- Changed `/admin/accounts/` from a multi-select role editor into a clearer permission matrix for owner/admin/moderator/DJ roles.
-- Continue live VPS deployment notes as production configuration changes.
-
-## 2026-05-18
-
-### Added
-
 - Added database migration `00009_bouncecast_account_notifications.sql` for public account notification opt-in preferences.
 - Added public account notification preference persistence for email, browser push, and Messenger destinations.
 - Added public account UI controls for email, browser push, and Facebook Messenger go-live opt-ins.
@@ -31,6 +57,7 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 
 ### Changed
 
+- Changed `/admin/accounts/` from a multi-select role editor into a clearer permission matrix for owner/admin/moderator/DJ roles.
 - Upgraded Stars overlay effects so sparkle, fireworks, hearts, hype, and DJ drop selections trigger distinct on-screen animations instead of only changing the toast styling.
 - Updated linked Studio accounts so if a matching public BounceCast account exists, Studio access now requires that account to keep the `dj` role.
 - Updated the public account modal so users can upload a profile picture or keep using an external profile picture URL.

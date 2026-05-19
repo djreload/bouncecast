@@ -1,7 +1,19 @@
 import React, { ReactElement, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Avatar, Button, Card, Empty, Skeleton, Tag, Typography } from 'antd';
+import {
+  Avatar,
+  Button,
+  Card,
+  Empty,
+  Form,
+  Input,
+  Select,
+  Skeleton,
+  Space,
+  Tag,
+  Typography,
+} from 'antd';
 import {
   BounceCastDJProfile,
   BounceCastPublicDJ,
@@ -63,6 +75,16 @@ function DJCard({ dj, active }: { dj: BounceCastPublicDJ; active: boolean }) {
           <Tag color="blue">{dj.upcomingCount} upcoming</Tag>
           <Tag color="purple">{dj.totalLiveEvents} live sets</Tag>
         </div>
+        {dj.genres?.length > 0 && (
+          <div className={styles.statRow}>
+            {dj.genres.slice(0, 4).map(genre => (
+              <Tag key={genre} color="geekblue">
+                {genre}
+              </Tag>
+            ))}
+          </div>
+        )}
+        {dj.bio && <Text className={styles.muted}>{dj.bio}</Text>}
         <Text className={styles.muted}>
           {dj.upcomingSet
             ? `Next: ${dj.upcomingSet} at ${formatDate(dj.upcomingStarts)}`
@@ -82,7 +104,10 @@ export default function DJsPage() {
   const router = useRouter();
   const [djs, setDjs] = useState<BounceCastPublicDJ[]>([]);
   const [profile, setProfile] = useState<BounceCastDJProfile | null>(null);
+  const [lineup, setLineup] = useState<BounceCastScheduleItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'planned' | 'live'>('all');
+  const [searchFilter, setSearchFilter] = useState('');
 
   const selectedHandle = useMemo(() => {
     const queryHandle = router.query.handle;
@@ -94,6 +119,16 @@ export default function DJsPage() {
       .then(result => setDjs(result || []))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    BounceCastService.getSchedule({
+      limit: 25,
+      status: statusFilter,
+      q: searchFilter,
+    })
+      .then(result => setLineup(result || []))
+      .catch(() => setLineup([]));
+  }, [searchFilter, statusFilter]);
 
   useEffect(() => {
     if (!selectedHandle) {
@@ -152,10 +187,65 @@ export default function DJsPage() {
             </section>
 
             <aside>
+              <Card className={styles.panel} title="Lineup filters">
+                <Form layout="vertical">
+                  <Form.Item label="Search">
+                    <Input
+                      allowClear
+                      maxLength={80}
+                      placeholder="DJ, set, or genre"
+                      value={searchFilter}
+                      onChange={event => setSearchFilter(event.target.value)}
+                    />
+                  </Form.Item>
+                  <Form.Item label="Status">
+                    <Select
+                      value={statusFilter}
+                      onChange={setStatusFilter}
+                      options={[
+                        { label: 'All active sets', value: 'all' },
+                        { label: 'Planned', value: 'planned' },
+                        { label: 'Live now', value: 'live' },
+                      ]}
+                    />
+                  </Form.Item>
+                </Form>
+              </Card>
+
+              <Card className={styles.panel} title="Public lineup">
+                <ScheduleList schedule={lineup} />
+              </Card>
+
               <Card
                 className={styles.panel}
                 title={profile ? `${profile.dj.displayName} schedule` : 'DJ schedule'}
               >
+                {profile?.dj.heroImageUrl && (
+                  <img
+                    className={styles.heroImage}
+                    src={profile.dj.heroImageUrl}
+                    alt={`${profile.dj.displayName} hero`}
+                  />
+                )}
+                {profile?.dj.bio && <p className={styles.profileBio}>{profile.dj.bio}</p>}
+                {profile?.dj.genres?.length > 0 && (
+                  <Space wrap className={styles.profileTags}>
+                    {profile.dj.genres.map(genre => (
+                      <Tag key={genre} color="geekblue">
+                        {genre}
+                      </Tag>
+                    ))}
+                  </Space>
+                )}
+                {profile?.dj.socialLinks?.length > 0 && (
+                  <Space wrap className={styles.profileTags}>
+                    {profile.dj.socialLinks.map(link => (
+                      <a key={link.url} href={link.url} rel="noreferrer" target="_blank">
+                        {link.label}
+                      </a>
+                    ))}
+                  </Space>
+                )}
                 <ScheduleList schedule={profile?.schedule || []} />
               </Card>
             </aside>

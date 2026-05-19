@@ -55,6 +55,7 @@ type ScheduleItem = {
   streamer: string;
   startsAt: string;
   status: string;
+  visibility: string;
   notifyEmail: boolean;
   notifyPush: boolean;
   notifyWebhook: boolean;
@@ -135,6 +136,14 @@ const columns = [
     dataIndex: 'status',
     key: 'status',
     render: status => <Tag color={status === 'planned' ? 'purple' : 'default'}>{status}</Tag>,
+  },
+  {
+    title: 'Visibility',
+    dataIndex: 'visibility',
+    key: 'visibility',
+    render: visibility => (
+      <Tag color={visibility === 'public' ? 'green' : 'default'}>{visibility}</Tag>
+    ),
   },
   {
     title: 'Alerts',
@@ -541,6 +550,8 @@ export default function Schedule() {
           layout="vertical"
           initialValues={{
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+            status: 'planned',
+            visibility: 'public',
             notifyWebhook: true,
           }}
         >
@@ -577,6 +588,28 @@ export default function Schedule() {
           <Form.Item name="timezone" label="Timezone">
             <Input />
           </Form.Item>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="status" label="Status">
+                <Select
+                  options={[
+                    { label: 'Planned', value: 'planned' },
+                    { label: 'Live now', value: 'live' },
+                  ]}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="visibility" label="Visibility">
+                <Select
+                  options={[
+                    { label: 'Public lineup', value: 'public' },
+                    { label: 'Private/internal', value: 'private' },
+                  ]}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
           <Space direction="vertical">
             <Form.Item name="notifyPush" valuePropName="checked" noStyle>
               <Checkbox>Push notification</Checkbox>

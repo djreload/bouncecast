@@ -51,7 +51,7 @@ func BounceCastAdminLogin(w http.ResponseWriter, r *http.Request) {
 		writeBounceCastAdminUnauthorized(w)
 		return
 	}
-	middleware.SetAdminSessionCookie(w, r)
+	middleware.SetAdminRoleSessionCookie(w, r, roleUser.ID, roleUser.adminRoleName())
 	webutils.WriteResponse(w, webutils.J{
 		"role":        roleUser.adminRoleName(),
 		"destination": "/admin/",

@@ -297,6 +297,10 @@ func queueBounceCastGoLiveNotifications(goLiveEventID int64, scheduleID sql.Null
 		queuedCount++
 	}
 
+	if scheduleID.Valid && enabledChannels["email"] {
+		queuedCount += queueBounceCastScheduleReminderDeliveries(db, goLiveEventID, scheduleID.Int64)
+	}
+
 	if enabledChannels[bounceCastPushDeliveryChannel] {
 		queuedCount += queueBounceCastBrowserPushDeliveries(db, goLiveEventID)
 	}
@@ -312,6 +316,62 @@ func queueBounceCastGoLiveNotifications(goLiveEventID int64, scheduleID sql.Null
 	if queuedCount > 0 {
 		sendBounceCastQueuedDeliveries(goLiveEventID)
 	}
+}
+
+func queueBounceCastScheduleReminderDeliveries(db *sql.DB, goLiveEventID int64, scheduleID int64) int {
+	rows, err := db.Query(`
+		SELECT email
+		FROM bouncecast_schedule_reminders
+		WHERE schedule_id = ?
+			AND disabled_at IS NULL
+			AND notify_email = 1
+			AND COALESCE(email, '') != ''
+	`, scheduleID)
+	if err != nil {
+		log.Debugln("unable to query BounceCast schedule reminders", err)
+		return 0
+	}
+
+	destinations := []string{}
+	for rows.Next() {
+		var destination string
+		if err := rows.Scan(&destination); err != nil {
+			log.Debugln("unable to scan BounceCast schedule reminder", err)
+			continue
+		}
+		destination = strings.TrimSpace(destination)
+		if destination == "" {
+			continue
+		}
+		destinations = append(destinations, destination)
+	}
+	if err := rows.Close(); err != nil {
+		log.Debugln("unable to close BounceCast schedule reminder rows", err)
+	}
+	if err := rows.Err(); err != nil {
+		log.Debugln("unable to iterate BounceCast schedule reminders", err)
+	}
+
+	queuedCount := 0
+	for _, destination := range destinations {
+		result, err := db.Exec(`
+			INSERT INTO bouncecast_notification_deliveries(go_live_event_id, channel, destination)
+			SELECT ?, 'email', ?
+			WHERE NOT EXISTS (
+				SELECT 1
+				FROM bouncecast_notification_deliveries
+				WHERE go_live_event_id = ? AND channel = 'email' AND destination = ?
+			)
+		`, goLiveEventID, destination, goLiveEventID, destination)
+		if err != nil {
+			log.Debugln("unable to queue BounceCast schedule reminder delivery", err)
+			continue
+		}
+		if rowsAffected, _ := result.RowsAffected(); rowsAffected > 0 {
+			queuedCount++
+		}
+	}
+	return queuedCount
 }
 
 func queueBounceCastBrowserPushDeliveries(db *sql.DB, goLiveEventID int64) int {

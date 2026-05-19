@@ -2,7 +2,9 @@ import {
   BOUNCECAST_ACCOUNT_HUB,
   BOUNCECAST_PUBLIC_DJS,
   BOUNCECAST_PUBLIC_SCHEDULE,
+  BOUNCECAST_PUBLIC_SCHEDULE_REMINDERS,
   getUnauthedData,
+  fetchData,
 } from '../utils/apis';
 import { StarLeaderboardEntry, StarWalletSummary } from '../interfaces/stars.model';
 
@@ -18,12 +20,26 @@ export type BounceCastPublicDJ = {
   displayName: string;
   handle: string;
   avatarUrl?: string;
+  bio?: string;
+  genres: string[];
+  socialLinks: { label: string; url: string }[];
+  heroImageUrl?: string;
   role: string;
   upcomingSet?: string;
   upcomingStarts?: string;
   upcomingCount: number;
   totalLiveEvents: number;
   lastLiveAt?: string;
+};
+
+export type BounceCastScheduleFilters = {
+  limit?: number;
+  handle?: string;
+  status?: 'all' | 'planned' | 'live';
+  q?: string;
+  from?: string;
+  to?: string;
+  includePast?: boolean;
 };
 
 export type BounceCastScheduleItem = {
@@ -83,16 +99,55 @@ export class BounceCastService {
     return getUnauthedData(`${BOUNCECAST_PUBLIC_DJS}/${encodeURIComponent(handle)}`);
   }
 
-  public static async getSchedule(limit = 12, handle?: string): Promise<BounceCastScheduleItem[]> {
-    const params = new URLSearchParams({ limit: String(limit) });
-    if (handle) {
-      params.set('handle', handle);
+  public static async getSchedule(
+    limitOrFilters: number | BounceCastScheduleFilters = 12,
+    handle?: string,
+  ): Promise<BounceCastScheduleItem[]> {
+    const filters =
+      typeof limitOrFilters === 'number'
+        ? ({ limit: limitOrFilters, handle } as BounceCastScheduleFilters)
+        : limitOrFilters;
+    const params = new URLSearchParams({ limit: String(filters.limit || 12) });
+    if (filters.handle) {
+      params.set('handle', filters.handle);
+    }
+    if (filters.status && filters.status !== 'all') {
+      params.set('status', filters.status);
+    }
+    if (filters.q) {
+      params.set('q', filters.q);
+    }
+    if (filters.from) {
+      params.set('from', filters.from);
+    }
+    if (filters.to) {
+      params.set('to', filters.to);
+    }
+    if (filters.includePast) {
+      params.set('includePast', 'true');
     }
     return getUnauthedData(`${BOUNCECAST_PUBLIC_SCHEDULE}?${params.toString()}`);
   }
 
   public static async getAccountHub(accessToken: string): Promise<BounceCastAccountHub> {
     return getUnauthedData(withAccessToken(BOUNCECAST_ACCOUNT_HUB, accessToken));
+  }
+
+  public static async setScheduleReminder(
+    accessToken: string,
+    scheduleId: number,
+    channels: { email?: boolean; browserPush?: boolean; messenger?: boolean },
+  ) {
+    return fetchData(withAccessToken(BOUNCECAST_PUBLIC_SCHEDULE_REMINDERS, accessToken), {
+      method: 'POST',
+      auth: false,
+      data: {
+        scheduleId,
+        email: Boolean(channels.email),
+        browserPush: Boolean(channels.browserPush),
+        messenger: Boolean(channels.messenger),
+      },
+    });
   }
 }
 

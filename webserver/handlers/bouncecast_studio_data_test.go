@@ -275,3 +275,44 @@ func TestBounceCastStudioCanCreateUpdateAndCancelOwnSchedule(t *testing.T) {
 		t.Fatalf("other schedule was changed: title=%q status=%q", otherTitle, otherStatus)
 	}
 }
+
+func TestBounceCastStudioCanUpdateOwnPublicProfile(t *testing.T) {
+	resetBounceCastStudioAuthTestTables(t)
+	insertBounceCastStudioAuthStreamer(t, "profile-dj", "profile@example.com", "active", "correct-password")
+
+	recorder, loginResponse := loginBounceCastStudioStreamer(t, `{"login":"profile-dj","password":"correct-password"}`)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("login status = %d, want 200: %s", recorder.Code, recorder.Body.String())
+	}
+
+	body := `{
+		"displayName":"DJ Profile",
+		"avatarUrl":"/public/profiles/profile.png",
+		"bio":"Peak-time house and garage.",
+		"genres":["House","Garage"],
+		"socialLinks":[{"label":"Mixcloud","url":"https://mixcloud.com/profile-dj"}],
+		"heroImageUrl":"/public/profiles/profile-hero.png"
+	}`
+	updateRecorder, updateRequest := authenticatedStudioRequest(http.MethodPost, "/api/bouncecast/studio/profile", loginResponse.Token, body)
+	BounceCastStudioUpdateProfile(updateRecorder, updateRequest)
+	if updateRecorder.Code != http.StatusOK {
+		t.Fatalf("profile update status = %d, want 200: %s", updateRecorder.Code, updateRecorder.Body.String())
+	}
+
+	db := data.GetDatabase()
+	var displayName string
+	var bio string
+	var genres string
+	var socialLinks string
+	var heroImageURL string
+	if err := db.QueryRow(`
+		SELECT display_name, COALESCE(bio, ''), COALESCE(genres, ''), COALESCE(social_links, ''), COALESCE(hero_image_url, '')
+		FROM bouncecast_streamer_accounts
+		WHERE handle = 'profile-dj'
+	`).Scan(&displayName, &bio, &genres, &socialLinks, &heroImageURL); err != nil {
+		t.Fatalf("read profile: %v", err)
+	}
+	if displayName != "DJ Profile" || bio == "" || !strings.Contains(genres, "Garage") || !strings.Contains(socialLinks, "Mixcloud") || heroImageURL == "" {
+		t.Fatalf("unexpected profile row: name=%q bio=%q genres=%q links=%q hero=%q", displayName, bio, genres, socialLinks, heroImageURL)
+	}
+}

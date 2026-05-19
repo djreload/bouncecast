@@ -69,6 +69,9 @@ func TestBounceCastAdminLoginAcceptsOwnerAndAdminAccountRoles(t *testing.T) {
 		if !hasBounceCastAdminSessionCookie(recorder) {
 			t.Fatalf("%s login did not set admin session cookie", testCase.role)
 		}
+		if !hasBounceCastAdminIdentityCookie(recorder) {
+			t.Fatalf("%s login did not set admin identity cookie", testCase.role)
+		}
 
 		var response map[string]string
 		if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
@@ -98,6 +101,15 @@ func TestBounceCastAdminLoginRejectsNonAdminAccountRoles(t *testing.T) {
 func hasBounceCastAdminSessionCookie(recorder *httptest.ResponseRecorder) bool {
 	for _, cookie := range recorder.Result().Cookies() {
 		if cookie.Name == middleware.AdminSessionCookieName {
+			return true
+		}
+	}
+	return false
+}
+
+func hasBounceCastAdminIdentityCookie(recorder *httptest.ResponseRecorder) bool {
+	for _, cookie := range recorder.Result().Cookies() {
+		if cookie.Name == middleware.AdminIdentityCookieName {
 			return true
 		}
 	}

@@ -164,6 +164,24 @@
   font-weight: 700;
 }
 
+.heroImage {
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  margin-bottom: 0.8rem;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 8px;
+}
+
+.profileBio {
+  margin: 0 0 0.75rem;
+  color: var(--rave-text-soft);
+}
+
+.profileTags {
+  margin-bottom: 0.75rem;
+}
+
 .statRow {
   display: flex;
   flex-wrap: wrap;
@@ -193,6 +211,10 @@
   margin: 0;
   color: var(--rave-text);
   font-weight: 800;
+}
+
+.reminderButton {
+  margin-top: 0.6rem;
 }
 
 .actions {

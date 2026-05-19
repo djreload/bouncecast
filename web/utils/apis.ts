@@ -184,6 +184,8 @@ export const BOUNCECAST_STUDIO_STREAM_KEY_REVOKE = `${STUDIO_API_LOCATION}stream
 
 export const BOUNCECAST_STUDIO_LIVE_EVENTS = `${STUDIO_API_LOCATION}live-events`;
 
+export const BOUNCECAST_STUDIO_PROFILE = `${STUDIO_API_LOCATION}profile`;
+
 export const BOUNCECAST_ADMIN_LOGIN = `${NEXT_PUBLIC_API_HOST}api/bouncecast/admin/login`;
 
 const ACCOUNT_API_LOCATION = `${NEXT_PUBLIC_API_HOST}api/bouncecast/account/`;
@@ -205,6 +207,8 @@ export const BOUNCECAST_ACCOUNT_HUB = `${ACCOUNT_API_LOCATION}hub`;
 export const BOUNCECAST_PUBLIC_DJS = `${NEXT_PUBLIC_API_HOST}api/bouncecast/djs`;
 
 export const BOUNCECAST_PUBLIC_SCHEDULE = `${NEXT_PUBLIC_API_HOST}api/bouncecast/schedule`;
+
+export const BOUNCECAST_PUBLIC_SCHEDULE_REMINDERS = `${NEXT_PUBLIC_API_HOST}api/bouncecast/schedule/reminders`;
 
 export const API_YP_RESET = `${API_LOCATION}yp/reset`;
 

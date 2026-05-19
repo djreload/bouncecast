@@ -22,6 +22,7 @@ import {
   BOUNCECAST_STUDIO_LOGIN,
   BOUNCECAST_STUDIO_LOGOUT,
   BOUNCECAST_STUDIO_ME,
+  BOUNCECAST_STUDIO_PROFILE,
   BOUNCECAST_STUDIO_REGISTER,
   BOUNCECAST_STUDIO_SCHEDULE,
   BOUNCECAST_STUDIO_SCHEDULE_CANCEL,
@@ -57,6 +58,11 @@ type Streamer = {
   email: string;
   role: string;
   status: string;
+  avatarUrl?: string;
+  bio?: string;
+  genres?: string[];
+  socialLinks?: { label: string; url: string }[];
+  heroImageUrl?: string;
 };
 
 type StudioSession = {
@@ -159,6 +165,7 @@ export default function Studio() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [keyModalOpen, setKeyModalOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<ScheduleItem | null>(null);
   const [newStreamKey, setNewStreamKey] = useState('');
@@ -166,6 +173,7 @@ export default function Studio() {
   const [loginForm] = Form.useForm();
   const [registerForm] = Form.useForm();
   const [keyForm] = Form.useForm();
+  const [profileForm] = Form.useForm();
   const [scheduleForm] = Form.useForm<ScheduleFormValues>();
 
   const loadStudio = async (activeToken: string) => {
@@ -300,6 +308,58 @@ export default function Studio() {
       notifyWebhook: item?.notifyWebhook ?? true,
     });
     setScheduleModalOpen(true);
+  };
+
+  const openProfileModal = () => {
+    if (!session) {
+      return;
+    }
+    profileForm.setFieldsValue({
+      displayName: session.streamer.displayName,
+      avatarUrl: session.streamer.avatarUrl || '',
+      bio: session.streamer.bio || '',
+      genres: (session.streamer.genres || []).join(', '),
+      heroImageUrl: session.streamer.heroImageUrl || '',
+      socialLinks: (session.streamer.socialLinks || [])
+        .map(link => `${link.label}|${link.url}`)
+        .join('\n'),
+    });
+    setProfileModalOpen(true);
+  };
+
+  const saveProfile = async () => {
+    const values = await profileForm.validateFields();
+    const socialLinks = String(values.socialLinks || '')
+      .split('\n')
+      .map(line => {
+        const [label, ...urlParts] = line.split('|');
+        return { label: label?.trim(), url: urlParts.join('|').trim() };
+      })
+      .filter(link => link.label || link.url);
+    setSaving(true);
+    try {
+      await fetchStudioData(BOUNCECAST_STUDIO_PROFILE, token, {
+        method: 'POST',
+        data: {
+          displayName: values.displayName,
+          avatarUrl: values.avatarUrl,
+          bio: values.bio,
+          genres: String(values.genres || '')
+            .split(',')
+            .map(genre => genre.trim())
+            .filter(Boolean),
+          socialLinks,
+          heroImageUrl: values.heroImageUrl,
+        },
+      });
+      setProfileModalOpen(false);
+      await loadStudio(token);
+      message.success('Profile saved');
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : 'Unable to save profile');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const saveScheduleItem = async () => {
@@ -505,6 +565,9 @@ export default function Studio() {
             <Button icon={<ReloadOutlined />} loading={loading} onClick={() => loadStudio(token)}>
               Refresh
             </Button>
+            <Button icon={<EditOutlined />} onClick={openProfileModal}>
+              Profile
+            </Button>
             <Button icon={<LogoutOutlined />} onClick={logout}>
               Log out
             </Button>
@@ -512,6 +575,13 @@ export default function Studio() {
         </header>
 
         <section className="studio-grid">
+          <Card className="studio-stat-accent">
+            <Statistic
+              title="Public profile"
+              value={session?.streamer.genres?.slice(0, 2).join(', ') || 'Add genres'}
+              prefix={<EditOutlined />}
+            />
+          </Card>
           <Card className="studio-stat-accent">
             <Statistic
               title="Next set"
@@ -715,6 +785,45 @@ export default function Studio() {
             ]}
           />
         </Card>
+
+        <Modal
+          title="Edit public DJ profile"
+          open={profileModalOpen}
+          onCancel={() => setProfileModalOpen(false)}
+          onOk={saveProfile}
+          confirmLoading={saving}
+          okText="Save profile"
+        >
+          <Form form={profileForm} layout="vertical">
+            <Form.Item
+              name="displayName"
+              label="Display name"
+              rules={[{ required: true, message: 'Enter your public DJ name' }]}
+            >
+              <Input maxLength={80} />
+            </Form.Item>
+            <Form.Item name="avatarUrl" label="Avatar image URL">
+              <Input maxLength={500} placeholder="/public/profiles/your-avatar.png" />
+            </Form.Item>
+            <Form.Item name="heroImageUrl" label="Hero image URL">
+              <Input maxLength={500} placeholder="Optional wider profile image" />
+            </Form.Item>
+            <Form.Item name="bio" label="Bio">
+              <Input.TextArea rows={4} maxLength={600} placeholder="Short public DJ bio" />
+            </Form.Item>
+            <Form.Item name="genres" label="Genres">
+              <Input placeholder="House, Garage, DnB" />
+            </Form.Item>
+            <Form.Item name="socialLinks" label="Social links">
+              <Input.TextArea
+                rows={4}
+                placeholder={
+                  'Instagram|https://instagram.com/yourname\nMixcloud|https://mixcloud.com/yourname'
+                }
+              />
+            </Form.Item>
+          </Form>
+        </Modal>
 
         <Modal
           title="New stream key"

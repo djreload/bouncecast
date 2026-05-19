@@ -29,6 +29,7 @@ import {
 const UserAddOutlined = dynamic(() => import('@ant-design/icons/UserAddOutlined'), { ssr: false });
 const KeyOutlined = dynamic(() => import('@ant-design/icons/KeyOutlined'), { ssr: false });
 const LockOutlined = dynamic(() => import('@ant-design/icons/LockOutlined'), { ssr: false });
+const EditOutlined = dynamic(() => import('@ant-design/icons/EditOutlined'), { ssr: false });
 const CopyOutlined = dynamic(() => import('@ant-design/icons/CopyOutlined'), { ssr: false });
 const CustomerServiceOutlined = dynamic(() => import('@ant-design/icons/CustomerServiceOutlined'), {
   ssr: false,
@@ -47,6 +48,11 @@ type Streamer = {
   email: string;
   role: string;
   status: string;
+  avatarUrl?: string;
+  bio?: string;
+  genres?: string[];
+  socialLinks?: { label: string; url: string }[];
+  heroImageUrl?: string;
   passwordSet: boolean;
   streamKeyCount: number;
 };
@@ -70,6 +76,7 @@ const statusColor = {
 
 const columns = (
   openPasswordModal: (streamer: Streamer) => void,
+  openProfileModal: (streamer: Streamer) => void,
   updateStreamerStatus: (streamer: Streamer, status: string) => void,
 ) => [
   {
@@ -80,6 +87,9 @@ const columns = (
       <Space direction="vertical" size={0}>
         <Text strong>{name}</Text>
         <Text type="secondary">@{record.handle}</Text>
+        {record.genres?.length > 0 && (
+          <Text type="secondary">{record.genres.slice(0, 3).join(', ')}</Text>
+        )}
       </Space>
     ),
   },
@@ -124,6 +134,9 @@ const columns = (
     key: 'actions',
     render: (_, streamer) => (
       <Space>
+        <Button size="small" icon={<EditOutlined />} onClick={() => openProfileModal(streamer)}>
+          Profile
+        </Button>
         <Button size="small" icon={<LockOutlined />} onClick={() => openPasswordModal(streamer)}>
           Password
         </Button>
@@ -190,6 +203,23 @@ const streamKeyColumns = (revokeStreamKey: (id: number) => void) => [
   },
 ];
 
+function normalizeStreamerFormPayload(values) {
+  return {
+    ...values,
+    genres: String(values.genres || '')
+      .split(',')
+      .map(genre => genre.trim())
+      .filter(Boolean),
+    socialLinks: String(values.socialLinks || '')
+      .split('\n')
+      .map(line => {
+        const [label, ...urlParts] = line.split('|');
+        return { label: label?.trim(), url: urlParts.join('|').trim() };
+      })
+      .filter(link => link.label || link.url),
+  };
+}
+
 type StreamerKeysTableProps = {
   streamer: Streamer;
   streamKeys: StreamKey[];
@@ -234,8 +264,11 @@ export default function Streamers() {
   const [form] = Form.useForm();
   const [keyForm] = Form.useForm();
   const [passwordForm] = Form.useForm();
+  const [profileForm] = Form.useForm();
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [passwordStreamer, setPasswordStreamer] = useState<Streamer | null>(null);
+  const [profileStreamer, setProfileStreamer] = useState<Streamer | null>(null);
 
   const loadStreamers = async () => {
     setLoading(true);
@@ -329,6 +362,11 @@ export default function Streamers() {
           email: streamer.email,
           role: streamer.role,
           status,
+          avatarUrl: streamer.avatarUrl,
+          bio: streamer.bio,
+          genres: streamer.genres || [],
+          socialLinks: streamer.socialLinks || [],
+          heroImageUrl: streamer.heroImageUrl,
         },
       });
       await loadStreamers();
@@ -347,10 +385,45 @@ export default function Streamers() {
     try {
       await fetchData(BOUNCECAST_STREAMERS, {
         method: 'POST',
-        data: values,
+        data: normalizeStreamerFormPayload(values),
       });
       form.resetFields();
       setModalOpen(false);
+      await loadStreamers();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openProfileModal = (streamer: Streamer) => {
+    setProfileStreamer(streamer);
+    profileForm.setFieldsValue({
+      ...streamer,
+      genres: (streamer.genres || []).join(', '),
+      socialLinks: (streamer.socialLinks || []).map(link => `${link.label}|${link.url}`).join('\n'),
+    });
+    setProfileModalOpen(true);
+  };
+
+  const saveProfile = async () => {
+    if (!profileStreamer) {
+      return;
+    }
+    const values = await profileForm.validateFields();
+    setSaving(true);
+    try {
+      await fetchData(BOUNCECAST_STREAMER_UPDATE, {
+        method: 'POST',
+        data: {
+          id: profileStreamer.id,
+          role: profileStreamer.role,
+          status: profileStreamer.status,
+          email: profileStreamer.email,
+          handle: profileStreamer.handle,
+          ...normalizeStreamerFormPayload(values),
+        },
+      });
+      setProfileModalOpen(false);
       await loadStreamers();
     } finally {
       setSaving(false);
@@ -410,7 +483,7 @@ export default function Streamers() {
 
       <Card title="Streamer accounts" className="studio-panel">
         <Table
-          columns={columns(openPasswordModal, updateStreamerStatus)}
+          columns={columns(openPasswordModal, openProfileModal, updateStreamerStatus)}
           dataSource={streamers}
           loading={loading}
           rowKey="id"
@@ -489,6 +562,75 @@ export default function Streamers() {
           </Form.Item>
           <Form.Item name="password" label="Dashboard password">
             <Input.Password placeholder="Optional for now" />
+          </Form.Item>
+          <Form.Item name="avatarUrl" label="Avatar URL">
+            <Input placeholder="/public/profiles/dj.png" />
+          </Form.Item>
+          <Form.Item name="heroImageUrl" label="Hero image URL">
+            <Input placeholder="Optional wide profile image" />
+          </Form.Item>
+          <Form.Item name="bio" label="Bio">
+            <Input.TextArea rows={3} maxLength={600} />
+          </Form.Item>
+          <Form.Item name="genres" label="Genres">
+            <Input placeholder="House, Garage, DnB" />
+          </Form.Item>
+          <Form.Item name="socialLinks" label="Social links">
+            <Input.TextArea
+              rows={3}
+              placeholder={
+                'Instagram|https://instagram.com/name\nMixcloud|https://mixcloud.com/name'
+              }
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={profileStreamer ? `Edit profile for ${profileStreamer.displayName}` : 'Edit profile'}
+        open={profileModalOpen}
+        onCancel={() => setProfileModalOpen(false)}
+        onOk={saveProfile}
+        confirmLoading={saving}
+        okText="Save profile"
+      >
+        <Form form={profileForm} layout="vertical">
+          <Form.Item
+            name="displayName"
+            label="Display name"
+            rules={[{ required: true, message: 'Add a display name' }]}
+          >
+            <Input maxLength={80} />
+          </Form.Item>
+          <Form.Item
+            name="handle"
+            label="Handle"
+            rules={[{ required: true, message: 'Add a handle' }]}
+          >
+            <Input maxLength={32} prefix="@" />
+          </Form.Item>
+          <Form.Item name="email" label="Email">
+            <Input />
+          </Form.Item>
+          <Form.Item name="avatarUrl" label="Avatar URL">
+            <Input maxLength={500} />
+          </Form.Item>
+          <Form.Item name="heroImageUrl" label="Hero image URL">
+            <Input maxLength={500} />
+          </Form.Item>
+          <Form.Item name="bio" label="Bio">
+            <Input.TextArea rows={4} maxLength={600} />
+          </Form.Item>
+          <Form.Item name="genres" label="Genres">
+            <Input placeholder="House, Garage, DnB" />
+          </Form.Item>
+          <Form.Item name="socialLinks" label="Social links">
+            <Input.TextArea
+              rows={4}
+              placeholder={
+                'Instagram|https://instagram.com/name\nMixcloud|https://mixcloud.com/name'
+              }
+            />
           </Form.Item>
         </Form>
       </Modal>

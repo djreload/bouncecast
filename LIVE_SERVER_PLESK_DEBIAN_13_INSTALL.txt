@@ -1,7 +1,7 @@
 BounceCast live server install guide
 Debian 13 VPS with Plesk already installed
 
-Last updated: 2026-05-18
+Last updated: 2026-05-19
 Repository: https://github.com/djreload/bouncecast
 
 Purpose
@@ -45,10 +45,17 @@ Important compatibility notes
    Cloudflare tunnel or Plesk domain is still pointing at another project,
    PayPal webhooks will not reach BounceCast.
 
-6. The current development branch includes public Account Hub, DJ roster, and
-   public schedule endpoints. When updating a live server, rebuild the Docker
-   image after pulling so the generated static web bundle and the Go API routes
-   stay in sync.
+6. The current development branch includes public Account Hub, DJ roster,
+   richer DJ profile pages, public schedule filters, schedule reminders, and
+   Stars. When updating a live server, rebuild the Docker image after pulling
+   so the generated static web bundle and the Go API routes stay in sync.
+
+7. BounceCast role accounts now create a signed admin identity cookie. The
+   original Owncast admin password remains owner-level access. Stored owner
+   accounts can change sensitive settings such as permissions, SMTP sender
+   settings, Stars payment settings, packages, and manual wallet adjustments.
+   Stored admin accounts can still use normal admin views but should not be
+   treated as owners.
 
 
 Recommended server layout
@@ -351,6 +358,8 @@ Then configure:
 - Chat settings.
 - Stream keys.
 - Streamer accounts.
+- DJ public profile fields, including bio, genres, avatar URL, hero image URL,
+  and social links.
 - Schedule.
 - Email/Brevo SMTP settings if used.
 - Stars settings.
@@ -486,6 +495,36 @@ profile images on the VPS:
   ls -lh /var/lib/bouncecast/data/public/profiles
 
 
+DJ profiles and public schedule reminders
+=========================================
+
+Migration `00010_bouncecast_profiles_permissions_reminders.sql` adds public DJ
+profile fields and schedule reminder storage. After updating, verify the
+container logs show goose migration version 10 and check:
+
+  curl -s https://live.example.com/api/bouncecast/djs | jq .
+  curl -s "https://live.example.com/api/bouncecast/schedule?limit=5&status=planned" | jq .
+
+DJ profile fields can be edited from:
+
+  https://live.example.com/studio
+  https://live.example.com/admin/streamers/
+
+Logged-in viewers can save reminders from:
+
+  https://live.example.com/account
+
+Current reminder behavior:
+
+- Email reminders are queued when the related schedule goes live and the set
+  has email notifications enabled.
+- Browser push and Messenger preferences are stored for the account/reminder,
+  but per-account push routing and Messenger delivery transport still need a
+  future production pass.
+- Global notification subscribers and existing browser push subscribers still
+  behave as before.
+
+
 Step 15 - Operational commands
 ==============================
 
@@ -580,6 +619,7 @@ Verify:
   curl -I https://live.example.com/account
   curl -I https://live.example.com/djs
   curl -s https://live.example.com/api/bouncecast/schedule?limit=3 | jq .
+  curl -s "https://live.example.com/api/bouncecast/schedule?limit=3&status=planned" | jq .
   curl -s https://live.example.com/api/bouncecast/djs | jq .
   docker compose logs --tail=80 bouncecast
 

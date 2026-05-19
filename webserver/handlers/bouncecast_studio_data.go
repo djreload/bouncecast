@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/owncast/owncast/core/data"
+	"github.com/owncast/owncast/models"
 	"github.com/owncast/owncast/utils"
 	webutils "github.com/owncast/owncast/webserver/utils"
 )
@@ -58,6 +59,15 @@ type saveBounceCastStudioScheduleRequest struct {
 	NotifyEmail   bool   `json:"notifyEmail"`
 	NotifyPush    bool   `json:"notifyPush"`
 	NotifyWebhook bool   `json:"notifyWebhook"`
+}
+
+type saveBounceCastStudioProfileRequest struct {
+	DisplayName  string                        `json:"displayName"`
+	AvatarURL    string                        `json:"avatarUrl"`
+	Bio          string                        `json:"bio"`
+	Genres       []string                      `json:"genres"`
+	SocialLinks  []models.BounceCastSocialLink `json:"socialLinks"`
+	HeroImageURL string                        `json:"heroImageUrl"`
 }
 
 type normalizedBounceCastStudioSchedule struct {
@@ -433,6 +443,59 @@ func BounceCastStudioLiveEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	webutils.WriteResponse(w, events)
+}
+
+// BounceCastStudioUpdateProfile updates the current DJ's public profile fields.
+func BounceCastStudioUpdateProfile(w http.ResponseWriter, r *http.Request) {
+	setBounceCastStudioAPIHeaders(w)
+
+	session, err := authenticateBounceCastStudioRequest(r)
+	if err != nil {
+		writeBounceCastStudioUnauthorized(w)
+		return
+	}
+
+	var request saveBounceCastStudioProfileRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+
+	displayName := utils.MakeSafeStringOfLength(request.DisplayName, 80)
+	if displayName == "" {
+		webutils.BadRequestHandler(w, errors.New("displayName is required"))
+		return
+	}
+
+	profile, err := normalizeBounceCastDJProfileFields(request.AvatarURL, request.Bio, request.Genres, request.SocialLinks, request.HeroImageURL)
+	if err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+
+	result, err := data.GetDatabase().Exec(`
+		UPDATE bouncecast_streamer_accounts
+		SET display_name = ?, avatar_url = NULLIF(?, ''), bio = NULLIF(?, ''),
+			genres = NULLIF(?, ''), social_links = NULLIF(?, ''),
+			hero_image_url = NULLIF(?, ''), profile_updated_at = CURRENT_TIMESTAMP,
+			updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, displayName, profile.avatarURL, profile.bio, profile.genresJSON, profile.socialLinksJSON, profile.heroImageURL, session.streamer.ID)
+	if err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+	if rowsAffected, _ := result.RowsAffected(); rowsAffected == 0 {
+		webutils.BadRequestHandler(w, errors.New("DJ profile not found"))
+		return
+	}
+
+	streamer, _, err := getBounceCastStudioStreamerForLogin(session.streamer.Handle)
+	if err != nil {
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+	webutils.WriteResponse(w, streamer)
 }
 
 func normalizeBounceCastStudioScheduleRequest(request saveBounceCastStudioScheduleRequest) (normalizedBounceCastStudioSchedule, error) {

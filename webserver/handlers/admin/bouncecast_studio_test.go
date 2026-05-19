@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/owncast/owncast/core/data"
+	"github.com/owncast/owncast/models"
 	"github.com/owncast/owncast/utils"
 )
 
@@ -145,6 +146,28 @@ func TestValidateBounceCastStreamerPassword(t *testing.T) {
 	}
 	if err := validateBounceCastStreamerPassword("long-enough\r\n"); err == nil {
 		t.Fatal("expected line break password error")
+	}
+}
+
+func TestNormalizeBounceCastStreamerProfile(t *testing.T) {
+	t.Parallel()
+
+	profile, err := normalizeBounceCastStreamerProfile(
+		"/public/profiles/dj.png",
+		"Peak-time DJ",
+		[]string{"House", "house", "Garage"},
+		[]models.BounceCastSocialLink{{Label: "Mixcloud", URL: "https://mixcloud.com/dj"}},
+		"https://example.com/hero.png",
+	)
+	if err != nil {
+		t.Fatalf("unexpected profile error: %v", err)
+	}
+	if profile.avatarURL == "" || profile.bio == "" || !strings.Contains(profile.genresJSON, "Garage") || !strings.Contains(profile.socialLinksJSON, "Mixcloud") || profile.heroImageURL == "" {
+		t.Fatalf("unexpected profile: %+v", profile)
+	}
+
+	if _, err := normalizeBounceCastStreamerProfile("", "", nil, []models.BounceCastSocialLink{{Label: "Bad", URL: "javascript:alert(1)"}}, ""); err == nil {
+		t.Fatal("expected unsafe social URL error")
 	}
 }
 

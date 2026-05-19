@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,10 +19,10 @@ func TestBounceCastPublicDJsAndScheduleExposeOnlyActivePublicLineup(t *testing.T
 
 	db := data.GetDatabase()
 	if _, err := db.Exec(`
-		INSERT INTO bouncecast_streamer_accounts(id, display_name, handle, email, role, status, avatar_url)
+		INSERT INTO bouncecast_streamer_accounts(id, display_name, handle, email, role, status, avatar_url, bio, genres, social_links, hero_image_url)
 		VALUES
-			(9001, 'DJ Public', 'dj-public', 'public@lineup.example', 'streamer', 'active', '/public/profiles/dj.png'),
-			(9002, 'DJ Hidden', 'dj-hidden', 'hidden@lineup.example', 'streamer', 'inactive', '/public/profiles/hidden.png')
+			(9001, 'DJ Public', 'dj-public', 'public@lineup.example', 'streamer', 'active', '/public/profiles/dj.png', 'Main room resident', '["House","Garage"]', '[{"label":"Mixcloud","url":"https://mixcloud.com/dj-public"}]', '/public/profiles/dj-hero.png'),
+			(9002, 'DJ Hidden', 'dj-hidden', 'hidden@lineup.example', 'streamer', 'inactive', '/public/profiles/hidden.png', '', '', '', '')
 	`); err != nil {
 		t.Fatalf("insert streamers: %v", err)
 	}
@@ -47,6 +49,9 @@ func TestBounceCastPublicDJsAndScheduleExposeOnlyActivePublicLineup(t *testing.T
 	if len(djs) != 1 || djs[0].Handle != "dj-public" || djs[0].UpcomingSet != "Public Set" {
 		t.Fatalf("unexpected public DJs: %+v", djs)
 	}
+	if djs[0].Bio != "Main room resident" || len(djs[0].Genres) != 2 || len(djs[0].SocialLinks) != 1 || djs[0].HeroImageURL == "" {
+		t.Fatalf("unexpected public DJ profile fields: %+v", djs[0])
+	}
 
 	scheduleRecorder := httptest.NewRecorder()
 	GetBounceCastPublicSchedule(scheduleRecorder, httptest.NewRequest(http.MethodGet, "/api/bouncecast/schedule", nil))
@@ -59,6 +64,19 @@ func TestBounceCastPublicDJsAndScheduleExposeOnlyActivePublicLineup(t *testing.T
 	}
 	if len(schedule) != 1 || schedule[0].Title != "Public Set" || schedule[0].Handle != "dj-public" {
 		t.Fatalf("unexpected public schedule: %+v", schedule)
+	}
+
+	filteredScheduleRecorder := httptest.NewRecorder()
+	GetBounceCastPublicSchedule(filteredScheduleRecorder, httptest.NewRequest(http.MethodGet, "/api/bouncecast/schedule?q=garage&status=planned", nil))
+	if filteredScheduleRecorder.Code != http.StatusOK {
+		t.Fatalf("filtered schedule status = %d, want 200: %s", filteredScheduleRecorder.Code, filteredScheduleRecorder.Body.String())
+	}
+	var filteredSchedule []bounceCastPublicScheduleItem
+	if err := json.NewDecoder(filteredScheduleRecorder.Body).Decode(&filteredSchedule); err != nil {
+		t.Fatalf("decode filtered schedule: %v", err)
+	}
+	if len(filteredSchedule) != 1 || filteredSchedule[0].Title != "Public Set" {
+		t.Fatalf("unexpected filtered schedule: %+v", filteredSchedule)
 	}
 
 	router := chi.NewRouter()
@@ -74,6 +92,59 @@ func TestBounceCastPublicDJsAndScheduleExposeOnlyActivePublicLineup(t *testing.T
 	}
 	if profile.DJ.Handle != "dj-public" || len(profile.Schedule) != 1 {
 		t.Fatalf("unexpected profile: %+v", profile)
+	}
+}
+
+func TestSetBounceCastScheduleReminderStoresViewerReminder(t *testing.T) {
+	resetBounceCastStudioAuthTestTables(t)
+	db := data.GetDatabase()
+	_, _ = db.Exec(`DELETE FROM users WHERE id = 'reminder-user'`)
+	t.Cleanup(func() {
+		_, _ = db.Exec(`DELETE FROM bouncecast_schedule_reminders WHERE user_id = 'reminder-user'`)
+		_, _ = db.Exec(`DELETE FROM users WHERE id = 'reminder-user'`)
+	})
+
+	if _, err := db.Exec(`
+		INSERT INTO users(id, display_name, display_color, previous_names, created_at, authenticated_at, email, registered_at, notification_email_opt_in)
+		VALUES('reminder-user', 'Reminder User', 1, 'Reminder User', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'reminder@example.com', CURRENT_TIMESTAMP, 1)
+	`); err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	if _, err := db.Exec(`
+		INSERT INTO bouncecast_streamer_accounts(id, display_name, handle, role, status)
+		VALUES(9020, 'Reminder DJ', 'reminder-dj', 'streamer', 'active')
+	`); err != nil {
+		t.Fatalf("insert streamer: %v", err)
+	}
+	result, err := db.Exec(`
+		INSERT INTO bouncecast_stream_schedule(streamer_id, title, starts_at, timezone, status, visibility)
+		VALUES(9020, 'Reminder Set', ?, 'Europe/London', 'planned', 'public')
+	`, time.Now().UTC().Add(2*time.Hour))
+	if err != nil {
+		t.Fatalf("insert schedule: %v", err)
+	}
+	scheduleID, _ := result.LastInsertId()
+
+	recorder := httptest.NewRecorder()
+	SetBounceCastScheduleReminder(models.User{
+		ID:    "reminder-user",
+		Email: "reminder@example.com",
+	}, recorder, httptest.NewRequest(http.MethodPost, "/api/bouncecast/schedule/reminders", strings.NewReader(`{"scheduleId":`+strconv.FormatInt(scheduleID, 10)+`,"email":true}`)))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("reminder status = %d, want 200: %s", recorder.Code, recorder.Body.String())
+	}
+
+	var notifyEmail bool
+	var email string
+	if err := db.QueryRow(`
+		SELECT notify_email, email
+		FROM bouncecast_schedule_reminders
+		WHERE schedule_id = ? AND user_id = 'reminder-user'
+	`, scheduleID).Scan(&notifyEmail, &email); err != nil {
+		t.Fatalf("read reminder: %v", err)
+	}
+	if !notifyEmail || email != "reminder@example.com" {
+		t.Fatalf("unexpected reminder: notifyEmail=%t email=%q", notifyEmail, email)
 	}
 }
 

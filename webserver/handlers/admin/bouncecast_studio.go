@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/owncast/owncast/core/data"
+	"github.com/owncast/owncast/models"
 	"github.com/owncast/owncast/persistence/configrepository"
 	"github.com/owncast/owncast/persistence/notificationsrepository"
 	"github.com/owncast/owncast/utils"
@@ -21,18 +22,22 @@ import (
 )
 
 type BounceCastStreamer struct {
-	ID             int64      `json:"id"`
-	DisplayName    string     `json:"displayName"`
-	Handle         string     `json:"handle"`
-	Email          string     `json:"email"`
-	Role           string     `json:"role"`
-	Status         string     `json:"status"`
-	AvatarURL      string     `json:"avatarUrl"`
-	PasswordSet    bool       `json:"passwordSet"`
-	StreamKeyCount int64      `json:"streamKeyCount"`
-	CreatedAt      time.Time  `json:"createdAt"`
-	UpdatedAt      time.Time  `json:"updatedAt"`
-	LastLoginAt    *time.Time `json:"lastLoginAt,omitempty"`
+	ID             int64                         `json:"id"`
+	DisplayName    string                        `json:"displayName"`
+	Handle         string                        `json:"handle"`
+	Email          string                        `json:"email"`
+	Role           string                        `json:"role"`
+	Status         string                        `json:"status"`
+	AvatarURL      string                        `json:"avatarUrl"`
+	Bio            string                        `json:"bio"`
+	Genres         []string                      `json:"genres"`
+	SocialLinks    []models.BounceCastSocialLink `json:"socialLinks"`
+	HeroImageURL   string                        `json:"heroImageUrl"`
+	PasswordSet    bool                          `json:"passwordSet"`
+	StreamKeyCount int64                         `json:"streamKeyCount"`
+	CreatedAt      time.Time                     `json:"createdAt"`
+	UpdatedAt      time.Time                     `json:"updatedAt"`
+	LastLoginAt    *time.Time                    `json:"lastLoginAt,omitempty"`
 }
 
 type BounceCastScheduleItem struct {
@@ -122,21 +127,31 @@ type BounceCastPushSettings struct {
 }
 
 type createStreamerRequest struct {
-	DisplayName string `json:"displayName"`
-	Handle      string `json:"handle"`
-	Email       string `json:"email"`
-	Role        string `json:"role"`
-	Status      string `json:"status"`
-	Password    string `json:"password"`
+	DisplayName  string                        `json:"displayName"`
+	Handle       string                        `json:"handle"`
+	Email        string                        `json:"email"`
+	Role         string                        `json:"role"`
+	Status       string                        `json:"status"`
+	AvatarURL    string                        `json:"avatarUrl"`
+	Bio          string                        `json:"bio"`
+	Genres       []string                      `json:"genres"`
+	SocialLinks  []models.BounceCastSocialLink `json:"socialLinks"`
+	HeroImageURL string                        `json:"heroImageUrl"`
+	Password     string                        `json:"password"`
 }
 
 type updateStreamerRequest struct {
-	ID          int64  `json:"id"`
-	DisplayName string `json:"displayName"`
-	Handle      string `json:"handle"`
-	Email       string `json:"email"`
-	Role        string `json:"role"`
-	Status      string `json:"status"`
+	ID           int64                         `json:"id"`
+	DisplayName  string                        `json:"displayName"`
+	Handle       string                        `json:"handle"`
+	Email        string                        `json:"email"`
+	Role         string                        `json:"role"`
+	Status       string                        `json:"status"`
+	AvatarURL    string                        `json:"avatarUrl"`
+	Bio          string                        `json:"bio"`
+	Genres       []string                      `json:"genres"`
+	SocialLinks  []models.BounceCastSocialLink `json:"socialLinks"`
+	HeroImageURL string                        `json:"heroImageUrl"`
 }
 
 type setStreamerPasswordRequest struct {
@@ -151,6 +166,8 @@ type createScheduleRequest struct {
 	StartsAt      string `json:"startsAt"`
 	EndsAt        string `json:"endsAt"`
 	Timezone      string `json:"timezone"`
+	Status        string `json:"status"`
+	Visibility    string `json:"visibility"`
 	NotifyEmail   bool   `json:"notifyEmail"`
 	NotifyPush    bool   `json:"notifyPush"`
 	NotifyWebhook bool   `json:"notifyWebhook"`
@@ -208,10 +225,19 @@ var bounceCastAllowedStreamerStatuses = map[string]bool{
 	"disabled": true,
 }
 
+type normalizedBounceCastStreamerProfile struct {
+	avatarURL       string
+	bio             string
+	genresJSON      string
+	socialLinksJSON string
+	heroImageURL    string
+}
+
 // GetBounceCastStreamers returns BounceCast dashboard streamer accounts.
 func GetBounceCastStreamers(w http.ResponseWriter, r *http.Request) {
 	rows, err := data.GetDatabase().Query(`
 		SELECT a.id, a.display_name, a.handle, COALESCE(a.email, ''), a.role, a.status, COALESCE(a.avatar_url, ''),
+			COALESCE(a.bio, ''), COALESCE(a.genres, ''), COALESCE(a.social_links, ''), COALESCE(a.hero_image_url, ''),
 			CASE WHEN COALESCE(a.password_hash, '') != '' THEN 1 ELSE 0 END,
 			COUNT(k.id), a.created_at, a.updated_at, a.last_login_at
 		FROM bouncecast_streamer_accounts a
@@ -230,6 +256,8 @@ func GetBounceCastStreamers(w http.ResponseWriter, r *http.Request) {
 		var streamer BounceCastStreamer
 		var lastLogin sql.NullTime
 		var passwordSet bool
+		var genresJSON string
+		var socialLinksJSON string
 		if err := rows.Scan(
 			&streamer.ID,
 			&streamer.DisplayName,
@@ -238,6 +266,10 @@ func GetBounceCastStreamers(w http.ResponseWriter, r *http.Request) {
 			&streamer.Role,
 			&streamer.Status,
 			&streamer.AvatarURL,
+			&streamer.Bio,
+			&genresJSON,
+			&socialLinksJSON,
+			&streamer.HeroImageURL,
 			&passwordSet,
 			&streamer.StreamKeyCount,
 			&streamer.CreatedAt,
@@ -247,6 +279,8 @@ func GetBounceCastStreamers(w http.ResponseWriter, r *http.Request) {
 			webutils.InternalErrorHandler(w, err)
 			return
 		}
+		streamer.Genres = parseBounceCastGenres(genresJSON)
+		streamer.SocialLinks = parseBounceCastSocialLinks(socialLinksJSON)
 		if lastLogin.Valid {
 			streamer.LastLoginAt = &lastLogin.Time
 		}
@@ -296,6 +330,11 @@ func CreateBounceCastStreamer(w http.ResponseWriter, r *http.Request) {
 		webutils.BadRequestHandler(w, err)
 		return
 	}
+	profile, err := normalizeBounceCastStreamerProfile(request.AvatarURL, request.Bio, request.Genres, request.SocialLinks, request.HeroImageURL)
+	if err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
 
 	password := strings.TrimSpace(request.Password)
 	var passwordHash interface{}
@@ -313,9 +352,9 @@ func CreateBounceCastStreamer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := data.GetDatabase().Exec(`
-		INSERT INTO bouncecast_streamer_accounts(display_name, handle, email, password_hash, role, status)
-		VALUES(?, ?, NULLIF(?, ''), ?, ?, ?)
-	`, displayName, handle, email, passwordHash, role, status)
+		INSERT INTO bouncecast_streamer_accounts(display_name, handle, email, password_hash, role, status, avatar_url, bio, genres, social_links, hero_image_url, profile_updated_at)
+		VALUES(?, ?, NULLIF(?, ''), ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), CURRENT_TIMESTAMP)
+	`, displayName, handle, email, passwordHash, role, status, profile.avatarURL, profile.bio, profile.genresJSON, profile.socialLinksJSON, profile.heroImageURL)
 	if err != nil {
 		webutils.InternalErrorHandler(w, err)
 		return
@@ -368,12 +407,20 @@ func UpdateBounceCastStreamer(w http.ResponseWriter, r *http.Request) {
 		webutils.BadRequestHandler(w, err)
 		return
 	}
+	profile, err := normalizeBounceCastStreamerProfile(request.AvatarURL, request.Bio, request.Genres, request.SocialLinks, request.HeroImageURL)
+	if err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
 
 	result, err := data.GetDatabase().Exec(`
 		UPDATE bouncecast_streamer_accounts
-		SET display_name = ?, handle = ?, email = NULLIF(?, ''), role = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+		SET display_name = ?, handle = ?, email = NULLIF(?, ''), role = ?, status = ?,
+			avatar_url = NULLIF(?, ''), bio = NULLIF(?, ''), genres = NULLIF(?, ''),
+			social_links = NULLIF(?, ''), hero_image_url = NULLIF(?, ''),
+			profile_updated_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, displayName, handle, email, role, status, request.ID)
+	`, displayName, handle, email, role, status, profile.avatarURL, profile.bio, profile.genresJSON, profile.socialLinksJSON, profile.heroImageURL, request.ID)
 	if err != nil {
 		webutils.InternalErrorHandler(w, err)
 		return
@@ -917,6 +964,139 @@ func validateBounceCastStreamerPassword(password string) error {
 	return nil
 }
 
+func normalizeBounceCastStreamerProfile(avatarURL string, bio string, genres []string, socialLinks []models.BounceCastSocialLink, heroImageURL string) (normalizedBounceCastStreamerProfile, error) {
+	normalizedAvatarURL, err := normalizeBounceCastProfileImageURL(avatarURL)
+	if err != nil {
+		return normalizedBounceCastStreamerProfile{}, err
+	}
+	normalizedHeroImageURL, err := normalizeBounceCastProfileImageURL(heroImageURL)
+	if err != nil {
+		return normalizedBounceCastStreamerProfile{}, err
+	}
+	normalizedGenres, err := normalizeBounceCastGenres(genres)
+	if err != nil {
+		return normalizedBounceCastStreamerProfile{}, err
+	}
+	normalizedLinks, err := normalizeBounceCastSocialLinks(socialLinks)
+	if err != nil {
+		return normalizedBounceCastStreamerProfile{}, err
+	}
+
+	genresJSON, err := marshalBounceCastProfileJSON(normalizedGenres)
+	if err != nil {
+		return normalizedBounceCastStreamerProfile{}, err
+	}
+	socialLinksJSON, err := marshalBounceCastProfileJSON(normalizedLinks)
+	if err != nil {
+		return normalizedBounceCastStreamerProfile{}, err
+	}
+
+	return normalizedBounceCastStreamerProfile{
+		avatarURL:       normalizedAvatarURL,
+		bio:             utils.MakeSafeStringOfLength(bio, 600),
+		genresJSON:      genresJSON,
+		socialLinksJSON: socialLinksJSON,
+		heroImageURL:    normalizedHeroImageURL,
+	}, nil
+}
+
+func normalizeBounceCastProfileImageURL(value string) (string, error) {
+	imageURL := utils.MakeSafeStringOfLength(value, 500)
+	if imageURL == "" {
+		return "", nil
+	}
+	if strings.HasPrefix(imageURL, "/") && !strings.HasPrefix(imageURL, "//") {
+		return imageURL, nil
+	}
+	parsed, err := url.ParseRequestURI(imageURL)
+	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return "", errors.New("profile images must be http(s) URLs or local paths")
+	}
+	return imageURL, nil
+}
+
+func normalizeBounceCastGenres(values []string) ([]string, error) {
+	genres := []string{}
+	seen := map[string]bool{}
+	for _, value := range values {
+		genre := utils.MakeSafeStringOfLength(value, 32)
+		if genre == "" {
+			continue
+		}
+		key := strings.ToLower(genre)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		genres = append(genres, genre)
+		if len(genres) > 8 {
+			return nil, errors.New("genres must contain 8 items or fewer")
+		}
+	}
+	return genres, nil
+}
+
+func normalizeBounceCastSocialLinks(values []models.BounceCastSocialLink) ([]models.BounceCastSocialLink, error) {
+	links := []models.BounceCastSocialLink{}
+	for _, value := range values {
+		label := utils.MakeSafeStringOfLength(value.Label, 40)
+		linkURL := strings.TrimSpace(value.URL)
+		if label == "" && linkURL == "" {
+			continue
+		}
+		if label == "" || linkURL == "" {
+			return nil, errors.New("social links require both label and URL")
+		}
+		if len(links) >= 6 {
+			return nil, errors.New("social links must contain 6 items or fewer")
+		}
+		parsedURL, err := url.Parse(linkURL)
+		if err != nil || parsedURL.Host == "" || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") {
+			return nil, errors.New("social link URLs must be valid http(s) URLs")
+		}
+		links = append(links, models.BounceCastSocialLink{
+			Label: label,
+			URL:   parsedURL.String(),
+		})
+	}
+	return links, nil
+}
+
+func marshalBounceCastProfileJSON(value interface{}) (string, error) {
+	body, err := json.Marshal(value)
+	if err != nil {
+		return "", err
+	}
+	if string(body) == "[]" || string(body) == "null" {
+		return "", nil
+	}
+	return string(body), nil
+}
+
+func parseBounceCastGenres(value string) []string {
+	var genres []string
+	if err := json.Unmarshal([]byte(strings.TrimSpace(value)), &genres); err == nil {
+		normalized, _ := normalizeBounceCastGenres(genres)
+		return normalized
+	}
+
+	parts := strings.Split(value, ",")
+	normalized, _ := normalizeBounceCastGenres(parts)
+	return normalized
+}
+
+func parseBounceCastSocialLinks(value string) []models.BounceCastSocialLink {
+	var links []models.BounceCastSocialLink
+	if err := json.Unmarshal([]byte(strings.TrimSpace(value)), &links); err != nil {
+		return []models.BounceCastSocialLink{}
+	}
+	normalized, err := normalizeBounceCastSocialLinks(links)
+	if err != nil {
+		return []models.BounceCastSocialLink{}
+	}
+	return normalized
+}
+
 // GetBounceCastPushSettings returns the current browser push status for BounceCast go-live alerts.
 func GetBounceCastPushSettings(w http.ResponseWriter, r *http.Request) {
 	configRepository := configrepository.Get()
@@ -1109,11 +1289,27 @@ func CreateBounceCastSchedule(w http.ResponseWriter, r *http.Request) {
 	if timezone == "" {
 		timezone = "UTC"
 	}
+	status := strings.ToLower(strings.TrimSpace(request.Status))
+	if status == "" {
+		status = "planned"
+	}
+	if status != "planned" && status != "live" {
+		webutils.BadRequestHandler(w, errors.New("status must be planned or live"))
+		return
+	}
+	visibility := strings.ToLower(strings.TrimSpace(request.Visibility))
+	if visibility == "" {
+		visibility = "public"
+	}
+	if visibility != "public" && visibility != "private" {
+		webutils.BadRequestHandler(w, errors.New("visibility must be public or private"))
+		return
+	}
 
 	result, err := data.GetDatabase().Exec(`
-		INSERT INTO bouncecast_stream_schedule(streamer_id, title, description, starts_at, ends_at, timezone, notify_email, notify_push, notify_webhook)
-		VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, request.StreamerID, title, strings.TrimSpace(request.Description), startsAt, endsAt, timezone, request.NotifyEmail, request.NotifyPush, request.NotifyWebhook)
+		INSERT INTO bouncecast_stream_schedule(streamer_id, title, description, starts_at, ends_at, timezone, status, visibility, notify_email, notify_push, notify_webhook)
+		VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, request.StreamerID, title, strings.TrimSpace(request.Description), startsAt, endsAt, timezone, status, visibility, request.NotifyEmail, request.NotifyPush, request.NotifyWebhook)
 	if err != nil {
 		webutils.InternalErrorHandler(w, err)
 		return

@@ -49,10 +49,30 @@ function roleColor(role: string) {
   return 'default';
 }
 
-function ScheduleList({ schedule }: { schedule: BounceCastScheduleItem[] }) {
+function ScheduleList({
+  schedule,
+  accessToken,
+  reminderChannels,
+}: {
+  schedule: BounceCastScheduleItem[];
+  accessToken?: string;
+  reminderChannels?: { email: boolean; browserPush: boolean; messenger: boolean };
+}) {
   if (!schedule.length) {
     return <Text className={styles.muted}>No public sets are scheduled yet.</Text>;
   }
+
+  const saveReminder = async (item: BounceCastScheduleItem) => {
+    if (!accessToken || !reminderChannels) {
+      return;
+    }
+    try {
+      await BounceCastService.setScheduleReminder(accessToken, item.id, reminderChannels);
+      message.success(`Reminder saved for ${item.title}`);
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : 'Unable to save reminder');
+    }
+  };
 
   return (
     <div className={styles.scheduleList}>
@@ -63,6 +83,15 @@ function ScheduleList({ schedule }: { schedule: BounceCastScheduleItem[] }) {
           <Text className={styles.muted}>
             {item.streamer ? `with ${item.streamer}` : 'BounceCast set'}
           </Text>
+          {accessToken && reminderChannels && (
+            <Button
+              size="small"
+              className={styles.reminderButton}
+              onClick={() => saveReminder(item)}
+            >
+              Remind me
+            </Button>
+          )}
         </article>
       ))}
     </div>
@@ -442,12 +471,20 @@ export default function AccountPage() {
                 <Card className={styles.panel} title="Your DJ profile">
                   <p className={styles.djName}>{hub.djProfile.dj.displayName}</p>
                   <p className={styles.handle}>@{hub.djProfile.dj.handle}</p>
-                  <ScheduleList schedule={hub.djProfile.schedule} />
+                  <ScheduleList
+                    schedule={hub.djProfile.schedule}
+                    accessToken={token}
+                    reminderChannels={hub.notificationPreferences}
+                  />
                 </Card>
               )}
 
               <Card className={styles.panel} title="Upcoming lineup">
-                <ScheduleList schedule={hub.upcomingSchedule || []} />
+                <ScheduleList
+                  schedule={hub.upcomingSchedule || []}
+                  accessToken={token}
+                  reminderChannels={hub.notificationPreferences}
+                />
               </Card>
             </aside>
           </div>
