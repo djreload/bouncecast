@@ -7,6 +7,7 @@ import {
   Empty,
   Form,
   Input,
+  InputNumber,
   Modal,
   Row,
   Select,
@@ -54,6 +55,10 @@ type Streamer = {
   genres?: string[];
   socialLinks?: { label: string; url: string }[];
   heroImageUrl?: string;
+  seoTitle?: string;
+  shareImageUrl?: string;
+  featuredScheduleId?: number;
+  featuredScheduleEnabled?: boolean;
   passwordSet: boolean;
   streamKeyCount: number;
 };
@@ -387,6 +392,10 @@ export default function Streamers() {
           genres: streamer.genres || [],
           socialLinks: streamer.socialLinks || [],
           heroImageUrl: streamer.heroImageUrl,
+          seoTitle: streamer.seoTitle,
+          shareImageUrl: streamer.shareImageUrl,
+          featuredScheduleId: streamer.featuredScheduleId,
+          featuredScheduleEnabled: streamer.featuredScheduleEnabled,
         },
       });
       await loadStreamers();
@@ -551,7 +560,7 @@ export default function Streamers() {
         <Form
           form={form}
           layout="vertical"
-          initialValues={{ role: 'streamer', status: 'inactive' }}
+          initialValues={{ role: 'streamer', status: 'inactive', featuredScheduleEnabled: false }}
         >
           <Form.Item
             name="displayName"
@@ -597,6 +606,23 @@ export default function Streamers() {
           </Form.Item>
           <Form.Item name="heroImageUrl" label="Hero image URL">
             <Input placeholder="Optional wide profile image" />
+          </Form.Item>
+          <Form.Item name="seoTitle" label="SEO title">
+            <Input placeholder="Optional share/search title" maxLength={90} />
+          </Form.Item>
+          <Form.Item name="shareImageUrl" label="Share image URL">
+            <Input placeholder="Optional Open Graph image" />
+          </Form.Item>
+          <Form.Item name="featuredScheduleId" label="Featured schedule ID">
+            <InputNumber min={1} style={{ width: '100%' }} placeholder="Optional schedule row ID" />
+          </Form.Item>
+          <Form.Item name="featuredScheduleEnabled" label="Featured schedule mode">
+            <Select
+              options={[
+                { label: 'Use automatic next set', value: false },
+                { label: 'Feature selected schedule', value: true },
+              ]}
+            />
           </Form.Item>
           <Form.Item name="bio" label="Bio">
             <Input.TextArea rows={3} maxLength={600} />
@@ -646,6 +672,23 @@ export default function Streamers() {
           </Form.Item>
           <Form.Item name="heroImageUrl" label="Hero image URL">
             <Input maxLength={500} />
+          </Form.Item>
+          <Form.Item name="seoTitle" label="SEO title">
+            <Input maxLength={90} placeholder="Optional share/search title" />
+          </Form.Item>
+          <Form.Item name="shareImageUrl" label="Share image URL">
+            <Input maxLength={500} placeholder="Optional Open Graph image" />
+          </Form.Item>
+          <Form.Item name="featuredScheduleId" label="Featured schedule ID">
+            <InputNumber min={1} style={{ width: '100%' }} placeholder="Optional schedule row ID" />
+          </Form.Item>
+          <Form.Item name="featuredScheduleEnabled" label="Featured schedule mode">
+            <Select
+              options={[
+                { label: 'Use automatic next set', value: false },
+                { label: 'Feature selected schedule', value: true },
+              ]}
+            />
           </Form.Item>
           <Form.Item name="bio" label="Bio">
             <Input.TextArea rows={4} maxLength={600} />

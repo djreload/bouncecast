@@ -23,22 +23,26 @@ import (
 )
 
 type BounceCastStreamer struct {
-	ID             int64                         `json:"id"`
-	DisplayName    string                        `json:"displayName"`
-	Handle         string                        `json:"handle"`
-	Email          string                        `json:"email"`
-	Role           string                        `json:"role"`
-	Status         string                        `json:"status"`
-	AvatarURL      string                        `json:"avatarUrl"`
-	Bio            string                        `json:"bio"`
-	Genres         []string                      `json:"genres"`
-	SocialLinks    []models.BounceCastSocialLink `json:"socialLinks"`
-	HeroImageURL   string                        `json:"heroImageUrl"`
-	PasswordSet    bool                          `json:"passwordSet"`
-	StreamKeyCount int64                         `json:"streamKeyCount"`
-	CreatedAt      time.Time                     `json:"createdAt"`
-	UpdatedAt      time.Time                     `json:"updatedAt"`
-	LastLoginAt    *time.Time                    `json:"lastLoginAt,omitempty"`
+	ID                      int64                         `json:"id"`
+	DisplayName             string                        `json:"displayName"`
+	Handle                  string                        `json:"handle"`
+	Email                   string                        `json:"email"`
+	Role                    string                        `json:"role"`
+	Status                  string                        `json:"status"`
+	AvatarURL               string                        `json:"avatarUrl"`
+	Bio                     string                        `json:"bio"`
+	Genres                  []string                      `json:"genres"`
+	SocialLinks             []models.BounceCastSocialLink `json:"socialLinks"`
+	HeroImageURL            string                        `json:"heroImageUrl"`
+	SEOTitle                string                        `json:"seoTitle"`
+	ShareImageURL           string                        `json:"shareImageUrl"`
+	FeaturedScheduleID      *int64                        `json:"featuredScheduleId,omitempty"`
+	FeaturedScheduleEnabled bool                          `json:"featuredScheduleEnabled"`
+	PasswordSet             bool                          `json:"passwordSet"`
+	StreamKeyCount          int64                         `json:"streamKeyCount"`
+	CreatedAt               time.Time                     `json:"createdAt"`
+	UpdatedAt               time.Time                     `json:"updatedAt"`
+	LastLoginAt             *time.Time                    `json:"lastLoginAt,omitempty"`
 }
 
 type BounceCastScheduleItem struct {
@@ -176,31 +180,39 @@ type BounceCastAuditEvent struct {
 }
 
 type createStreamerRequest struct {
-	DisplayName  string                        `json:"displayName"`
-	Handle       string                        `json:"handle"`
-	Email        string                        `json:"email"`
-	Role         string                        `json:"role"`
-	Status       string                        `json:"status"`
-	AvatarURL    string                        `json:"avatarUrl"`
-	Bio          string                        `json:"bio"`
-	Genres       []string                      `json:"genres"`
-	SocialLinks  []models.BounceCastSocialLink `json:"socialLinks"`
-	HeroImageURL string                        `json:"heroImageUrl"`
-	Password     string                        `json:"password"`
+	DisplayName             string                        `json:"displayName"`
+	Handle                  string                        `json:"handle"`
+	Email                   string                        `json:"email"`
+	Role                    string                        `json:"role"`
+	Status                  string                        `json:"status"`
+	AvatarURL               string                        `json:"avatarUrl"`
+	Bio                     string                        `json:"bio"`
+	Genres                  []string                      `json:"genres"`
+	SocialLinks             []models.BounceCastSocialLink `json:"socialLinks"`
+	HeroImageURL            string                        `json:"heroImageUrl"`
+	SEOTitle                string                        `json:"seoTitle"`
+	ShareImageURL           string                        `json:"shareImageUrl"`
+	FeaturedScheduleID      *int64                        `json:"featuredScheduleId"`
+	FeaturedScheduleEnabled bool                          `json:"featuredScheduleEnabled"`
+	Password                string                        `json:"password"`
 }
 
 type updateStreamerRequest struct {
-	ID           int64                         `json:"id"`
-	DisplayName  string                        `json:"displayName"`
-	Handle       string                        `json:"handle"`
-	Email        string                        `json:"email"`
-	Role         string                        `json:"role"`
-	Status       string                        `json:"status"`
-	AvatarURL    string                        `json:"avatarUrl"`
-	Bio          string                        `json:"bio"`
-	Genres       []string                      `json:"genres"`
-	SocialLinks  []models.BounceCastSocialLink `json:"socialLinks"`
-	HeroImageURL string                        `json:"heroImageUrl"`
+	ID                      int64                         `json:"id"`
+	DisplayName             string                        `json:"displayName"`
+	Handle                  string                        `json:"handle"`
+	Email                   string                        `json:"email"`
+	Role                    string                        `json:"role"`
+	Status                  string                        `json:"status"`
+	AvatarURL               string                        `json:"avatarUrl"`
+	Bio                     string                        `json:"bio"`
+	Genres                  []string                      `json:"genres"`
+	SocialLinks             []models.BounceCastSocialLink `json:"socialLinks"`
+	HeroImageURL            string                        `json:"heroImageUrl"`
+	SEOTitle                string                        `json:"seoTitle"`
+	ShareImageURL           string                        `json:"shareImageUrl"`
+	FeaturedScheduleID      *int64                        `json:"featuredScheduleId"`
+	FeaturedScheduleEnabled bool                          `json:"featuredScheduleEnabled"`
 }
 
 type setStreamerPasswordRequest struct {
@@ -283,11 +295,15 @@ var bounceCastAllowedStreamerStatuses = map[string]bool{
 }
 
 type normalizedBounceCastStreamerProfile struct {
-	avatarURL       string
-	bio             string
-	genresJSON      string
-	socialLinksJSON string
-	heroImageURL    string
+	avatarURL               string
+	bio                     string
+	genresJSON              string
+	socialLinksJSON         string
+	heroImageURL            string
+	seoTitle                string
+	shareImageURL           string
+	featuredScheduleID      interface{}
+	featuredScheduleEnabled bool
 }
 
 // GetBounceCastStreamers returns BounceCast dashboard streamer accounts.
@@ -295,6 +311,7 @@ func GetBounceCastStreamers(w http.ResponseWriter, r *http.Request) {
 	rows, err := data.GetDatabase().Query(`
 		SELECT a.id, a.display_name, a.handle, COALESCE(a.email, ''), a.role, a.status, COALESCE(a.avatar_url, ''),
 			COALESCE(a.bio, ''), COALESCE(a.genres, ''), COALESCE(a.social_links, ''), COALESCE(a.hero_image_url, ''),
+			COALESCE(a.seo_title, ''), COALESCE(a.share_image_url, ''), a.featured_schedule_id, a.featured_schedule_enabled,
 			CASE WHEN COALESCE(a.password_hash, '') != '' THEN 1 ELSE 0 END,
 			COUNT(k.id), a.created_at, a.updated_at, a.last_login_at
 		FROM bouncecast_streamer_accounts a
@@ -315,6 +332,7 @@ func GetBounceCastStreamers(w http.ResponseWriter, r *http.Request) {
 		var passwordSet bool
 		var genresJSON string
 		var socialLinksJSON string
+		var featuredScheduleID sql.NullInt64
 		if err := rows.Scan(
 			&streamer.ID,
 			&streamer.DisplayName,
@@ -327,6 +345,10 @@ func GetBounceCastStreamers(w http.ResponseWriter, r *http.Request) {
 			&genresJSON,
 			&socialLinksJSON,
 			&streamer.HeroImageURL,
+			&streamer.SEOTitle,
+			&streamer.ShareImageURL,
+			&featuredScheduleID,
+			&streamer.FeaturedScheduleEnabled,
 			&passwordSet,
 			&streamer.StreamKeyCount,
 			&streamer.CreatedAt,
@@ -338,6 +360,9 @@ func GetBounceCastStreamers(w http.ResponseWriter, r *http.Request) {
 		}
 		streamer.Genres = parseBounceCastGenres(genresJSON)
 		streamer.SocialLinks = parseBounceCastSocialLinks(socialLinksJSON)
+		if featuredScheduleID.Valid {
+			streamer.FeaturedScheduleID = &featuredScheduleID.Int64
+		}
 		if lastLogin.Valid {
 			streamer.LastLoginAt = &lastLogin.Time
 		}
@@ -387,7 +412,7 @@ func CreateBounceCastStreamer(w http.ResponseWriter, r *http.Request) {
 		webutils.BadRequestHandler(w, err)
 		return
 	}
-	profile, err := normalizeBounceCastStreamerProfile(request.AvatarURL, request.Bio, request.Genres, request.SocialLinks, request.HeroImageURL)
+	profile, err := normalizeBounceCastStreamerProfile(request.AvatarURL, request.Bio, request.Genres, request.SocialLinks, request.HeroImageURL, request.SEOTitle, request.ShareImageURL, request.FeaturedScheduleID, request.FeaturedScheduleEnabled)
 	if err != nil {
 		webutils.BadRequestHandler(w, err)
 		return
@@ -409,9 +434,9 @@ func CreateBounceCastStreamer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := data.GetDatabase().Exec(`
-		INSERT INTO bouncecast_streamer_accounts(display_name, handle, email, password_hash, role, status, avatar_url, bio, genres, social_links, hero_image_url, profile_updated_at)
-		VALUES(?, ?, NULLIF(?, ''), ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), CURRENT_TIMESTAMP)
-	`, displayName, handle, email, passwordHash, role, status, profile.avatarURL, profile.bio, profile.genresJSON, profile.socialLinksJSON, profile.heroImageURL)
+		INSERT INTO bouncecast_streamer_accounts(display_name, handle, email, password_hash, role, status, avatar_url, bio, genres, social_links, hero_image_url, seo_title, share_image_url, featured_schedule_id, featured_schedule_enabled, profile_updated_at)
+		VALUES(?, ?, NULLIF(?, ''), ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), ?, ?, CURRENT_TIMESTAMP)
+	`, displayName, handle, email, passwordHash, role, status, profile.avatarURL, profile.bio, profile.genresJSON, profile.socialLinksJSON, profile.heroImageURL, profile.seoTitle, profile.shareImageURL, profile.featuredScheduleID, profile.featuredScheduleEnabled)
 	if err != nil {
 		webutils.InternalErrorHandler(w, err)
 		return
@@ -465,7 +490,7 @@ func UpdateBounceCastStreamer(w http.ResponseWriter, r *http.Request) {
 		webutils.BadRequestHandler(w, err)
 		return
 	}
-	profile, err := normalizeBounceCastStreamerProfile(request.AvatarURL, request.Bio, request.Genres, request.SocialLinks, request.HeroImageURL)
+	profile, err := normalizeBounceCastStreamerProfile(request.AvatarURL, request.Bio, request.Genres, request.SocialLinks, request.HeroImageURL, request.SEOTitle, request.ShareImageURL, request.FeaturedScheduleID, request.FeaturedScheduleEnabled)
 	if err != nil {
 		webutils.BadRequestHandler(w, err)
 		return
@@ -476,9 +501,11 @@ func UpdateBounceCastStreamer(w http.ResponseWriter, r *http.Request) {
 		SET display_name = ?, handle = ?, email = NULLIF(?, ''), role = ?, status = ?,
 			avatar_url = NULLIF(?, ''), bio = NULLIF(?, ''), genres = NULLIF(?, ''),
 			social_links = NULLIF(?, ''), hero_image_url = NULLIF(?, ''),
+			seo_title = NULLIF(?, ''), share_image_url = NULLIF(?, ''),
+			featured_schedule_id = ?, featured_schedule_enabled = ?,
 			profile_updated_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, displayName, handle, email, role, status, profile.avatarURL, profile.bio, profile.genresJSON, profile.socialLinksJSON, profile.heroImageURL, request.ID)
+	`, displayName, handle, email, role, status, profile.avatarURL, profile.bio, profile.genresJSON, profile.socialLinksJSON, profile.heroImageURL, profile.seoTitle, profile.shareImageURL, profile.featuredScheduleID, profile.featuredScheduleEnabled, request.ID)
 	if err != nil {
 		webutils.InternalErrorHandler(w, err)
 		return
@@ -1028,12 +1055,16 @@ func validateBounceCastStreamerPassword(password string) error {
 	return nil
 }
 
-func normalizeBounceCastStreamerProfile(avatarURL string, bio string, genres []string, socialLinks []models.BounceCastSocialLink, heroImageURL string) (normalizedBounceCastStreamerProfile, error) {
+func normalizeBounceCastStreamerProfile(avatarURL string, bio string, genres []string, socialLinks []models.BounceCastSocialLink, heroImageURL string, seoTitle string, shareImageURL string, featuredScheduleID *int64, featuredScheduleEnabled bool) (normalizedBounceCastStreamerProfile, error) {
 	normalizedAvatarURL, err := normalizeBounceCastProfileImageURL(avatarURL)
 	if err != nil {
 		return normalizedBounceCastStreamerProfile{}, err
 	}
 	normalizedHeroImageURL, err := normalizeBounceCastProfileImageURL(heroImageURL)
+	if err != nil {
+		return normalizedBounceCastStreamerProfile{}, err
+	}
+	normalizedShareImageURL, err := normalizeBounceCastProfileImageURL(shareImageURL)
 	if err != nil {
 		return normalizedBounceCastStreamerProfile{}, err
 	}
@@ -1056,12 +1087,23 @@ func normalizeBounceCastStreamerProfile(avatarURL string, bio string, genres []s
 	}
 
 	return normalizedBounceCastStreamerProfile{
-		avatarURL:       normalizedAvatarURL,
-		bio:             utils.MakeSafeStringOfLength(bio, 600),
-		genresJSON:      genresJSON,
-		socialLinksJSON: socialLinksJSON,
-		heroImageURL:    normalizedHeroImageURL,
+		avatarURL:               normalizedAvatarURL,
+		bio:                     utils.MakeSafeStringOfLength(bio, 600),
+		genresJSON:              genresJSON,
+		socialLinksJSON:         socialLinksJSON,
+		heroImageURL:            normalizedHeroImageURL,
+		seoTitle:                utils.MakeSafeStringOfLength(seoTitle, 90),
+		shareImageURL:           normalizedShareImageURL,
+		featuredScheduleID:      normalizeBounceCastFeaturedScheduleID(featuredScheduleID),
+		featuredScheduleEnabled: featuredScheduleEnabled,
 	}, nil
+}
+
+func normalizeBounceCastFeaturedScheduleID(value *int64) interface{} {
+	if value == nil || *value <= 0 {
+		return nil
+	}
+	return *value
 }
 
 func normalizeBounceCastProfileImageURL(value string) (string, error) {

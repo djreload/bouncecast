@@ -39,6 +39,7 @@ import { MobileContent } from './MobileContent';
 import { ChatModal } from '../../modals/ChatModal/ChatModal';
 import { Footer } from '../Footer/Footer';
 import { PublicLineup } from '../../bouncecast/PublicLineup';
+import { MessengerAlertsCTA } from '../../bouncecast/MessengerAlertsCTA';
 
 // Lazy loaded components
 const ChatContainer = dynamic(
@@ -295,6 +296,7 @@ export const Content: FC = () => {
             externalActionSelected={externalActionSelected}
           />
         </Row>
+        <MessengerAlertsCTA />
         <PublicLineup />
 
         <Modal

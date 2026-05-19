@@ -158,15 +158,19 @@ func TestNormalizeBounceCastStreamerProfile(t *testing.T) {
 		[]string{"House", "house", "Garage"},
 		[]models.BounceCastSocialLink{{Label: "Mixcloud", URL: "https://mixcloud.com/dj"}},
 		"https://example.com/hero.png",
+		"DJ SEO Title",
+		"https://example.com/share.png",
+		nil,
+		false,
 	)
 	if err != nil {
 		t.Fatalf("unexpected profile error: %v", err)
 	}
-	if profile.avatarURL == "" || profile.bio == "" || !strings.Contains(profile.genresJSON, "Garage") || !strings.Contains(profile.socialLinksJSON, "Mixcloud") || profile.heroImageURL == "" {
+	if profile.avatarURL == "" || profile.bio == "" || !strings.Contains(profile.genresJSON, "Garage") || !strings.Contains(profile.socialLinksJSON, "Mixcloud") || profile.heroImageURL == "" || profile.seoTitle == "" || profile.shareImageURL == "" {
 		t.Fatalf("unexpected profile: %+v", profile)
 	}
 
-	if _, err := normalizeBounceCastStreamerProfile("", "", nil, []models.BounceCastSocialLink{{Label: "Bad", URL: "javascript:alert(1)"}}, ""); err == nil {
+	if _, err := normalizeBounceCastStreamerProfile("", "", nil, []models.BounceCastSocialLink{{Label: "Bad", URL: "javascript:alert(1)"}}, "", "", "", nil, false); err == nil {
 		t.Fatal("expected unsafe social URL error")
 	}
 }

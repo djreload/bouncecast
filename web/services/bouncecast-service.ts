@@ -24,6 +24,10 @@ export type BounceCastPublicDJ = {
   genres: string[];
   socialLinks: { label: string; url: string }[];
   heroImageUrl?: string;
+  seoTitle?: string;
+  shareImageUrl?: string;
+  featuredScheduleId?: number;
+  featuredSchedule?: BounceCastScheduleItem;
   role: string;
   upcomingSet?: string;
   upcomingStarts?: string;
@@ -118,13 +122,14 @@ export class BounceCastService {
   }
 
   public static async getSchedule(
-    limitOrFilters: number | BounceCastScheduleFilters = 12,
+    limitOrFilters?: number | BounceCastScheduleFilters,
     handle?: string,
   ): Promise<BounceCastScheduleItem[]> {
+    const requestedLimitOrFilters = limitOrFilters ?? 12;
     const filters =
-      typeof limitOrFilters === 'number'
-        ? ({ limit: limitOrFilters, handle } as BounceCastScheduleFilters)
-        : limitOrFilters;
+      typeof requestedLimitOrFilters === 'number'
+        ? ({ limit: requestedLimitOrFilters, handle } as BounceCastScheduleFilters)
+        : requestedLimitOrFilters;
     const params = new URLSearchParams({ limit: String(filters.limit || 12) });
     if (filters.handle) {
       params.set('handle', filters.handle);

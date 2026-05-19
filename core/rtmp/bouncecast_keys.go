@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/owncast/owncast/core/data"
+	"github.com/owncast/owncast/core/facebookmessenger"
 	"github.com/owncast/owncast/notifications/browser"
 	"github.com/owncast/owncast/persistence/configrepository"
 	"github.com/owncast/owncast/persistence/notificationsrepository"
@@ -89,6 +90,78 @@ var sendBounceCastQueuedDeliveries = func(goLiveEventID int64) {
 	go sendBounceCastEmailDeliveries(goLiveEventID)
 	go sendBounceCastBrowserPushDeliveries(goLiveEventID)
 	go sendBounceCastMessengerDeliveries(goLiveEventID)
+}
+
+// RetryBounceCastFailedNotificationDeliveries requeues failed BounceCast
+// go-live notification deliveries and dispatches the affected go-live events.
+func RetryBounceCastFailedNotificationDeliveries(goLiveEventID int64, channel string) (int64, error) {
+	db := data.GetDatabase()
+	if db == nil {
+		return 0, fmt.Errorf("database unavailable")
+	}
+
+	channel = strings.TrimSpace(strings.ToLower(channel))
+	args := []interface{}{}
+	query := `
+		SELECT DISTINCT go_live_event_id
+		FROM bouncecast_notification_deliveries
+		WHERE status = 'failed'
+			AND go_live_event_id IS NOT NULL
+	`
+	if goLiveEventID > 0 {
+		query += " AND go_live_event_id = ?"
+		args = append(args, goLiveEventID)
+	}
+	if channel != "" && channel != "all" {
+		query += " AND channel = ?"
+		args = append(args, channel)
+	}
+
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return 0, err
+	}
+	eventIDs := []int64{}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			_ = rows.Close()
+			return 0, err
+		}
+		eventIDs = append(eventIDs, id)
+	}
+	if err := rows.Close(); err != nil {
+		return 0, err
+	}
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+
+	updateArgs := []interface{}{}
+	updateQuery := `
+		UPDATE bouncecast_notification_deliveries
+		SET status = 'queued',
+			last_error = NULL
+		WHERE status = 'failed'
+	`
+	if goLiveEventID > 0 {
+		updateQuery += " AND go_live_event_id = ?"
+		updateArgs = append(updateArgs, goLiveEventID)
+	}
+	if channel != "" && channel != "all" {
+		updateQuery += " AND channel = ?"
+		updateArgs = append(updateArgs, channel)
+	}
+
+	result, err := db.Exec(updateQuery, updateArgs...)
+	if err != nil {
+		return 0, err
+	}
+	count, _ := result.RowsAffected()
+	for _, id := range eventIDs {
+		sendBounceCastQueuedDeliveries(id)
+	}
+	return count, nil
 }
 
 func validateBounceCastStreamerKey(path string) *bounceCastStreamerKeyMatch {
@@ -204,6 +277,7 @@ func beginBounceCastGoLiveEvent(match *bounceCastStreamerKeyMatch, remoteAddr ne
 	}
 
 	queueBounceCastGoLiveNotifications(eventID, scheduleID)
+	facebookmessenger.QueueGoLiveAlert(eventID)
 }
 
 func endBounceCastGoLiveEvent(match *bounceCastStreamerKeyMatch) {

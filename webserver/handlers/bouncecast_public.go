@@ -23,19 +23,23 @@ const (
 )
 
 type bounceCastPublicDJ struct {
-	DisplayName     string                        `json:"displayName"`
-	Handle          string                        `json:"handle"`
-	AvatarURL       string                        `json:"avatarUrl,omitempty"`
-	Bio             string                        `json:"bio,omitempty"`
-	Genres          []string                      `json:"genres"`
-	SocialLinks     []models.BounceCastSocialLink `json:"socialLinks"`
-	HeroImageURL    string                        `json:"heroImageUrl,omitempty"`
-	Role            string                        `json:"role"`
-	UpcomingSet     string                        `json:"upcomingSet,omitempty"`
-	UpcomingStarts  *time.Time                    `json:"upcomingStarts,omitempty"`
-	UpcomingCount   int                           `json:"upcomingCount"`
-	TotalLiveEvents int                           `json:"totalLiveEvents"`
-	LastLiveAt      *time.Time                    `json:"lastLiveAt,omitempty"`
+	DisplayName        string                        `json:"displayName"`
+	Handle             string                        `json:"handle"`
+	AvatarURL          string                        `json:"avatarUrl,omitempty"`
+	Bio                string                        `json:"bio,omitempty"`
+	Genres             []string                      `json:"genres"`
+	SocialLinks        []models.BounceCastSocialLink `json:"socialLinks"`
+	HeroImageURL       string                        `json:"heroImageUrl,omitempty"`
+	SEOTitle           string                        `json:"seoTitle,omitempty"`
+	ShareImageURL      string                        `json:"shareImageUrl,omitempty"`
+	FeaturedScheduleID *int64                        `json:"featuredScheduleId,omitempty"`
+	FeaturedSchedule   *bounceCastPublicScheduleItem `json:"featuredSchedule,omitempty"`
+	Role               string                        `json:"role"`
+	UpcomingSet        string                        `json:"upcomingSet,omitempty"`
+	UpcomingStarts     *time.Time                    `json:"upcomingStarts,omitempty"`
+	UpcomingCount      int                           `json:"upcomingCount"`
+	TotalLiveEvents    int                           `json:"totalLiveEvents"`
+	LastLiveAt         *time.Time                    `json:"lastLiveAt,omitempty"`
 }
 
 type bounceCastPublicScheduleItem struct {
@@ -165,9 +169,19 @@ func GetBounceCastPublicDJProfile(w http.ResponseWriter, r *http.Request) {
 		webutils.InternalErrorHandler(w, err)
 		return
 	}
+	dj := djs[0]
+	if dj.FeaturedScheduleID != nil {
+		for _, item := range schedule {
+			if item.ID == *dj.FeaturedScheduleID {
+				featured := item
+				dj.FeaturedSchedule = &featured
+				break
+			}
+		}
+	}
 
 	webutils.WriteResponse(w, bounceCastPublicDJProfile{
-		DJ:       djs[0],
+		DJ:       dj,
 		Schedule: schedule,
 	})
 }
@@ -351,6 +365,7 @@ func queryBounceCastPublicDJs(handle string) ([]bounceCastPublicDJ, error) {
 	query := `
 		SELECT a.display_name, a.handle, COALESCE(a.avatar_url, ''), COALESCE(a.bio, ''),
 			COALESCE(a.genres, ''), COALESCE(a.social_links, ''), COALESCE(a.hero_image_url, ''), a.role,
+			COALESCE(a.seo_title, ''), COALESCE(a.share_image_url, ''), a.featured_schedule_id, a.featured_schedule_enabled,
 			COALESCE((
 				SELECT s.title
 				FROM bouncecast_stream_schedule s
@@ -410,6 +425,8 @@ func queryBounceCastPublicDJs(handle string) ([]bounceCastPublicDJ, error) {
 		var dj bounceCastPublicDJ
 		var upcomingStarts sql.NullString
 		var lastLiveAt sql.NullString
+		var featuredScheduleID sql.NullInt64
+		var featuredScheduleEnabled bool
 		var genresJSON string
 		var socialLinksJSON string
 		if err := rows.Scan(
@@ -421,6 +438,10 @@ func queryBounceCastPublicDJs(handle string) ([]bounceCastPublicDJ, error) {
 			&socialLinksJSON,
 			&dj.HeroImageURL,
 			&dj.Role,
+			&dj.SEOTitle,
+			&dj.ShareImageURL,
+			&featuredScheduleID,
+			&featuredScheduleEnabled,
 			&dj.UpcomingSet,
 			&upcomingStarts,
 			&dj.UpcomingCount,
@@ -432,6 +453,9 @@ func queryBounceCastPublicDJs(handle string) ([]bounceCastPublicDJ, error) {
 		dj.Genres = parseBounceCastGenres(genresJSON)
 		dj.SocialLinks = parseBounceCastSocialLinks(socialLinksJSON)
 		dj.Role = publicBounceCastDJRole(dj.Role)
+		if featuredScheduleEnabled && featuredScheduleID.Valid {
+			dj.FeaturedScheduleID = &featuredScheduleID.Int64
+		}
 		if upcomingStarts.Valid {
 			if parsed, err := parseBounceCastSQLiteTime(upcomingStarts.String); err == nil {
 				dj.UpcomingStarts = &parsed
@@ -548,7 +572,17 @@ func queryBounceCastDJProfileForAccountEmail(email string) (bounceCastPublicDJPr
 	if err != nil {
 		return bounceCastPublicDJProfile{}, err
 	}
-	return bounceCastPublicDJProfile{DJ: djs[0], Schedule: schedule}, nil
+	dj := djs[0]
+	if dj.FeaturedScheduleID != nil {
+		for _, item := range schedule {
+			if item.ID == *dj.FeaturedScheduleID {
+				featured := item
+				dj.FeaturedSchedule = &featured
+				break
+			}
+		}
+	}
+	return bounceCastPublicDJProfile{DJ: dj, Schedule: schedule}, nil
 }
 
 func queryBounceCastAccountReminderStatuses(userID string) ([]bounceCastAccountReminderStatus, error) {

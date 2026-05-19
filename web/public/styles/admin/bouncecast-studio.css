@@ -83,7 +83,18 @@
 }
 
 .bouncecast-admin-page {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  color: var(--rave-text);
   animation: studio-page-in 220ms ease-out;
+}
+
+#admin-page .main-content-container > .bouncecast-studio-dashboard {
+  width: min(1180px, 100%);
+  min-height: auto;
+  margin: 0 auto;
+  padding: 0;
+  background: transparent;
 }
 
 .admin-studio-shell {
@@ -119,6 +130,7 @@
 }
 
 .studio-hero {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -133,6 +145,31 @@
   box-shadow:
     0 18px 42px rgb(0 0 0 / 30%),
     inset 0 1px 0 rgb(255 255 255 / 8%);
+  overflow: hidden;
+}
+
+.studio-hero::before {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, transparent 0%, rgb(255 255 255 / 10%) 48%, transparent 100%),
+    repeating-linear-gradient(
+      90deg,
+      rgb(255 255 255 / 0%) 0,
+      rgb(255 255 255 / 0%) 20px,
+      rgb(32 228 255 / 8%) 21px,
+      rgb(255 54 188 / 6%) 22px
+    );
+  opacity: 0.34;
+  transform: translateX(-58%);
+  animation: studio-hero-sweep 8s ease-in-out infinite;
+  content: '';
+  pointer-events: none;
+}
+
+.studio-hero > * {
+  position: relative;
+  z-index: 1;
 }
 
 .studio-hero h1.ant-typography {
@@ -169,6 +206,14 @@
     border-color 180ms ease,
     transform 180ms ease,
     box-shadow 180ms ease;
+}
+
+.bouncecast-admin-page .ant-card,
+.bouncecast-studio-dashboard .studio-panel,
+#admin-page .admin-studio-shell .ant-card,
+#admin-page .admin-studio-shell .form-module,
+#admin-page .admin-studio-shell .ant-table-wrapper {
+  backdrop-filter: blur(18px);
 }
 
 .bouncecast-admin-page .ant-card:hover {
@@ -245,6 +290,14 @@
   background:
     linear-gradient(90deg, rgb(255 54 188 / 12%), rgb(32 228 255 / 10%)),
     rgb(255 255 255 / 4%);
+}
+
+.bouncecast-admin-page .ant-card-head,
+.bouncecast-studio-dashboard .ant-card-head {
+  background:
+    linear-gradient(90deg, rgb(255 54 188 / 12%), rgb(32 228 255 / 10%)),
+    rgb(255 255 255 / 4%);
+  border-bottom-color: rgb(255 255 255 / 10%);
 }
 
 #admin-page .admin-studio-shell .ant-card-head-title,
@@ -358,6 +411,7 @@
 #admin-page .admin-studio-shell .ant-input-affix-wrapper,
 #admin-page .admin-studio-shell .ant-input-number,
 #admin-page .admin-studio-shell .ant-input-number-input,
+#admin-page .admin-studio-shell .ant-input-group-addon,
 #admin-page .admin-studio-shell .ant-picker,
 #admin-page .admin-studio-shell .ant-select:not(.ant-select-customize-input) .ant-select-selector {
   color: var(--rave-text);
@@ -387,9 +441,21 @@
 
 #admin-page .admin-studio-shell .ant-picker-input > input,
 #admin-page .admin-studio-shell .ant-select-selection-item,
+#admin-page .admin-studio-shell .ant-input-password-icon,
 #admin-page .admin-studio-shell .ant-input-number-handler-wrap,
 #admin-page .admin-studio-shell .ant-input-number-handler {
   color: var(--rave-text);
+}
+
+#admin-page .admin-studio-shell .ant-input-number-handler-wrap {
+  border-left-color: rgb(255 255 255 / 10%);
+  background: rgb(255 255 255 / 5%);
+}
+
+#admin-page .admin-studio-shell .ant-input-group-addon .ant-btn-link {
+  height: auto;
+  padding: 0 0.25rem;
+  color: var(--rave-cyan);
 }
 
 #admin-page .admin-studio-shell .ant-switch {
@@ -587,7 +653,8 @@
 
 .ant-select-dropdown,
 .ant-picker-dropdown .ant-picker-panel-container,
-.ant-popover-inner {
+.ant-popover-inner,
+.ant-tooltip-inner {
   color: var(--rave-text);
   border: 1px solid var(--rave-line);
   border-radius: 8px;
@@ -624,7 +691,10 @@
 .ant-modal-content,
 .ant-modal-header,
 .ant-modal-body,
-.ant-modal-footer {
+.ant-modal-footer,
+.ant-drawer-content,
+.ant-drawer-header,
+.ant-drawer-body {
   color: var(--rave-text);
   border-color: var(--rave-line);
   background:
@@ -637,12 +707,28 @@
 }
 
 .ant-modal-close,
-.ant-modal-title {
+.ant-modal-title,
+.ant-drawer-title,
+.ant-drawer-close {
   color: var(--rave-text);
 }
 
-.ant-modal-close:hover {
+.ant-modal-close:hover,
+.ant-drawer-close:hover {
   color: var(--rave-cyan);
+}
+
+.messenger-alerts-page .ant-input[readonly] {
+  cursor: copy;
+  background:
+    linear-gradient(90deg, rgb(32 228 255 / 10%), rgb(255 54 188 / 7%)),
+    rgb(9 13 31 / 88%);
+}
+
+.messenger-alerts-page .studio-secret-box {
+  display: block;
+  padding: 1rem;
+  white-space: pre-wrap;
 }
 
 .home-container,
@@ -818,6 +904,18 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes studio-hero-sweep {
+  0%,
+  42%,
+  100% {
+    transform: translateX(-62%);
+  }
+
+  58% {
+    transform: translateX(62%);
   }
 }
 

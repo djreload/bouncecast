@@ -14,6 +14,7 @@ BUTTONS
 .ant-btn {
   font-size: 0.85rem;
   font-weight: 700;
+  letter-spacing: 0;
   transition:
     border-color 180ms ease,
     box-shadow 180ms ease,
@@ -148,6 +149,7 @@ DROPDOWN
 }
 
 .ant-input,
+.ant-input-group-addon,
 .ant-input-number,
 .ant-input-number-input,
 .ant-select:not(.ant-select-customize-input) .ant-select-selector {
@@ -174,9 +176,10 @@ DROPDOWN
 .ant-card {
   color: var(--rave-text);
   background:
-    linear-gradient(145deg, rgb(255 255 255 / 7%), rgb(255 255 255 / 3%)),
-    var(--rave-panel);
+    linear-gradient(145deg, rgb(255 255 255 / 7%), rgb(255 255 255 / 3%)), var(--rave-panel);
   border-color: var(--rave-line);
+  border-radius: 8px;
+  box-shadow: 0 16px 38px rgb(0 0 0 / 22%);
 }
 
 .ant-card-head {
@@ -221,6 +224,11 @@ DROPDOWN
   background: rgb(32 228 255 / 8%);
 }
 
+.ant-table-cell-fix-left,
+.ant-table-cell-fix-right {
+  background: rgb(15 21 42 / 96%) !important;
+}
+
 .ant-empty-description,
 .ant-list-item,
 .ant-descriptions-item-label,
@@ -241,6 +249,24 @@ DROPDOWN
   .ant-alert-message {
     color: var(--theme-color-palette-error);
   }
+}
+
+.ant-alert-info,
+.ant-alert-success,
+.ant-alert-warning {
+  color: var(--rave-text);
+  border-color: var(--rave-line);
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 7%), rgb(255 255 255 / 3%)), rgb(15 21 42 / 92%);
+}
+
+.ant-alert-info .ant-alert-message,
+.ant-alert-info .ant-alert-description,
+.ant-alert-success .ant-alert-message,
+.ant-alert-success .ant-alert-description,
+.ant-alert-warning .ant-alert-message,
+.ant-alert-warning .ant-alert-description {
+  color: var(--rave-text);
 }
 
 .ant-tabs-tab {

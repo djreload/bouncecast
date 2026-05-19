@@ -99,11 +99,17 @@ func handleBounceCastDJScraperMetadataPage(w http.ResponseWriter, r *http.Reques
 		if djs, err := queryBounceCastPublicDJs(handle); err == nil && len(djs) > 0 {
 			dj := djs[0]
 			metadata.Name = fmt.Sprintf("%s on BounceCast", dj.DisplayName)
+			if dj.SEOTitle != "" {
+				metadata.Name = dj.SEOTitle
+			}
 			metadata.Summary = dj.Bio
 			if metadata.Summary == "" {
 				metadata.Summary = fmt.Sprintf("Upcoming sets and public profile for %s on BounceCast.", dj.DisplayName)
 			}
-			if dj.HeroImageURL != "" {
+			if dj.ShareImageURL != "" {
+				metadata.Image = buildBounceCastAbsoluteURL(r, dj.ShareImageURL)
+				metadata.Thumbnail = metadata.Image
+			} else if dj.HeroImageURL != "" {
 				metadata.Image = buildBounceCastAbsoluteURL(r, dj.HeroImageURL)
 				metadata.Thumbnail = metadata.Image
 			} else if dj.AvatarURL != "" {

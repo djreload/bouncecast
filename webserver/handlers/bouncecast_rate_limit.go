@@ -37,6 +37,7 @@ var (
 	bounceCastStarsCheckoutRateLimit        = bounceCastRateLimitRule{Name: "stars-checkout", MaxRequests: 12, Window: 10 * time.Minute, Message: "Too many Stars checkout attempts. Please wait before trying again."}
 	bounceCastStarsCaptureRateLimit         = bounceCastRateLimitRule{Name: "stars-capture", MaxRequests: 20, Window: 10 * time.Minute, Message: "Too many Stars payment confirmations. Please wait before trying again."}
 	bounceCastStarsSendRateLimit            = bounceCastRateLimitRule{Name: "stars-send", MaxRequests: 10, Window: time.Minute, Message: "Too many Stars sends. Please wait before trying again."}
+	bounceCastMessengerWebhookRateLimit     = bounceCastRateLimitRule{Name: "messenger-webhook", MaxRequests: 120, Window: time.Minute, Message: "Too many Messenger webhook requests. Please wait before trying again."}
 )
 
 func enforceBounceCastRateLimit(w http.ResponseWriter, r *http.Request, rule bounceCastRateLimitRule, subjects ...string) bool {

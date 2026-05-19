@@ -7,7 +7,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-const latestGooseMigrationVersion int64 = 11
+const latestGooseMigrationVersion int64 = 12
 
 func openTestDB(t *testing.T) *sql.DB {
 	t.Helper()
@@ -64,6 +64,8 @@ func TestRun_FreshDatabase(t *testing.T) {
 		"star_wallet_transactions", "star_paypal_orders", "star_send_events",
 		"star_paypal_webhook_events", "bouncecast_schedule_reminders",
 		"bouncecast_account_push_subscriptions", "bouncecast_audit_events", "goose_db_version",
+		"bouncecast_messenger_alert_subscribers", "bouncecast_messenger_alert_campaigns",
+		"bouncecast_messenger_alert_campaign_recipients",
 	}
 	for _, name := range expectedTables {
 		if !tableExists(t, db, name) {
@@ -115,8 +117,8 @@ func TestRun_LegacyDatabaseAtV9(t *testing.T) {
 	// goose_db_version and the BounceCast extension tables were added.
 	var newTableCount int
 	mustScan(t, db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table'`), &newTableCount)
-	if newTableCount != tableCount+20 {
-		t.Errorf("table count changed from %d to %d (expected +20 for goose and BounceCast tables)", tableCount, newTableCount)
+	if newTableCount != tableCount+23 {
+		t.Errorf("table count changed from %d to %d (expected +23 for goose and BounceCast tables)", tableCount, newTableCount)
 	}
 }
 

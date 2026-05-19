@@ -25,6 +25,8 @@ import {
   BOUNCECAST_MESSENGER_SETTINGS,
   BOUNCECAST_LIVE_EVENTS,
   BOUNCECAST_NOTIFICATION_DELIVERIES,
+  BOUNCECAST_NOTIFICATION_DELIVERIES_EXPORT,
+  BOUNCECAST_NOTIFICATION_DELIVERIES_RETRY_FAILED,
   BOUNCECAST_NOTIFICATION_SUBSCRIBERS,
   BOUNCECAST_NOTIFICATION_SUBSCRIBER_DISABLE,
   BOUNCECAST_PUSH_SETTINGS,
@@ -43,6 +45,10 @@ const ClockCircleOutlined = dynamic(() => import('@ant-design/icons/ClockCircleO
   ssr: false,
 });
 const ThunderboltOutlined = dynamic(() => import('@ant-design/icons/ThunderboltOutlined'), {
+  ssr: false,
+});
+const ReloadOutlined = dynamic(() => import('@ant-design/icons/ReloadOutlined'), { ssr: false });
+const DownloadOutlined = dynamic(() => import('@ant-design/icons/DownloadOutlined'), {
   ssr: false,
 });
 
@@ -317,6 +323,18 @@ export default function Schedule() {
       data: { id },
     });
     await loadStudioData();
+  };
+
+  const retryFailedDeliveries = async () => {
+    await fetchData(BOUNCECAST_NOTIFICATION_DELIVERIES_RETRY_FAILED, {
+      method: 'POST',
+      data: { channel: 'all' },
+    });
+    await loadStudioData();
+  };
+
+  const exportDeliveries = () => {
+    window.open(BOUNCECAST_NOTIFICATION_DELIVERIES_EXPORT, '_blank', 'noopener,noreferrer');
   };
 
   const saveEmailSettings = async () => {
@@ -652,7 +670,20 @@ export default function Schedule() {
         />
       </Card>
 
-      <Card title="Notification deliveries" className="studio-panel">
+      <Card
+        title="Notification deliveries"
+        className="studio-panel"
+        extra={
+          <Space>
+            <Button size="small" icon={<ReloadOutlined />} onClick={retryFailedDeliveries}>
+              Retry failed
+            </Button>
+            <Button size="small" icon={<DownloadOutlined />} onClick={exportDeliveries}>
+              Export CSV
+            </Button>
+          </Space>
+        }
+      >
         <Table
           dataSource={deliveries}
           rowKey="id"

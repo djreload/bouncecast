@@ -21,6 +21,7 @@ import {
   BounceCastScheduleItem,
   BounceCastService,
 } from '../services/bouncecast-service';
+import { MessengerAlertsCTA } from '../components/bouncecast/MessengerAlertsCTA';
 import styles from '../styles/bouncecast-public.module.scss';
 
 const { Text } = Typography;
@@ -154,7 +155,9 @@ export default function DJsPage() {
     <main className={styles.page}>
       <Head>
         <title>
-          {profile ? `${profile.dj.displayName} on BounceCast` : 'BounceCast DJ profiles'}
+          {profile
+            ? profile.dj.seoTitle || `${profile.dj.displayName} on BounceCast`
+            : 'BounceCast DJ profiles'}
         </title>
         <meta
           name="description"
@@ -163,9 +166,14 @@ export default function DJsPage() {
             'Browse BounceCast DJs, public lineup filters, and upcoming live DJ sets.'
           }
         />
-        {profile?.dj.heroImageUrl && <meta property="og:image" content={profile.dj.heroImageUrl} />}
+        {(profile?.dj.shareImageUrl || profile?.dj.heroImageUrl) && (
+          <meta property="og:image" content={profile.dj.shareImageUrl || profile.dj.heroImageUrl} />
+        )}
         {profile && (
-          <meta property="og:title" content={`${profile.dj.displayName} on BounceCast`} />
+          <meta
+            property="og:title"
+            content={profile.dj.seoTitle || `${profile.dj.displayName} on BounceCast`}
+          />
         )}
       </Head>
       <div className={styles.shell}>
@@ -242,10 +250,25 @@ export default function DJsPage() {
                 <ScheduleList schedule={lineup} />
               </Card>
 
+              <MessengerAlertsCTA />
+
               <Card
                 className={styles.panel}
                 title={profile ? `${profile.dj.displayName} schedule` : 'DJ schedule'}
               >
+                {profile?.dj.featuredSchedule && (
+                  <article className={styles.scheduleItem}>
+                    <p className={styles.scheduleTime}>
+                      Featured: {formatDate(profile.dj.featuredSchedule.startsAt)}
+                    </p>
+                    <p className={styles.scheduleTitle}>{profile.dj.featuredSchedule.title}</p>
+                    {profile.dj.featuredSchedule.description && (
+                      <Text className={styles.muted}>
+                        {profile.dj.featuredSchedule.description}
+                      </Text>
+                    )}
+                  </article>
+                )}
                 {profile?.dj.heroImageUrl && (
                   <img
                     className={styles.heroImage}

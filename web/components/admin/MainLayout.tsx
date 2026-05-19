@@ -162,6 +162,10 @@ export const MainLayout: FC<MainLayoutProps> = ({ children }) => {
 
   const integrationsMenu = [
     {
+      label: <Link href="/admin/integrations/facebook-messenger-alerts">Facebook Messenger Alerts</Link>,
+      key: '/admin/integrations/facebook-messenger-alerts',
+    },
+    {
       label: <Link href="/admin/webhooks">Webhooks</Link>,
       key: '/admin/webhooks',
     },

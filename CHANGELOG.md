@@ -6,16 +6,22 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 
 ### Planned
 
-- Add admin retry/export tools for failed reminder deliveries and notification deliveries.
-- Add webhook verification/testing helpers for Facebook Messenger Page setup.
 - Continue expanding owner/admin UI hiding and audit coverage across older Owncast-compatible admin pages.
-- Add per-DJ public profile customization for SEO titles, share images, and featured schedule cards.
 - Continue live VPS deployment notes as production configuration changes.
 
 ## 2026-05-19
 
 ### Added
 
+- Added database migration `00012_bouncecast_facebook_messenger_alerts.sql` for Meta Messenger opt-in subscribers, go-live alert campaigns, per-recipient campaign results, and per-DJ SEO/share customization fields.
+- Added Admin -> Integrations -> Facebook Messenger Alerts with enablement, Meta App/Page configuration, masked secrets, webhook helper details, token validation, message preview, test sends, subscriber stats, and campaign logs.
+- Added Meta Messenger webhook verification and POST event handling at `/integrations/facebook/messenger/webhook`, including App Secret signature validation when enabled.
+- Added Messenger opt-in keyword handling for `LIVE`, `START`, and `SUBSCRIBE`, opt-out handling for `STOP`, `UNSUBSCRIBE`, and `CANCEL`, and `HELP` replies.
+- Added go-live Messenger alert campaign sending with configured delay, cooldown/idempotency, 24-hour policy-window checks, per-recipient logs, and optional Facebook Page post fallback.
+- Added a public "Get Messenger live alerts" CTA for the stream page and DJ profile page that sends viewers to the connected Page with the `LIVE` opt-in keyword.
+- Added retry and CSV export tools for failed BounceCast notification deliveries in `/admin/schedule/`.
+- Added per-DJ SEO title, share image, and featured schedule controls in `/admin/streamers/`, with bot-facing metadata support on `/djs/{handle}`.
+- Added `docs/integrations/facebook-messenger-live-alerts.md` with Meta setup, webhook, policy, opt-in, troubleshooting, and production notes.
 - Added database migration `00011_bouncecast_reminder_delivery_management.sql` for account-bound browser push subscriptions, reminder delivery status, notification delivery reminder links, and product audit events.
 - Added admin schedule reminder management at `/admin/schedule/`, including viewer, channel, delivery status, and disable controls.
 - Added Account Hub reminder status cards so viewers can see saved reminder channels and delivery state.
@@ -34,6 +40,9 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 
 ### Changed
 
+- Changed Messenger go-live alerts to use a dedicated BounceCast service module rather than the earlier lightweight reminder-only transport.
+- Changed public DJ profiles so configured SEO title/share image/featured schedule can override automatic metadata and cards.
+- Upgraded the shared BounceCast visual system across the public stream page, DJ pages, Studio-style admin pages, forms, tables, dropdowns, modals, and Messenger alert CTA.
 - Changed more BounceCast admin writes, including streamer account changes, stream key changes, schedule creation, and reminder disabling, to require owner/admin product roles.
 - Changed `/admin/schedule/` to include Messenger settings and account reminder management alongside email, push, subscribers, live events, and delivery logs.
 - Changed Account Hub reminder saving so browser push reminders attempt to capture the browser push subscription endpoint at the point of opt-in.

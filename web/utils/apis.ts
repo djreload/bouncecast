@@ -128,9 +128,23 @@ export const BOUNCECAST_NOTIFICATION_SUBSCRIBER_DISABLE = `${API_LOCATION}bounce
 
 export const BOUNCECAST_NOTIFICATION_DELIVERIES = `${API_LOCATION}bouncecast/notification-deliveries`;
 
+export const BOUNCECAST_NOTIFICATION_DELIVERIES_RETRY_FAILED = `${API_LOCATION}bouncecast/notification-deliveries/retry-failed`;
+
+export const BOUNCECAST_NOTIFICATION_DELIVERIES_EXPORT = `${API_LOCATION}bouncecast/notification-deliveries/export`;
+
 export const BOUNCECAST_EMAIL_SETTINGS = `${API_LOCATION}bouncecast/email-settings`;
 
 export const BOUNCECAST_MESSENGER_SETTINGS = `${API_LOCATION}bouncecast/messenger-settings`;
+
+export const BOUNCECAST_FACEBOOK_MESSENGER_ALERTS = `${API_LOCATION}bouncecast/integrations/facebook-messenger-alerts`;
+
+export const BOUNCECAST_FACEBOOK_MESSENGER_ALERTS_SETTINGS = `${API_LOCATION}bouncecast/integrations/facebook-messenger-alerts/settings`;
+
+export const BOUNCECAST_FACEBOOK_MESSENGER_ALERTS_VALIDATE = `${API_LOCATION}bouncecast/integrations/facebook-messenger-alerts/validate`;
+
+export const BOUNCECAST_FACEBOOK_MESSENGER_ALERTS_TEST = `${API_LOCATION}bouncecast/integrations/facebook-messenger-alerts/test-message`;
+
+export const BOUNCECAST_FACEBOOK_MESSENGER_ALERTS_PREVIEW = `${API_LOCATION}bouncecast/integrations/facebook-messenger-alerts/preview`;
 
 export const BOUNCECAST_PUSH_SETTINGS = `${API_LOCATION}bouncecast/push-settings`;
 
@@ -219,6 +233,8 @@ export const BOUNCECAST_PUBLIC_DJS = `${NEXT_PUBLIC_API_HOST}api/bouncecast/djs`
 export const BOUNCECAST_PUBLIC_SCHEDULE = `${NEXT_PUBLIC_API_HOST}api/bouncecast/schedule`;
 
 export const BOUNCECAST_PUBLIC_SCHEDULE_REMINDERS = `${NEXT_PUBLIC_API_HOST}api/bouncecast/schedule/reminders`;
+
+export const BOUNCECAST_MESSENGER_ALERTS_PUBLIC_CONFIG = `${NEXT_PUBLIC_API_HOST}api/bouncecast/messenger-alerts/config`;
 
 export const API_YP_RESET = `${API_LOCATION}yp/reset`;
 

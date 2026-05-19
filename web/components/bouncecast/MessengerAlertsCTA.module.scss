@@ -1,0 +1,80 @@
+.messengerCta {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  margin: 14px 0;
+  padding: 16px;
+  border: 1px solid rgb(0 229 255 / 26%);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgb(0 229 255 / 12%), rgb(255 0 136 / 12%)), rgb(8 12 26 / 82%);
+  box-shadow: 0 16px 40px rgb(0 0 0 / 24%);
+  color: #f7fbff;
+  overflow: hidden;
+}
+
+.messengerCta::before {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, var(--rave-cyan), var(--rave-magenta), var(--rave-yellow));
+  content: '';
+}
+
+.messengerCta > * {
+  position: relative;
+  z-index: 1;
+}
+
+.copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.title {
+  margin: 0;
+  font-size: 0.96rem;
+  font-weight: 800;
+}
+
+.body {
+  margin: 0;
+  color: rgb(247 251 255 / 78%);
+  font-size: 0.88rem;
+}
+
+.button {
+  flex: 0 0 auto;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: linear-gradient(90deg, #00e5ff, #f08);
+  color: #06101f;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow: 0 12px 28px rgb(0 229 255 / 18%);
+  transition:
+    filter 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.button:hover,
+.button:focus {
+  color: #020711;
+  filter: saturate(1.15);
+  transform: translateY(-1px);
+  box-shadow: 0 16px 34px rgb(255 0 136 / 24%);
+}
+
+@media (width <= 640px) {
+  .messengerCta {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

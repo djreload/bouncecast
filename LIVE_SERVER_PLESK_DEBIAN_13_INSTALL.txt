@@ -199,6 +199,12 @@ Paste:
         - "1935:1935"
       volumes:
         - /var/lib/bouncecast/data:/app/data
+      environment:
+        # Keep this stable once set. It encrypts newly saved Messenger secrets.
+        BOUNCECAST_SECRET_KEY: "replace-with-a-long-random-secret"
+        # Optional defaults. Admin settings can override these values.
+        FACEBOOK_MESSENGER_ENABLED: "false"
+        FACEBOOK_GRAPH_API_VERSION: "v25.0"
 
 Save and exit.
 
@@ -505,12 +511,17 @@ Migration `00011_bouncecast_reminder_delivery_management.sql` adds account-bound
 browser push subscriptions, reminder delivery status fields, reminder-linked
 delivery rows, Messenger delivery settings, and product audit events.
 
-After updating, verify the container logs show goose migration version 11 and
+Migration `00012_bouncecast_facebook_messenger_alerts.sql` adds Facebook
+Messenger live-alert subscribers, go-live alert campaign logs, per-recipient
+campaign results, and per-DJ SEO/share/featured schedule fields.
+
+After updating, verify the container logs show goose migration version 12 and
 check:
 
   curl -s https://live.example.com/api/bouncecast/djs | jq .
   curl -I https://live.example.com/djs/example-dj
   curl -s "https://live.example.com/api/bouncecast/schedule?limit=5&status=planned" | jq .
+  curl -s https://live.example.com/api/bouncecast/messenger-alerts/config | jq .
 
 DJ profile fields can be edited from:
 
@@ -528,9 +539,9 @@ Current reminder behavior:
 - Browser push reminders map the logged-in account to the browser subscription
   endpoint captured by Account Hub. The existing global Owncast browser push
   table is still synced for compatibility.
-- Messenger reminders queue to the viewer's Messenger destination when
-  Messenger delivery is enabled and a Facebook Page Access Token is saved in
-  the admin schedule settings.
+- Messenger schedule reminders queue to the viewer's Messenger destination when
+  reminder Messenger delivery is enabled and a Facebook Page Access Token is
+  saved in the admin schedule settings.
 - Reminder delivery status is visible to admins at:
 
   https://live.example.com/admin/schedule/
@@ -542,10 +553,10 @@ Current reminder behavior:
 - Global notification subscribers and existing browser push subscribers still
   behave as before.
 
-Messenger setup notes:
+Schedule reminder Messenger setup notes:
 
 1. In Meta/Facebook developer tools, create or reuse an app with Messenger API
-   access for the Facebook Page that will send alerts.
+   access for the Facebook Page that will send reminder messages.
 2. Generate a Page Access Token for the Page.
 3. In BounceCast, open:
 
@@ -555,6 +566,61 @@ Messenger setup notes:
    `v20.0`, and paste the Page Access Token.
 5. Viewers must save a Messenger destination/contact in Account Hub and choose
    Messenger when saving a schedule reminder.
+
+Facebook Messenger Live Alerts setup notes:
+
+This is the site-wide go-live alert integration. It is separate from the older
+schedule reminder Messenger transport above.
+
+1. In Meta/Facebook developer tools, create or reuse an app with the Messenger
+   product enabled for the connected Facebook Page.
+2. Generate a Page Access Token for the Page.
+3. In BounceCast, open:
+
+   https://live.example.com/admin/integrations/facebook-messenger-alerts/
+
+4. Configure:
+
+   - Enable Facebook Messenger alerts.
+   - Facebook App ID.
+   - Facebook App Secret.
+   - Facebook Page ID.
+   - Facebook Page Access Token.
+   - Webhook Verify Token.
+   - Graph API version, normally `v25.0` unless Meta requires a newer version.
+   - Default live alert message and button label.
+   - Send delay and cooldown.
+
+5. In the Meta app webhook settings, use this callback URL:
+
+   https://live.example.com/integrations/facebook/messenger/webhook
+
+6. Use the same verify token you saved in BounceCast.
+7. Subscribe the Page webhook to Messenger message events.
+8. Ask viewers to click "Get Messenger live alerts" and send `LIVE` to your
+   Facebook Page. BounceCast also accepts `START` and `SUBSCRIBE`.
+9. Viewers can opt out with `STOP`, `UNSUBSCRIBE`, or `CANCEL`.
+
+Important Meta policy notes:
+
+- BounceCast does not message all Facebook Page followers.
+- Messenger alerts are only sent to stored opt-in/subscriber PSIDs.
+- The standard Messenger messaging window is 24 hours after user interaction
+  unless your Meta app has an approved notification flow or another allowed
+  policy basis.
+- If a subscriber is outside the allowed policy window, BounceCast skips them
+  and records the skip in the campaign log.
+
+Optional environment defaults for Docker Compose:
+
+  FACEBOOK_MESSENGER_ENABLED=false
+  FACEBOOK_APP_ID=your-app-id
+  FACEBOOK_APP_SECRET=your-app-secret
+  FACEBOOK_PAGE_ID=your-page-id
+  FACEBOOK_PAGE_ACCESS_TOKEN=your-page-access-token
+  FACEBOOK_WEBHOOK_VERIFY_TOKEN=choose-a-random-token
+  FACEBOOK_GRAPH_API_VERSION=v25.0
+  BOUNCECAST_SECRET_KEY=use-a-long-random-secret-for-encrypting-saved-secrets
 
 Security notes:
 
@@ -661,6 +727,8 @@ Verify:
   curl -s https://live.example.com/api/bouncecast/schedule?limit=3 | jq .
   curl -s "https://live.example.com/api/bouncecast/schedule?limit=3&status=planned" | jq .
   curl -s https://live.example.com/api/bouncecast/djs | jq .
+  curl -s https://live.example.com/api/bouncecast/messenger-alerts/config | jq .
+  curl -I https://live.example.com/admin/integrations/facebook-messenger-alerts/
   docker compose logs --tail=80 bouncecast
 
 
