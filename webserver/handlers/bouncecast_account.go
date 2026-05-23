@@ -209,31 +209,8 @@ func BounceCastAccountLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := utils.GenerateAccessToken()
+	token, err := issueBounceCastAccountAccessToken(userID)
 	if err != nil {
-		webutils.InternalErrorHandler(w, err)
-		return
-	}
-
-	datastore := data.GetDatastore()
-	if err := func() error {
-		datastore.DbLock.Lock()
-		defer datastore.DbLock.Unlock()
-
-		tx, err := datastore.DB.Begin()
-		if err != nil {
-			return err
-		}
-		defer tx.Rollback() //nolint
-
-		if _, err := tx.Exec("INSERT INTO user_access_tokens(token, user_id) VALUES(?, ?)", token, userID); err != nil {
-			return err
-		}
-		if _, err := tx.Exec("UPDATE users SET authenticated_at = COALESCE(authenticated_at, CURRENT_TIMESTAMP), last_login_at = CURRENT_TIMESTAMP WHERE id = ?", userID); err != nil {
-			return err
-		}
-		return tx.Commit()
-	}(); err != nil {
 		webutils.InternalErrorHandler(w, err)
 		return
 	}
@@ -460,6 +437,37 @@ func getBounceCastAccountLogin(email string) (string, string, error) {
 		return "", "", err
 	}
 	return user.ID, user.PasswordHash, nil
+}
+
+func issueBounceCastAccountAccessToken(userID string) (string, error) {
+	token, err := utils.GenerateAccessToken()
+	if err != nil {
+		return "", err
+	}
+
+	datastore := data.GetDatastore()
+	if err := func() error {
+		datastore.DbLock.Lock()
+		defer datastore.DbLock.Unlock()
+
+		tx, err := datastore.DB.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback() //nolint
+
+		if _, err := tx.Exec("INSERT INTO user_access_tokens(token, user_id) VALUES(?, ?)", token, userID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec("UPDATE users SET authenticated_at = COALESCE(authenticated_at, CURRENT_TIMESTAMP), last_login_at = CURRENT_TIMESTAMP WHERE id = ?", userID); err != nil {
+			return err
+		}
+		return tx.Commit()
+	}(); err != nil {
+		return "", err
+	}
+
+	return token, nil
 }
 
 func normalizeBounceCastAccountEmail(value string) (string, error) {

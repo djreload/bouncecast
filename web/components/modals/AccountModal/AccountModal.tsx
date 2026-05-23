@@ -72,8 +72,6 @@ export const AccountModal: FC<AccountModalProps> = ({ closeModal }) => {
     useState<NotificationPreferencesPayload>(defaultNotificationPreferences);
   const [savingNotifications, setSavingNotifications] = useState(false);
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
-  const [registerForm] = Form.useForm();
-  const [loginForm] = Form.useForm();
   const [profileForm] = Form.useForm();
   const [notificationForm] = Form.useForm();
 
@@ -103,11 +101,6 @@ export const AccountModal: FC<AccountModalProps> = ({ closeModal }) => {
   };
 
   useEffect(() => {
-    registerForm.setFieldsValue({
-      displayName: currentUser?.displayName,
-      profileImageUrl: currentUser?.profileImageUrl,
-      notificationPreferences,
-    });
     profileForm.setFieldsValue({
       displayName: currentUser?.displayName,
       profileImageUrl: currentUser?.profileImageUrl,
@@ -136,30 +129,6 @@ export const AccountModal: FC<AccountModalProps> = ({ closeModal }) => {
       throw new Error('Browser push notifications are not enabled on this server yet');
     }
     return registerWebPushNotifications(publicKey);
-  };
-
-  const handleRegister = async () => {
-    try {
-      const values = await registerForm.validateFields();
-      const result = await AccountService.register(accessToken, values);
-      applyAccountResponse(result);
-      toast.success('Account registered');
-      closeModal();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Unable to register account');
-    }
-  };
-
-  const handleLogin = async () => {
-    try {
-      const values = await loginForm.validateFields();
-      const result = await AccountService.login(values);
-      applyAccountResponse(result);
-      toast.success('Logged in');
-      closeModal();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Unable to log in');
-    }
   };
 
   const handleProfileSave = async () => {
@@ -198,7 +167,7 @@ export const AccountModal: FC<AccountModalProps> = ({ closeModal }) => {
       <Upload
         accept="image/png,image/jpeg,image/gif"
         beforeUpload={file => {
-          void handleProfileImageUpload(file as File, form);
+          handleProfileImageUpload(file as File, form);
           return false;
         }}
         maxCount={1}
@@ -279,85 +248,20 @@ export const AccountModal: FC<AccountModalProps> = ({ closeModal }) => {
     </div>
   );
 
-  const registerPanel = (
+  const accessPanel = (
     <div className={styles.accountPanel}>
       {accountHeader}
       <Alert
         type="info"
         showIcon
-        message="Visitor is the default role. Admins can approve owner, admin, moderator, and DJ permissions."
+        message="Use the unified BounceCast login"
+        description="Account creation, admin login, DJ access, and viewer sign-in now all start from the same page."
+        action={
+          <Button type="primary" onClick={() => window.location.assign('/login?next=/account')}>
+            Open login
+          </Button>
+        }
       />
-      <Form form={registerForm} layout="vertical">
-        <Form.Item
-          name="displayName"
-          label="Display name"
-          rules={[{ required: true, message: 'Display name is required' }]}
-        >
-          <Input maxLength={30} />
-        </Form.Item>
-        <Form.Item
-          name="email"
-          label="Email"
-          rules={[
-            { required: true, message: 'Email is required' },
-            { type: 'email', message: 'Enter a valid email address' },
-          ]}
-        >
-          <Input />
-        </Form.Item>
-        <Form.Item
-          name="password"
-          label="Password"
-          rules={[
-            { required: true, message: 'Password is required' },
-            { min: 8, message: 'Password must be at least 8 characters' },
-          ]}
-        >
-          <Input.Password />
-        </Form.Item>
-        <Form.Item name="profileImageUrl" label="Profile picture URL">
-          <Input placeholder="https://example.com/avatar.png" maxLength={500} />
-        </Form.Item>
-        {profileImageUploadControl(registerForm)}
-        <div className={styles.notificationBox}>
-          <Text strong>Go-live notifications</Text>
-          <Text type="secondary">
-            Opt in now and admins can use these preferences for future alerts.
-          </Text>
-          {notificationFields(['notificationPreferences'], true)}
-        </div>
-        <div className={styles.formActions}>
-          <Button type="primary" onClick={handleRegister}>
-            Register account
-          </Button>
-        </div>
-      </Form>
-    </div>
-  );
-
-  const loginPanel = (
-    <div className={styles.accountPanel}>
-      {accountHeader}
-      <Form form={loginForm} layout="vertical">
-        <Form.Item
-          name="email"
-          label="Email"
-          rules={[
-            { required: true, message: 'Email is required' },
-            { type: 'email', message: 'Enter a valid email address' },
-          ]}
-        >
-          <Input />
-        </Form.Item>
-        <Form.Item name="password" label="Password" rules={[{ required: true }]}>
-          <Input.Password />
-        </Form.Item>
-        <div className={styles.formActions}>
-          <Button type="primary" onClick={handleLogin}>
-            Log in
-          </Button>
-        </div>
-      </Form>
     </div>
   );
 
@@ -395,7 +299,11 @@ export const AccountModal: FC<AccountModalProps> = ({ closeModal }) => {
         message="Viewer notifications only"
         description="These opt-ins are for go-live alerts. They do not grant Admin or DJ dashboard access."
       />
-      <Form form={notificationForm} layout="vertical" initialValues={defaultNotificationPreferences}>
+      <Form
+        form={notificationForm}
+        layout="vertical"
+        initialValues={defaultNotificationPreferences}
+      >
         {notificationFields()}
         {!isRegistered && (
           <Alert
@@ -414,15 +322,12 @@ export const AccountModal: FC<AccountModalProps> = ({ closeModal }) => {
     </div>
   );
 
-  return (
-    <Tabs
-      defaultActiveKey={isRegistered ? 'profile' : 'register'}
-      items={[
+  const items = isRegistered
+    ? [
         { key: 'profile', label: 'Profile', children: profilePanel },
         { key: 'notifications', label: 'Notifications', children: notificationsPanel },
-        { key: 'register', label: 'Register', children: registerPanel },
-        { key: 'login', label: 'Log in', children: loginPanel },
-      ]}
-    />
-  );
+      ]
+    : [{ key: 'access', label: 'Login', children: accessPanel }];
+
+  return <Tabs defaultActiveKey={isRegistered ? 'profile' : 'access'} items={items} />;
 };

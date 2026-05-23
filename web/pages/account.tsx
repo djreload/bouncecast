@@ -10,7 +10,6 @@ import {
   Input,
   Space,
   Statistic,
-  Tabs,
   Tag,
   Typography,
   Upload,
@@ -18,6 +17,7 @@ import {
 } from 'antd';
 import { AccountPayload, AccountService } from '../services/account-service';
 import { registerWebPushNotifications } from '../services/notifications-service';
+import { BOUNCECAST_AUTH_LOGOUT, getUnauthedData } from '../utils/apis';
 import {
   BounceCastAccountHub,
   BounceCastDestination,
@@ -64,6 +64,19 @@ function roleColor(role: string) {
   if (role === 'moderator') return 'cyan';
   if (role === 'dj') return 'blue';
   return 'default';
+}
+
+function reminderStatusColor(reminder: { disabledAt?: string; lastDeliveryStatus?: string }) {
+  if (reminder.disabledAt) {
+    return 'default';
+  }
+  if (reminder.lastDeliveryStatus === 'sent') {
+    return 'green';
+  }
+  if (reminder.lastDeliveryStatus === 'failed') {
+    return 'red';
+  }
+  return 'blue';
 }
 
 function ScheduleList({
@@ -141,8 +154,6 @@ export default function AccountPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [loginForm] = Form.useForm<AccountPayload>();
-  const [registerForm] = Form.useForm<AccountPayload>();
   const [profileForm] = Form.useForm<AccountPayload>();
   const [notificationForm] = Form.useForm();
 
@@ -161,7 +172,7 @@ export default function AccountPage() {
         profileImageUrl: result.user.profileImageUrl,
       });
       notificationForm.setFieldsValue(result.notificationPreferences);
-    } catch (error) {
+    } catch {
       setHub(null);
       localStorage.removeItem(ACCESS_TOKEN_KEY);
       setToken('');
@@ -173,7 +184,7 @@ export default function AccountPage() {
   useEffect(() => {
     const savedToken = localStorage.getItem(ACCESS_TOKEN_KEY) || '';
     setToken(savedToken);
-    void loadHub(savedToken);
+    loadHub(savedToken);
   }, []);
 
   const applyAccountResponse = async result => {
@@ -183,34 +194,6 @@ export default function AccountPage() {
       setToken(result.accessToken);
     }
     await loadHub(nextToken);
-  };
-
-  const register = async () => {
-    const values = await registerForm.validateFields();
-    setSaving(true);
-    try {
-      const result = await AccountService.register(token, values);
-      await applyAccountResponse(result);
-      message.success('Account registered');
-    } catch (error) {
-      message.error(error instanceof Error ? error.message : 'Unable to register');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const login = async () => {
-    const values = await loginForm.validateFields();
-    setSaving(true);
-    try {
-      const result = await AccountService.login(values);
-      await applyAccountResponse(result);
-      message.success('Logged in');
-    } catch (error) {
-      message.error(error instanceof Error ? error.message : 'Unable to log in');
-    } finally {
-      setSaving(false);
-    }
   };
 
   const saveProfile = async () => {
@@ -262,8 +245,20 @@ export default function AccountPage() {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await getUnauthedData(BOUNCECAST_AUTH_LOGOUT, {
+        method: 'POST',
+        data: {
+          accessToken: token,
+          studioToken: localStorage.getItem('bouncecastStudioToken') || '',
+        },
+      });
+    } catch (error) {
+      console.error(error);
+    }
     localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem('bouncecastStudioToken');
     setToken('');
     setHub(null);
   };
@@ -279,7 +274,7 @@ export default function AccountPage() {
           <nav className={styles.nav} aria-label="Public navigation">
             <Link href="/">Live stream</Link>
             <Link href="/djs">DJ profiles</Link>
-            <Link href="/login">Dashboard login</Link>
+            <Link href="/login">Login</Link>
           </nav>
         </header>
 
@@ -297,87 +292,16 @@ export default function AccountPage() {
 
         {!hub && !loading && (
           <Card className={styles.panel}>
-            <Tabs
-              defaultActiveKey="login"
-              items={[
-                {
-                  key: 'login',
-                  label: 'Log in',
-                  children: (
-                    <Form form={loginForm} layout="vertical">
-                      <Alert
-                        type="info"
-                        showIcon
-                        message="Use your public account email here. Admin and DJ dashboard login stays separate."
-                      />
-                      <Form.Item
-                        name="email"
-                        label="Email"
-                        rules={[
-                          { required: true, message: 'Email is required' },
-                          { type: 'email', message: 'Use a valid email address' },
-                        ]}
-                      >
-                        <Input autoComplete="email" />
-                      </Form.Item>
-                      <Form.Item
-                        name="password"
-                        label="Password"
-                        rules={[{ required: true, message: 'Password is required' }]}
-                      >
-                        <Input.Password autoComplete="current-password" />
-                      </Form.Item>
-                      <Button type="primary" loading={saving} onClick={login}>
-                        Log in
-                      </Button>
-                    </Form>
-                  ),
-                },
-                {
-                  key: 'register',
-                  label: 'Register',
-                  children: (
-                    <Form form={registerForm} layout="vertical">
-                      <Form.Item
-                        name="displayName"
-                        label="Chat username"
-                        rules={[{ required: true, message: 'Choose a chat username' }]}
-                      >
-                        <Input maxLength={30} autoComplete="nickname" />
-                      </Form.Item>
-                      <Form.Item
-                        name="email"
-                        label="Email"
-                        rules={[
-                          { required: true, message: 'Email is required' },
-                          { type: 'email', message: 'Use a valid email address' },
-                        ]}
-                      >
-                        <Input autoComplete="email" />
-                      </Form.Item>
-                      <Form.Item
-                        name="password"
-                        label="Password"
-                        rules={[
-                          { required: true, message: 'Password is required' },
-                          { min: 8, message: 'Use at least 8 characters' },
-                        ]}
-                      >
-                        <Input.Password autoComplete="new-password" />
-                      </Form.Item>
-                      <Form.Item
-                        name={['notificationPreferences', 'email']}
-                        valuePropName="checked"
-                      >
-                        <Checkbox>Email go-live alerts</Checkbox>
-                      </Form.Item>
-                      <Button type="primary" loading={saving} onClick={register}>
-                        Register account
-                      </Button>
-                    </Form>
-                  ),
-                },
-              ]}
+            <Alert
+              type="info"
+              showIcon
+              message="Use the unified BounceCast login"
+              description="One login now covers your chat profile, notifications, Stars wallet, DJ Studio, and admin access when your role allows it."
+              action={
+                <Link href="/login?next=/account">
+                  <Button type="primary">Open login</Button>
+                </Link>
+              }
             />
           </Card>
         )}
@@ -420,7 +344,7 @@ export default function AccountPage() {
                     <Upload
                       accept="image/png,image/jpeg,image/gif"
                       beforeUpload={file => {
-                        void uploadProfileImage(file as File);
+                        uploadProfileImage(file as File);
                         return false;
                       }}
                       maxCount={1}
@@ -475,17 +399,7 @@ export default function AccountPage() {
                             .filter(Boolean)
                             .join(', ') || 'No channels'}
                         </Text>
-                        <Tag
-                          color={
-                            reminder.disabledAt
-                              ? 'default'
-                              : reminder.lastDeliveryStatus === 'sent'
-                                ? 'green'
-                                : reminder.lastDeliveryStatus === 'failed'
-                                  ? 'red'
-                                  : 'blue'
-                          }
-                        >
+                        <Tag color={reminderStatusColor(reminder)}>
                           {reminder.disabledAt
                             ? 'disabled'
                             : reminder.lastDeliveryStatus || 'scheduled'}

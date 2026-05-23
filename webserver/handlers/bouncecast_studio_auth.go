@@ -70,6 +70,9 @@ func BounceCastStudioOptions(w http.ResponseWriter, r *http.Request) {
 // BounceCastStudioLogin verifies a streamer account and issues a scoped Studio bearer session.
 func BounceCastStudioLogin(w http.ResponseWriter, r *http.Request) {
 	setBounceCastStudioAPIHeaders(w)
+	if !enforceBounceCastRateLimit(w, r, bounceCastUnifiedLoginIPRateLimit, bounceCastRateLimitIPSubject(r)) {
+		return
+	}
 
 	var request bounceCastStudioLoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
@@ -81,6 +84,9 @@ func BounceCastStudioLogin(w http.ResponseWriter, r *http.Request) {
 	password := strings.TrimSpace(request.Password)
 	if login == "" || password == "" {
 		writeBounceCastStudioUnauthorized(w)
+		return
+	}
+	if !enforceBounceCastRateLimit(w, r, bounceCastUnifiedLoginIdentityRateLimit, bounceCastRateLimitEmailSubject(login)) {
 		return
 	}
 
@@ -112,6 +118,9 @@ func BounceCastStudioLogin(w http.ResponseWriter, r *http.Request) {
 // BounceCastStudioRegister creates an inactive DJ dashboard account for admin approval.
 func BounceCastStudioRegister(w http.ResponseWriter, r *http.Request) {
 	setBounceCastStudioAPIHeaders(w)
+	if !enforceBounceCastRateLimit(w, r, bounceCastStudioRegisterIPRateLimit, bounceCastRateLimitIPSubject(r)) {
+		return
+	}
 
 	var request bounceCastStudioRegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
@@ -138,6 +147,9 @@ func BounceCastStudioRegister(w http.ResponseWriter, r *http.Request) {
 	parsedEmail, err := mail.ParseAddress(email)
 	if err != nil {
 		webutils.BadRequestHandler(w, errors.New("email must be a valid email address"))
+		return
+	}
+	if !enforceBounceCastRateLimit(w, r, bounceCastStudioRegisterEmailRateLimit, bounceCastRateLimitEmailSubject(parsedEmail.Address)) {
 		return
 	}
 
@@ -387,24 +399,8 @@ func trimBounceCastStudioHandle(handle string, maxLength int) string {
 }
 
 func writeBounceCastStudioSession(w http.ResponseWriter, r *http.Request, streamer bounceCastStudioStreamer) {
-	token, err := utils.GenerateAccessToken()
+	token, expiresAt, err := createBounceCastStudioSession(r, streamer)
 	if err != nil {
-		webutils.InternalErrorHandler(w, err)
-		return
-	}
-	expiresAt := time.Now().UTC().Add(bounceCastStudioSessionDuration)
-	if _, err := data.GetDatabase().Exec(`
-		INSERT INTO bouncecast_streamer_sessions(streamer_id, token_hash, expires_at, user_agent, remote_addr)
-		VALUES(?, ?, ?, NULLIF(?, ''), NULLIF(?, ''))
-	`, streamer.ID, hashBounceCastStudioToken(token), expiresAt, r.UserAgent(), utils.GetIPAddressFromRequest(r)); err != nil {
-		webutils.InternalErrorHandler(w, err)
-		return
-	}
-	if _, err := data.GetDatabase().Exec(`
-		UPDATE bouncecast_streamer_accounts
-		SET last_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?
-	`, streamer.ID); err != nil {
 		webutils.InternalErrorHandler(w, err)
 		return
 	}
@@ -414,6 +410,29 @@ func writeBounceCastStudioSession(w http.ResponseWriter, r *http.Request, stream
 		ExpiresAt: expiresAt,
 		Streamer:  streamer,
 	})
+}
+
+func createBounceCastStudioSession(r *http.Request, streamer bounceCastStudioStreamer) (string, time.Time, error) {
+	token, err := utils.GenerateAccessToken()
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	expiresAt := time.Now().UTC().Add(bounceCastStudioSessionDuration)
+	if _, err := data.GetDatabase().Exec(`
+		INSERT INTO bouncecast_streamer_sessions(streamer_id, token_hash, expires_at, user_agent, remote_addr)
+		VALUES(?, ?, ?, NULLIF(?, ''), NULLIF(?, ''))
+	`, streamer.ID, hashBounceCastStudioToken(token), expiresAt, r.UserAgent(), utils.GetIPAddressFromRequest(r)); err != nil {
+		return "", time.Time{}, err
+	}
+	if _, err := data.GetDatabase().Exec(`
+		UPDATE bouncecast_streamer_accounts
+		SET last_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, streamer.ID); err != nil {
+		return "", time.Time{}, err
+	}
+
+	return token, expiresAt, nil
 }
 
 func authenticateBounceCastStudioRequest(r *http.Request) (bounceCastStudioSession, error) {

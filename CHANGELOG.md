@@ -7,7 +7,28 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 ### Planned
 
 - Continue expanding owner/admin UI hiding and audit coverage across older Owncast-compatible admin pages.
+- Continue reviewing older Owncast-compatible API auth surfaces before changing any Basic-auth behavior.
 - Continue live VPS deployment notes as production configuration changes.
+
+## 2026-05-23
+
+### Added
+
+- Added `docs/auth-unification-audit.md` documenting the existing Owncast admin, BounceCast account, Studio, and chat identity auth flows before unifying the browser login experience.
+- Added `/api/bouncecast/auth/login` as the primary browser login endpoint that can issue the normal account access token, admin session cookies, and Studio bearer token in one successful login.
+- Added `/api/bouncecast/auth/logout` to clear BounceCast admin cookies and revoke supplied account/Studio tokens from the unified UI.
+
+### Changed
+
+- Changed `/admin/*` browser requests to redirect unauthenticated users to `/login?next=...` while keeping `/api/admin/*` Owncast-compatible Basic auth behavior intact.
+- Changed `/login` into the single visible BounceCast access page for admins, DJs, moderators, and viewers, with account creation and DJ access requests as secondary actions on that same page.
+- Changed `/account`, `/studio`, the public user menu, and admin logout controls to hand off to the unified login/logout flow instead of keeping separate login forms.
+- Changed Account Hub role destination links to open the actual admin or Studio area once the unified login has issued the correct session.
+
+### Security
+
+- Added rate limiting to the unified login path and added rate limiting to the older admin and Studio login/register endpoints.
+- Preserved the original Owncast `admin` credentials as owner-level BounceCast access without exposing passwords or changing existing API clients.
 
 ## 2026-05-19
 

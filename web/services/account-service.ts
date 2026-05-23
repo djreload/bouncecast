@@ -1,10 +1,10 @@
 import {
-  BOUNCECAST_ACCOUNT_LOGIN,
   BOUNCECAST_ACCOUNT_ME,
   BOUNCECAST_ACCOUNT_NOTIFICATIONS,
   BOUNCECAST_ACCOUNT_PROFILE,
   BOUNCECAST_ACCOUNT_PROFILE_IMAGE,
   BOUNCECAST_ACCOUNT_REGISTER,
+  BOUNCECAST_AUTH_LOGIN,
   getUnauthedData,
   postUnauthedFormData,
 } from '../utils/apis';
@@ -42,7 +42,7 @@ export class AccountService {
   }
 
   public static async login(payload: AccountPayload) {
-    return getUnauthedData(BOUNCECAST_ACCOUNT_LOGIN, {
+    return getUnauthedData(BOUNCECAST_AUTH_LOGIN, {
       method: 'POST',
       data: payload,
     });
@@ -62,7 +62,10 @@ export class AccountService {
   public static async uploadProfileImage(accessToken: string, file: File) {
     const data = new FormData();
     data.append('image', file);
-    return postUnauthedFormData(withAccessToken(BOUNCECAST_ACCOUNT_PROFILE_IMAGE, accessToken), data);
+    return postUnauthedFormData(
+      withAccessToken(BOUNCECAST_ACCOUNT_PROFILE_IMAGE, accessToken),
+      data,
+    );
   }
 
   public static async updateNotifications(

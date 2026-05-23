@@ -12,25 +12,25 @@ import {
   Space,
   Statistic,
   Table,
-  Tabs,
   Tag,
   Typography,
   message,
 } from 'antd';
 import {
+  BOUNCECAST_AUTH_LOGOUT,
   BOUNCECAST_STUDIO_LIVE_EVENTS,
-  BOUNCECAST_STUDIO_LOGIN,
   BOUNCECAST_STUDIO_LOGOUT,
   BOUNCECAST_STUDIO_ME,
   BOUNCECAST_STUDIO_PROFILE,
-  BOUNCECAST_STUDIO_REGISTER,
   BOUNCECAST_STUDIO_SCHEDULE,
   BOUNCECAST_STUDIO_SCHEDULE_CANCEL,
   BOUNCECAST_STUDIO_SCHEDULE_UPDATE,
   BOUNCECAST_STUDIO_STREAM_KEYS,
   BOUNCECAST_STUDIO_STREAM_KEY_REVOKE,
   fetchStudioData,
+  getUnauthedData,
 } from '../utils/apis';
+import { ACCESS_TOKEN_KEY } from '../components/stores/ClientConfigStore';
 
 const CalendarOutlined = dynamic(() => import('@ant-design/icons/CalendarOutlined'), {
   ssr: false,
@@ -169,9 +169,6 @@ export default function Studio() {
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<ScheduleItem | null>(null);
   const [newStreamKey, setNewStreamKey] = useState('');
-  const [registrationSubmitted, setRegistrationSubmitted] = useState(false);
-  const [loginForm] = Form.useForm();
-  const [registerForm] = Form.useForm();
   const [keyForm] = Form.useForm();
   const [profileForm] = Form.useForm();
   const [scheduleForm] = Form.useForm<ScheduleFormValues>();
@@ -212,43 +209,8 @@ export default function Studio() {
       return;
     }
     setLoading(false);
+    window.location.replace('/login?next=/studio');
   }, []);
-
-  const login = async () => {
-    const values = await loginForm.validateFields();
-    setSaving(true);
-    try {
-      const result = await fetchStudioData(BOUNCECAST_STUDIO_LOGIN, undefined, {
-        method: 'POST',
-        data: values,
-      });
-      localStorage.setItem(studioTokenStorageKey, result.token);
-      await loadStudio(result.token);
-      loginForm.resetFields();
-    } catch (error) {
-      message.error(error instanceof Error ? error.message : 'Unable to log in');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const register = async () => {
-    const values = await registerForm.validateFields();
-    setSaving(true);
-    try {
-      const result = await fetchStudioData(BOUNCECAST_STUDIO_REGISTER, undefined, {
-        method: 'POST',
-        data: values,
-      });
-      registerForm.resetFields();
-      setRegistrationSubmitted(true);
-      message.success(result.message || 'Registration received');
-    } catch (error) {
-      message.error(error instanceof Error ? error.message : 'Unable to register');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const logout = async () => {
     if (token) {
@@ -258,6 +220,18 @@ export default function Studio() {
         console.error(error);
       }
     }
+    try {
+      await getUnauthedData(BOUNCECAST_AUTH_LOGOUT, {
+        method: 'POST',
+        data: {
+          accessToken: localStorage.getItem(ACCESS_TOKEN_KEY) || '',
+          studioToken: token,
+        },
+      });
+    } catch (error) {
+      console.error(error);
+    }
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(studioTokenStorageKey);
     setToken('');
     setSession(null);
@@ -438,106 +412,34 @@ export default function Studio() {
             <div className="studio-brand-lockup">
               <img src="/logo" alt="BounceCast" />
               <div>
-                <p className="studio-brand-title">Studio login</p>
-                <Text className="studio-brand-subtitle">BounceCast DJ dashboard</Text>
+                <p className="studio-brand-title">Studio access</p>
+                <Text className="studio-brand-subtitle">Use the unified BounceCast login</Text>
               </div>
             </div>
             <Card className="studio-login-card">
-              {registrationSubmitted && (
-                <Alert
-                  className="studio-register-alert"
-                  type="info"
-                  showIcon
-                  message="Registration pending"
-                  description="Your DJ account is inactive until an admin activates it."
-                />
-              )}
-              <Tabs
-                defaultActiveKey="login"
-                items={[
-                  {
-                    key: 'login',
-                    label: 'Log in',
-                    children: (
-                      <Form form={loginForm} layout="vertical">
-                        <Form.Item
-                          name="login"
-                          label="Handle or email"
-                          rules={[{ required: true, message: 'Enter your handle or email' }]}
-                        >
-                          <Input autoComplete="username" placeholder="@dj-name" />
-                        </Form.Item>
-                        <Form.Item
-                          name="password"
-                          label="Password"
-                          rules={[{ required: true, message: 'Enter your password' }]}
-                        >
-                          <Input.Password autoComplete="current-password" />
-                        </Form.Item>
-                        <Button type="primary" block loading={saving} onClick={login}>
-                          Log in
-                        </Button>
-                      </Form>
-                    ),
-                  },
-                  {
-                    key: 'register',
-                    label: 'Register',
-                    children: (
-                      <Form form={registerForm} layout="vertical">
-                        <Form.Item
-                          name="displayName"
-                          label="DJ name"
-                          rules={[{ required: true, message: 'Add your DJ name' }]}
-                        >
-                          <Input maxLength={80} autoComplete="name" placeholder="DJ name" />
-                        </Form.Item>
-                        <Form.Item
-                          name="handle"
-                          label="Handle"
-                          rules={[{ required: true, message: 'Choose a handle' }]}
-                        >
-                          <Input
-                            maxLength={32}
-                            autoComplete="username"
-                            placeholder="dj-name"
-                            prefix="@"
-                          />
-                        </Form.Item>
-                        <Form.Item
-                          name="email"
-                          label="Email"
-                          rules={[
-                            { required: true, message: 'Add your email' },
-                            { type: 'email', message: 'Use a valid email address' },
-                          ]}
-                        >
-                          <Input autoComplete="email" placeholder="dj@example.com" />
-                        </Form.Item>
-                        <Form.Item
-                          name="password"
-                          label="Password"
-                          rules={[
-                            { required: true, message: 'Choose a password' },
-                            { min: 8, message: 'Use at least 8 characters' },
-                          ]}
-                        >
-                          <Input.Password autoComplete="new-password" />
-                        </Form.Item>
-                        <Button
-                          type="primary"
-                          block
-                          icon={<UserAddOutlined />}
-                          loading={saving}
-                          onClick={register}
-                        >
-                          Request DJ access
-                        </Button>
-                      </Form>
-                    ),
-                  },
-                ]}
+              <Alert
+                className="studio-register-alert"
+                type="info"
+                showIcon
+                message="One login for every role"
+                description="DJ Studio now uses the same BounceCast session as chat, account, Stars, and admin access. Log in with an active DJ account, or request DJ access from the unified login page."
               />
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <Button
+                  type="primary"
+                  block
+                  onClick={() => window.location.assign('/login?next=/studio')}
+                >
+                  Log in to Studio
+                </Button>
+                <Button
+                  block
+                  icon={<UserAddOutlined />}
+                  onClick={() => window.location.assign('/login?mode=dj-register&next=/studio')}
+                >
+                  Request DJ access
+                </Button>
+              </Space>
             </Card>
           </section>
         </div>

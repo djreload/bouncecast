@@ -7,7 +7,7 @@ import { Layout, Menu, Alert, Button, Space, Tooltip } from 'antd';
 
 import classNames from 'classnames';
 import dynamic from 'next/dynamic';
-import { upgradeVersionAvailable } from '../../utils/apis';
+import { BOUNCECAST_AUTH_LOGOUT, getUnauthedData, upgradeVersionAvailable } from '../../utils/apis';
 import { parseSecondsToDurationString } from '../../utils/format';
 
 import { OwncastLogo } from '../common/OwncastLogo/OwncastLogo';
@@ -71,6 +71,10 @@ const EditOutlined = dynamic(() => import('@ant-design/icons/EditOutlined'), {
 });
 
 const DownloadOutlined = dynamic(() => import('@ant-design/icons/DownloadOutlined'), {
+  ssr: false,
+});
+
+const LogoutOutlined = dynamic(() => import('@ant-design/icons/LogoutOutlined'), {
   ssr: false,
 });
 
@@ -141,6 +145,23 @@ export const MainLayout: FC<MainLayoutProps> = ({ children }) => {
     alertMessage.setMessage(null);
   };
 
+  const handleUnifiedLogout = async () => {
+    try {
+      await getUnauthedData(BOUNCECAST_AUTH_LOGOUT, {
+        method: 'POST',
+        data: {
+          accessToken: window.localStorage?.getItem('accessToken') || '',
+          studioToken: window.localStorage?.getItem('bouncecastStudioToken') || '',
+        },
+      });
+    } catch (error) {
+      console.error(error);
+    }
+    window.localStorage?.removeItem('accessToken');
+    window.localStorage?.removeItem('bouncecastStudioToken');
+    window.location.assign('/login');
+  };
+
   const headerAlertMessage = alertMessage.message ? (
     <Alert message={alertMessage.message} afterClose={clearAlertMessage} banner closable />
   ) : null;
@@ -162,7 +183,9 @@ export const MainLayout: FC<MainLayoutProps> = ({ children }) => {
 
   const integrationsMenu = [
     {
-      label: <Link href="/admin/integrations/facebook-messenger-alerts">Facebook Messenger Alerts</Link>,
+      label: (
+        <Link href="/admin/integrations/facebook-messenger-alerts">Facebook Messenger Alerts</Link>
+      ),
       key: '/admin/integrations/facebook-messenger-alerts',
     },
     {
@@ -389,6 +412,16 @@ export const MainLayout: FC<MainLayoutProps> = ({ children }) => {
                 style={{ display: federationEnabled ? 'block' : 'none', margin: '10px' }}
               >
                 Compose Post
+              </Button>
+            </Tooltip>
+            <Tooltip title="Log out of BounceCast">
+              <Button
+                type="link"
+                icon={<LogoutOutlined />}
+                size="small"
+                onClick={handleUnifiedLogout}
+              >
+                Log out
               </Button>
             </Tooltip>
           </Space>

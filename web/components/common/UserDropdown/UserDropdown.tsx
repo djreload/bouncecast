@@ -166,8 +166,14 @@ export const UserDropdown: FC<UserDropdownProps> = ({
     {
       key: 0,
       icon: <UserOutlined />,
-      label: currentUser.email ? 'Profile' : 'Register / log in',
-      onClick: () => setShowAccountModal(true),
+      label: currentUser.email ? 'Profile' : 'Log in / register',
+      onClick: () => {
+        if (currentUser.email) {
+          setShowAccountModal(true);
+          return;
+        }
+        window.location.href = '/login?next=/account';
+      },
     },
     {
       key: 1,
@@ -188,7 +194,7 @@ export const UserDropdown: FC<UserDropdownProps> = ({
     {
       key: 3,
       icon: <DashboardOutlined />,
-      label: 'Dashboard login',
+      label: 'Login',
       onClick: () => {
         window.location.href = '/login';
       },
@@ -257,7 +263,7 @@ export const UserDropdown: FC<UserDropdownProps> = ({
                 hideTitleOnMobile && styles.hideTitleOnMobile,
               ])}
             >
-              {currentUser.email ? username : 'Register / Login'}
+              {currentUser.email ? username : 'Login'}
             </span>
             <CaretDownOutlined />
           </Button>

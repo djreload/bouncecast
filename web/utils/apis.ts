@@ -212,6 +212,10 @@ export const BOUNCECAST_STUDIO_PROFILE = `${STUDIO_API_LOCATION}profile`;
 
 export const BOUNCECAST_ADMIN_LOGIN = `${NEXT_PUBLIC_API_HOST}api/bouncecast/admin/login`;
 
+export const BOUNCECAST_AUTH_LOGIN = `${NEXT_PUBLIC_API_HOST}api/bouncecast/auth/login`;
+
+export const BOUNCECAST_AUTH_LOGOUT = `${NEXT_PUBLIC_API_HOST}api/bouncecast/auth/logout`;
+
 const ACCOUNT_API_LOCATION = `${NEXT_PUBLIC_API_HOST}api/bouncecast/account/`;
 
 export const BOUNCECAST_ACCOUNT_REGISTER = `${ACCOUNT_API_LOCATION}register`;

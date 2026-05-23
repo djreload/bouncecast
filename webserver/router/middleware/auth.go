@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -71,6 +72,29 @@ func RequireAdminAuth(handler http.HandlerFunc) http.HandlerFunc {
 			w.Header().Set("WWW-Authenticate", `Basic realm="`+realm+`"`)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			log.Debugln("Failed admin authentication")
+			return
+		}
+
+		handler(w, r)
+	}
+}
+
+// RequireAdminPageAuth protects the browser admin app without forcing the
+// browser's Basic Auth dialog. API routes still use RequireAdminAuth so
+// Owncast-compatible clients can continue using Basic auth.
+func RequireAdminPageAuth(handler http.HandlerFunc) http.HandlerFunc {
+	configRepository := configrepository.Get()
+	return func(w http.ResponseWriter, r *http.Request) {
+		username := "admin"
+		password := configRepository.GetAdminPassword()
+
+		if !isValidAdminBasicAuth(r, username, password) && !isValidAdminSessionCookie(r, password) {
+			next := r.URL.RequestURI()
+			if !strings.HasPrefix(next, "/") || strings.HasPrefix(next, "//") {
+				next = "/admin/"
+			}
+			http.Redirect(w, r, "/login?next="+url.QueryEscape(next), http.StatusFound)
+			log.Debugln("Redirecting unauthenticated admin page request to unified login")
 			return
 		}
 
@@ -160,6 +184,21 @@ func SetAdminSessionCookie(w http.ResponseWriter, r *http.Request) {
 
 func SetAdminRoleSessionCookie(w http.ResponseWriter, r *http.Request, userID string, role string) {
 	setAdminSessionCookie(w, r, userID, role)
+}
+
+func ClearAdminSessionCookies(w http.ResponseWriter, r *http.Request) {
+	for _, name := range []string{AdminSessionCookieName, AdminIdentityCookieName} {
+		http.SetCookie(w, &http.Cookie{
+			Name:     name,
+			Value:    "",
+			Path:     "/",
+			Expires:  time.Unix(0, 0),
+			MaxAge:   -1,
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+			Secure:   r.TLS != nil,
+		})
+	}
 }
 
 func setAdminSessionCookie(w http.ResponseWriter, r *http.Request, userID string, role string) {

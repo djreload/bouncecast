@@ -47,7 +47,11 @@ func Start(enableVerboseLogging bool) error {
 	r.HandleFunc("/hls/*", handlers.HandleHLSRequest)
 
 	// The admin web app.
-	r.HandleFunc("/admin/*", middleware.RequireAdminAuth(handlers.IndexHandler))
+	r.Get("/admin/login", handlers.BounceCastUnifiedLoginRedirect)
+	r.Get("/admin/login/", handlers.BounceCastUnifiedLoginRedirect)
+	r.Get("/studio/login", handlers.BounceCastUnifiedLoginRedirect)
+	r.Get("/studio/login/", handlers.BounceCastUnifiedLoginRedirect)
+	r.HandleFunc("/admin/*", middleware.RequireAdminPageAuth(handlers.IndexHandler))
 
 	// BounceCast Studio admin APIs. These are kept separate from the generated
 	// Owncast-compatible API while the multi-streamer surface is still growing.
@@ -114,6 +118,11 @@ func Start(enableVerboseLogging bool) error {
 	r.Post("/api/admin/config/chat/backgroundopacity", middleware.RequireAdminAuth(adminhandlers.SetChatBackgroundOpacity))
 	r.Options("/api/admin/config/chat/tenorapikey", middleware.RequireAdminAuth(adminhandlers.SetChatTenorAPIKey))
 	r.Post("/api/admin/config/chat/tenorapikey", middleware.RequireAdminAuth(adminhandlers.SetChatTenorAPIKey))
+
+	r.Options("/api/bouncecast/auth/login", handlers.BounceCastUnifiedAuthOptions)
+	r.Post("/api/bouncecast/auth/login", handlers.BounceCastUnifiedLogin)
+	r.Options("/api/bouncecast/auth/logout", handlers.BounceCastUnifiedAuthOptions)
+	r.Post("/api/bouncecast/auth/logout", handlers.BounceCastUnifiedLogout)
 
 	// BounceCast Studio DJ dashboard auth. This is additive and does not replace
 	// the existing Owncast admin authentication path.

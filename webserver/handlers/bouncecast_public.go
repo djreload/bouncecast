@@ -638,28 +638,7 @@ func queryBounceCastAccountReminderStatuses(userID string) ([]bounceCastAccountR
 }
 
 func bounceCastPermissionsFromUserScopes(scopes []string) []string {
-	scopeMap := map[string]bool{}
-	for _, scope := range scopes {
-		scopeMap[scope] = true
-	}
-
-	permissions := []string{}
-	if scopeMap[models.BounceCastOwnerScopeKey] {
-		permissions = append(permissions, "owner")
-	}
-	if scopeMap[models.BounceCastAdminScopeKey] {
-		permissions = append(permissions, "admin")
-	}
-	if scopeMap[models.ModeratorScopeKey] {
-		permissions = append(permissions, "moderator")
-	}
-	if scopeMap[models.BounceCastDJScopeKey] {
-		permissions = append(permissions, "dj")
-	}
-	if len(permissions) == 0 {
-		return []string{"visitor"}
-	}
-	return permissions
+	return bounceCastPermissionsFromScopes(scopes)
 }
 
 func bounceCastAccountDestinations(user models.User) []bounceCastAccountDestination {
@@ -673,14 +652,14 @@ func bounceCastAccountDestinations(user models.User) []bounceCastAccountDestinat
 		{
 			Key:       "admin",
 			Label:     "Admin control panel",
-			URL:       "/login",
+			URL:       "/admin/",
 			Available: user.IsOwner() || user.IsAdmin(),
 			Reason:    "Requires owner or admin permission.",
 		},
 		{
 			Key:       "studio",
 			Label:     "DJ Studio dashboard",
-			URL:       "/login",
+			URL:       "/studio",
 			Available: user.IsDJ(),
 			Reason:    "Requires DJ permission and an active Studio account.",
 		},

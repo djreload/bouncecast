@@ -185,7 +185,7 @@ export default function DJsPage() {
           <nav className={styles.nav} aria-label="Public navigation">
             <Link href="/">Live stream</Link>
             <Link href="/account">Account Hub</Link>
-            <Link href="/login">Dashboard login</Link>
+            <Link href="/login">Login</Link>
           </nav>
         </header>
 

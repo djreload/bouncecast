@@ -34,6 +34,10 @@ var (
 	bounceCastAccountLoginEmailRateLimit    = bounceCastRateLimitRule{Name: "account-login-email", MaxRequests: 8, Window: 10 * time.Minute, Message: "Too many login attempts for this account. Please wait before trying again."}
 	bounceCastAccountProfileRateLimit       = bounceCastRateLimitRule{Name: "account-profile", MaxRequests: 20, Window: time.Hour, Message: "Too many profile updates. Please wait before trying again."}
 	bounceCastAccountProfileImageRateLimit  = bounceCastRateLimitRule{Name: "account-profile-image", MaxRequests: 10, Window: time.Hour, Message: "Too many profile image uploads. Please wait before trying again."}
+	bounceCastUnifiedLoginIPRateLimit       = bounceCastRateLimitRule{Name: "unified-login-ip", MaxRequests: 20, Window: 10 * time.Minute, Message: "Too many login attempts. Please wait before trying again."}
+	bounceCastUnifiedLoginIdentityRateLimit = bounceCastRateLimitRule{Name: "unified-login-identity", MaxRequests: 8, Window: 10 * time.Minute, Message: "Too many login attempts for this account. Please wait before trying again."}
+	bounceCastStudioRegisterIPRateLimit     = bounceCastRateLimitRule{Name: "studio-register-ip", MaxRequests: 8, Window: 15 * time.Minute, Message: "Too many DJ registration attempts. Please wait before trying again."}
+	bounceCastStudioRegisterEmailRateLimit  = bounceCastRateLimitRule{Name: "studio-register-email", MaxRequests: 4, Window: time.Hour, Message: "Too many DJ registration attempts for this email. Please wait before trying again."}
 	bounceCastStarsCheckoutRateLimit        = bounceCastRateLimitRule{Name: "stars-checkout", MaxRequests: 12, Window: 10 * time.Minute, Message: "Too many Stars checkout attempts. Please wait before trying again."}
 	bounceCastStarsCaptureRateLimit         = bounceCastRateLimitRule{Name: "stars-capture", MaxRequests: 20, Window: 10 * time.Minute, Message: "Too many Stars payment confirmations. Please wait before trying again."}
 	bounceCastStarsSendRateLimit            = bounceCastRateLimitRule{Name: "stars-send", MaxRequests: 10, Window: time.Minute, Message: "Too many Stars sends. Please wait before trying again."}

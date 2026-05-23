@@ -23,6 +23,9 @@ func BounceCastAdminLogin(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
+	if !enforceBounceCastRateLimit(w, r, bounceCastUnifiedLoginIPRateLimit, bounceCastRateLimitIPSubject(r)) {
+		return
+	}
 
 	var request bounceCastAdminLoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
@@ -32,6 +35,9 @@ func BounceCastAdminLogin(w http.ResponseWriter, r *http.Request) {
 
 	username := strings.TrimSpace(request.Username)
 	password := strings.TrimSpace(request.Password)
+	if !enforceBounceCastRateLimit(w, r, bounceCastUnifiedLoginIdentityRateLimit, bounceCastRateLimitEmailSubject(username)) {
+		return
+	}
 	if middleware.CheckAdminCredentials(username, password) {
 		middleware.SetAdminSessionCookie(w, r)
 		webutils.WriteResponse(w, webutils.J{
