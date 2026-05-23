@@ -140,10 +140,11 @@ type BounceCastMessengerSettings struct {
 }
 
 type BounceCastAdminSessionInfo struct {
-	UserID string `json:"userId"`
-	Role   string `json:"role"`
-	Owner  bool   `json:"owner"`
-	Admin  bool   `json:"admin"`
+	UserID      string   `json:"userId"`
+	Role        string   `json:"role"`
+	Owner       bool     `json:"owner"`
+	Admin       bool     `json:"admin"`
+	Permissions []string `json:"permissions"`
 }
 
 type BounceCastScheduleReminderAdminItem struct {
@@ -1238,11 +1239,23 @@ func GetBounceCastAdminSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	webutils.WriteResponse(w, BounceCastAdminSessionInfo{
-		UserID: identity.UserID,
-		Role:   identity.Role,
-		Owner:  identity.Role == "owner",
-		Admin:  identity.Role == "admin" || identity.Role == "owner",
+		UserID:      identity.UserID,
+		Role:        identity.Role,
+		Owner:       identity.Role == middleware.AdminRoleOwner,
+		Admin:       identity.Role == middleware.AdminRoleAdmin || identity.Role == middleware.AdminRoleOwner,
+		Permissions: bounceCastAdminSessionPermissions(identity.Role),
 	})
+}
+
+func bounceCastAdminSessionPermissions(role string) []string {
+	switch role {
+	case middleware.AdminRoleOwner:
+		return []string{middleware.AdminRoleOwner, middleware.AdminRoleAdmin}
+	case middleware.AdminRoleAdmin:
+		return []string{middleware.AdminRoleAdmin}
+	default:
+		return []string{}
+	}
 }
 
 // GetBounceCastMessengerSettings returns Messenger transport configuration

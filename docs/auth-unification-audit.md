@@ -89,10 +89,28 @@ The original Owncast admin password is mapped to the `owncast-admin` account
 identity with owner-level access and the compatibility scopes needed to use the
 site as a full operator.
 
+## Role Hardening Added After Unification
+
+- Signed BounceCast admin cookies are now rechecked against the stored account
+  role on each admin API request. If an admin account is disabled or its admin
+  scope is removed, existing cookies stop authorizing protected admin APIs.
+- Older generated Owncast-compatible admin handlers now use role-aware wrappers:
+  - owner/admin for day-to-day stream, chat, viewer, logs, schedule, streamer,
+    and moderation operations;
+  - owner-only for secrets, integrations, access tokens, webhooks, upgrade
+    actions, admin password changes, stream keys, custom JavaScript, external
+    actions, server binding/storage settings, notification secrets, and similar
+    high-risk configuration.
+- The admin sidebar reads `/api/admin/bouncecast/session` and hides owner-only
+  sections from non-owner admin sessions.
+
 ## Follow-Up Risks
 
-- Some older Owncast-compatible admin API handlers still rely on Basic auth by
-  design. Do not remove that without an API compatibility plan.
+- Some older Owncast-compatible admin API handlers still rely on Basic auth as
+  an owner-level compatibility path. Do not remove that without an API
+  compatibility plan.
+- Moderator-specific admin pages are still not exposed; moderator chat actions
+  continue to use the existing Owncast moderation token flow.
 - Studio still uses a bearer token internally because the existing Studio API is
   built around that model. The unified login now issues it automatically where
   permitted.

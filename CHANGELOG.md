@@ -6,8 +6,8 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 
 ### Planned
 
-- Continue expanding owner/admin UI hiding and audit coverage across older Owncast-compatible admin pages.
-- Continue reviewing older Owncast-compatible API auth surfaces before changing any Basic-auth behavior.
+- Continue expanding audit records around older Owncast-compatible admin actions.
+- Continue reviewing moderator-specific admin surfaces before exposing moderator dashboard pages.
 - Continue live VPS deployment notes as production configuration changes.
 
 ## 2026-05-23
@@ -24,11 +24,14 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 - Changed `/login` into the single visible BounceCast access page for admins, DJs, moderators, and viewers, with account creation and DJ access requests as secondary actions on that same page.
 - Changed `/account`, `/studio`, the public user menu, and admin logout controls to hand off to the unified login/logout flow instead of keeping separate login forms.
 - Changed Account Hub role destination links to open the actual admin or Studio area once the unified login has issued the correct session.
+- Changed older Owncast-compatible admin/config handlers to use owner/admin role guards, with owner-only protection for sensitive surfaces such as access tokens, webhooks, upgrade actions, admin password, stream keys, server binding/storage settings, custom JavaScript, external actions, and notification secrets.
+- Changed the admin sidebar to hide owner-only pages from non-owner admin sessions.
 
 ### Security
 
 - Added rate limiting to the unified login path and added rate limiting to the older admin and Studio login/register endpoints.
 - Preserved the original Owncast `admin` credentials as owner-level BounceCast access without exposing passwords or changing existing API clients.
+- Added current stored-account role validation for signed BounceCast admin cookies so removed/disabled admin users lose admin API access instead of keeping stale cookie privileges until expiry.
 
 ## 2026-05-19
 

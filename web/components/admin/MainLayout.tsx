@@ -4,10 +4,17 @@ import Head from 'next/head';
 import { differenceInSeconds } from 'date-fns';
 import { useRouter } from 'next/router';
 import { Layout, Menu, Alert, Button, Space, Tooltip } from 'antd';
+import type { MenuProps } from 'antd';
 
 import classNames from 'classnames';
 import dynamic from 'next/dynamic';
-import { BOUNCECAST_AUTH_LOGOUT, getUnauthedData, upgradeVersionAvailable } from '../../utils/apis';
+import {
+  BOUNCECAST_ADMIN_SESSION,
+  BOUNCECAST_AUTH_LOGOUT,
+  fetchData,
+  getUnauthedData,
+  upgradeVersionAvailable,
+} from '../../utils/apis';
 import { parseSecondsToDurationString } from '../../utils/format';
 
 import { OwncastLogo } from '../common/OwncastLogo/OwncastLogo';
@@ -86,6 +93,19 @@ export type MainLayoutProps = {
   children: ReactNode;
 };
 
+type AdminSession = {
+  role?: string;
+  owner?: boolean;
+  admin?: boolean;
+  permissions?: string[];
+};
+
+type MenuItem = Required<MenuProps>['items'][number];
+
+function compactMenuItems(items: Array<MenuItem | false | null | undefined>): MenuItem[] {
+  return items.filter(Boolean) as MenuItem[];
+}
+
 export const MainLayout: FC<MainLayoutProps> = ({ children }) => {
   const context = useContext(ServerStatusContext);
   const { serverConfig, online, broadcaster, versionNumber, error: serverError } = context || {};
@@ -94,6 +114,7 @@ export const MainLayout: FC<MainLayoutProps> = ({ children }) => {
 
   const [currentStreamTitle, setCurrentStreamTitle] = useState('');
   const [postModalDisplayed, setPostModalDisplayed] = useState(false);
+  const [adminSession, setAdminSession] = useState<AdminSession | null>(null);
 
   const alertMessage = useContext(AlertMessageContext);
 
@@ -118,6 +139,20 @@ export const MainLayout: FC<MainLayoutProps> = ({ children }) => {
   useEffect(() => {
     checkForUpgrade();
   }, [versionNumber]);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchData(BOUNCECAST_ADMIN_SESSION)
+      .then(result => {
+        if (mounted) setAdminSession(result || null);
+      })
+      .catch(() => {
+        if (mounted) setAdminSession(null);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     setCurrentStreamTitle(instanceDetails.streamTitle);
@@ -181,28 +216,30 @@ export const MainLayout: FC<MainLayoutProps> = ({ children }) => {
     </div>
   );
 
-  const integrationsMenu = [
-    {
+  const isOwner = Boolean(adminSession?.owner);
+
+  const integrationsMenu = compactMenuItems([
+    isOwner && {
       label: (
         <Link href="/admin/integrations/facebook-messenger-alerts">Facebook Messenger Alerts</Link>
       ),
       key: '/admin/integrations/facebook-messenger-alerts',
     },
-    {
+    isOwner && {
       label: <Link href="/admin/webhooks">Webhooks</Link>,
       key: '/admin/webhooks',
     },
-    {
+    isOwner && {
       label: <Link href="/admin/access-tokens">Access Tokens</Link>,
       key: '/admin/access-tokens',
     },
-    {
+    isOwner && {
       label: <Link href="/admin/actions">External Actions</Link>,
       key: '/admin/actions',
     },
-  ];
+  ]);
 
-  const chatMenu = [
+  const chatMenu = compactMenuItems([
     {
       label: <Link href="/admin/chat/messages">Messages</Link>,
       key: '/admin/chat/messages',
@@ -215,10 +252,10 @@ export const MainLayout: FC<MainLayoutProps> = ({ children }) => {
       label: <Link href="/admin/chat/emojis">Emojis</Link>,
       key: '/admin/chat/emojis',
     },
-  ];
+  ]);
 
-  const studioMenu = [
-    {
+  const studioMenu = compactMenuItems([
+    isOwner && {
       label: <Link href="/admin/accounts">Accounts</Link>,
       key: '/admin/accounts',
     },
@@ -230,13 +267,13 @@ export const MainLayout: FC<MainLayoutProps> = ({ children }) => {
       label: <Link href="/admin/schedule">Schedule</Link>,
       key: '/admin/schedule',
     },
-    {
+    isOwner && {
       label: <Link href="/admin/stars">Stars</Link>,
       key: '/admin/stars',
     },
-  ];
+  ]);
 
-  const utilitiesMenu = [
+  const utilitiesMenu = compactMenuItems([
     {
       label: <Link href="/admin/hardware-info">Hardware</Link>,
       key: '/admin/hardware-info',
@@ -253,14 +290,14 @@ export const MainLayout: FC<MainLayoutProps> = ({ children }) => {
       label: <Link href="/admin/federation/actions">Social Actions</Link>,
       key: '/admin/federation/actions',
     },
-  ];
+  ]);
 
-  const configurationMenu = [
+  const configurationMenu = compactMenuItems([
     {
       label: <Link href="/admin/config/general">General</Link>,
       key: '/admin/config/general',
     },
-    {
+    isOwner && {
       label: <Link href="/admin/config/server">Server Setup</Link>,
       key: '/admin/config/server',
     },
@@ -272,17 +309,17 @@ export const MainLayout: FC<MainLayoutProps> = ({ children }) => {
       label: <Link href="/admin/config-chat">Chat</Link>,
       key: '/admin/config-chat',
     },
-    {
+    isOwner && {
       label: <Link href="/admin/config-federation">Social</Link>,
       key: '/admin/config-federation',
     },
-    {
+    isOwner && {
       label: <Link href="/admin/config-notify">Notifications</Link>,
       key: '/admin/config-notify',
     },
-  ];
+  ]);
 
-  const menuItems = [
+  const menuItems = compactMenuItems([
     { label: <Link href="/admin">Home</Link>, icon: <HomeOutlined />, key: '/admin' },
     {
       label: <Link href="/admin/viewer-info">Viewers</Link>,
@@ -328,31 +365,33 @@ export const MainLayout: FC<MainLayoutProps> = ({ children }) => {
       icon: <ToolOutlined />,
       children: utilitiesMenu,
     },
-    {
+    isOwner && {
       key: 'integrations',
       label: 'Integrations',
       icon: <ExperimentOutlined />,
       children: integrationsMenu,
     },
-    upgradeVersion && {
-      type: 'divider',
-      key: 'upgrade-divider',
-    },
-    upgradeVersion && {
-      key: '/admin/upgrade',
-      label: (
-        <Link href="/admin/upgrade">
-          <strong>{upgradeMessage}</strong>
-        </Link>
-      ),
-      icon: <DownloadOutlined />,
-    },
+    isOwner &&
+      upgradeVersion && {
+        type: 'divider',
+        key: 'upgrade-divider',
+      },
+    isOwner &&
+      upgradeVersion && {
+        key: '/admin/upgrade',
+        label: (
+          <Link href="/admin/upgrade">
+            <strong>{upgradeMessage}</strong>
+          </Link>
+        ),
+        icon: <DownloadOutlined />,
+      },
     {
       key: '/admin/help',
       label: <Link href="/admin/help">Help</Link>,
       icon: <QuestionCircleOutlined />,
     },
-  ];
+  ]);
 
   const [openKeys, setOpenKeys] = useState(openMenuItems);
 
@@ -361,11 +400,14 @@ export const MainLayout: FC<MainLayoutProps> = ({ children }) => {
   };
 
   useEffect(() => {
-    menuItems.forEach(item =>
-      item?.children?.forEach(child => {
-        if (child?.key === route) setOpenKeys([...openMenuItems, item.key]);
-      }),
-    );
+    menuItems.forEach(item => {
+      if (!item || !('children' in item) || !item.children) {
+        return;
+      }
+      item.children.forEach(child => {
+        if (child?.key === route) setOpenKeys([...openMenuItems, `${item.key}`]);
+      });
+    });
   }, []);
 
   return (

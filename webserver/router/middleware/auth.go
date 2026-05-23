@@ -25,6 +25,9 @@ import (
 const AdminSessionCookieName = "bouncecast_admin_session"
 const AdminIdentityCookieName = "bouncecast_admin_identity"
 
+const AdminRoleOwner = "owner"
+const AdminRoleAdmin = "admin"
+
 const adminSessionDuration = 30 * 24 * time.Hour
 
 type adminIdentityPayload struct {
@@ -49,10 +52,7 @@ type UserAccessTokenHandlerFunc func(models.User, http.ResponseWriter, *http.Req
 // RequireAdminAuth wraps a handler requiring HTTP basic auth for it using the given
 // the stream key as the password and and a hardcoded "admin" for username.
 func RequireAdminAuth(handler http.HandlerFunc) http.HandlerFunc {
-	configRepository := configrepository.Get()
 	return func(w http.ResponseWriter, r *http.Request) {
-		username := "admin"
-		password := configRepository.GetAdminPassword()
 		realm := "Owncast Authenticated Request"
 
 		// Alow CORS only for localhost:3000 to support Owncast development.
@@ -68,7 +68,7 @@ func RequireAdminAuth(handler http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		if !isValidAdminBasicAuth(r, username, password) && !isValidAdminSessionCookie(r, password) {
+		if _, ok := CurrentAdminIdentity(r); !ok {
 			w.Header().Set("WWW-Authenticate", `Basic realm="`+realm+`"`)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			log.Debugln("Failed admin authentication")
@@ -83,12 +83,8 @@ func RequireAdminAuth(handler http.HandlerFunc) http.HandlerFunc {
 // browser's Basic Auth dialog. API routes still use RequireAdminAuth so
 // Owncast-compatible clients can continue using Basic auth.
 func RequireAdminPageAuth(handler http.HandlerFunc) http.HandlerFunc {
-	configRepository := configrepository.Get()
 	return func(w http.ResponseWriter, r *http.Request) {
-		username := "admin"
-		password := configRepository.GetAdminPassword()
-
-		if !isValidAdminBasicAuth(r, username, password) && !isValidAdminSessionCookie(r, password) {
+		if _, ok := CurrentAdminIdentity(r); !ok {
 			next := r.URL.RequestURI()
 			if !strings.HasPrefix(next, "/") || strings.HasPrefix(next, "//") {
 				next = "/admin/"
@@ -106,10 +102,7 @@ func RequireAdminPageAuth(handler http.HandlerFunc) http.HandlerFunc {
 // to carry one of the supplied BounceCast product roles. The legacy Owncast
 // admin password is treated as owner-level access for compatibility.
 func RequireAdminRole(handler http.HandlerFunc, roles ...string) http.HandlerFunc {
-	configRepository := configrepository.Get()
 	return func(w http.ResponseWriter, r *http.Request) {
-		username := "admin"
-		password := configRepository.GetAdminPassword()
 		realm := "Owncast Authenticated Request"
 
 		validAdminHost := "http://localhost:3000"
@@ -123,17 +116,8 @@ func RequireAdminRole(handler http.HandlerFunc, roles ...string) http.HandlerFun
 			return
 		}
 
-		role := ""
-		if isValidAdminBasicAuth(r, username, password) {
-			role = "owner"
-		} else if isValidAdminSessionCookie(r, password) {
-			identity, ok := getValidAdminIdentity(r, password)
-			if ok {
-				role = identity.Role
-			}
-		}
-
-		if role == "" || !adminRoleAllowed(role, roles...) {
+		identity, ok := CurrentAdminIdentity(r)
+		if !ok || !adminRoleAllowed(identity.Role, roles...) {
 			w.Header().Set("WWW-Authenticate", `Basic realm="`+realm+`"`)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			log.Debugln("Failed admin role authentication")
@@ -142,6 +126,14 @@ func RequireAdminRole(handler http.HandlerFunc, roles ...string) http.HandlerFun
 
 		handler(w, r)
 	}
+}
+
+func RequireOwner(handler http.HandlerFunc) http.HandlerFunc {
+	return RequireAdminRole(handler, AdminRoleOwner)
+}
+
+func RequireOwnerOrAdmin(handler http.HandlerFunc) http.HandlerFunc {
+	return RequireAdminRole(handler, AdminRoleOwner, AdminRoleAdmin)
 }
 
 func CheckAdminCredentials(username string, plainPassword string) bool {
@@ -156,13 +148,16 @@ func CheckAdminCredentials(username string, plainPassword string) bool {
 func CurrentAdminIdentity(r *http.Request) (AdminIdentity, bool) {
 	adminPasswordHash := configrepository.Get().GetAdminPassword()
 	if isValidAdminBasicAuth(r, "admin", adminPasswordHash) {
-		return AdminIdentity{UserID: "owncast-admin", Role: "owner"}, true
+		return AdminIdentity{UserID: "owncast-admin", Role: AdminRoleOwner}, true
 	}
 	if !isValidAdminSessionCookie(r, adminPasswordHash) {
 		return AdminIdentity{}, false
 	}
 	identity, ok := getValidAdminIdentity(r, adminPasswordHash)
 	if !ok {
+		return AdminIdentity{}, false
+	}
+	if !storedAdminIdentityStillAllowed(identity) {
 		return AdminIdentity{}, false
 	}
 	return AdminIdentity{UserID: identity.UserID, Role: identity.Role}, true
@@ -179,7 +174,7 @@ func RequestAdminHasRole(r *http.Request, roles ...string) bool {
 }
 
 func SetAdminSessionCookie(w http.ResponseWriter, r *http.Request) {
-	setAdminSessionCookie(w, r, "owncast-admin", "owner")
+	setAdminSessionCookie(w, r, "owncast-admin", AdminRoleOwner)
 }
 
 func SetAdminRoleSessionCookie(w http.ResponseWriter, r *http.Request, userID string, role string) {
@@ -308,6 +303,26 @@ func adminRoleAllowed(role string, allowedRoles ...string) bool {
 		}
 	}
 	return false
+}
+
+func storedAdminIdentityStillAllowed(identity adminIdentityPayload) bool {
+	if identity.UserID == "" || identity.UserID == "owncast-admin" {
+		return true
+	}
+
+	user := userrepository.Get().GetUserByID(identity.UserID)
+	if user == nil || !user.IsEnabled() {
+		return false
+	}
+
+	switch identity.Role {
+	case AdminRoleOwner:
+		return user.IsOwner()
+	case AdminRoleAdmin:
+		return user.IsOwner() || user.IsAdmin()
+	default:
+		return false
+	}
 }
 
 func signAdminSession(payload string, adminPasswordHash string) string {

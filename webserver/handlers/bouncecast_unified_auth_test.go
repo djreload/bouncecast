@@ -156,6 +156,57 @@ func TestBounceCastAdminPageAuthRedirectsToUnifiedLogin(t *testing.T) {
 	}
 }
 
+func TestBounceCastAdminRoleMiddlewareUsesCurrentStoredAccountRole(t *testing.T) {
+	cleanupBounceCastUnifiedAuthTest(t)
+	t.Cleanup(func() { cleanupBounceCastUnifiedAuthTest(t) })
+	withBounceCastUnifiedAdminPassword(t, "role-middleware-password")
+
+	insertBounceCastUnifiedUser(t, "role-check-admin", "Role Check Admin", "role-check@unified-auth-test.example", models.BounceCastAdminScopeKey, "correct-password")
+
+	cookieRecorder := httptest.NewRecorder()
+	cookieRequest := httptest.NewRequest(http.MethodGet, "/admin/", nil)
+	middleware.SetAdminRoleSessionCookie(cookieRecorder, cookieRequest, "role-check-admin", middleware.AdminRoleAdmin)
+
+	adminRequest := httptest.NewRequest(http.MethodGet, "/api/admin/status", nil)
+	for _, cookie := range cookieRecorder.Result().Cookies() {
+		adminRequest.AddCookie(cookie)
+	}
+	adminRecorder := httptest.NewRecorder()
+	middleware.RequireOwnerOrAdmin(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})(adminRecorder, adminRequest)
+	if adminRecorder.Code != http.StatusNoContent {
+		t.Fatalf("admin role status = %d, want 204", adminRecorder.Code)
+	}
+
+	ownerRequest := httptest.NewRequest(http.MethodPost, "/api/admin/config/adminpass", nil)
+	for _, cookie := range cookieRecorder.Result().Cookies() {
+		ownerRequest.AddCookie(cookie)
+	}
+	ownerRecorder := httptest.NewRecorder()
+	middleware.RequireOwner(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})(ownerRecorder, ownerRequest)
+	if ownerRecorder.Code != http.StatusUnauthorized {
+		t.Fatalf("admin hitting owner-only route status = %d, want 401", ownerRecorder.Code)
+	}
+
+	if _, err := data.GetDatabase().Exec(`UPDATE users SET scopes = NULL WHERE id = 'role-check-admin'`); err != nil {
+		t.Fatalf("remove admin scope: %v", err)
+	}
+	revokedRequest := httptest.NewRequest(http.MethodGet, "/api/admin/status", nil)
+	for _, cookie := range cookieRecorder.Result().Cookies() {
+		revokedRequest.AddCookie(cookie)
+	}
+	revokedRecorder := httptest.NewRecorder()
+	middleware.RequireOwnerOrAdmin(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})(revokedRecorder, revokedRequest)
+	if revokedRecorder.Code != http.StatusUnauthorized {
+		t.Fatalf("revoked admin role status = %d, want 401", revokedRecorder.Code)
+	}
+}
+
 func TestBounceCastUnifiedLoginRateLimitsAttempts(t *testing.T) {
 	resetBounceCastRateLimitersForTesting()
 	cleanupBounceCastUnifiedAuthTest(t)
