@@ -27,6 +27,9 @@ class ChatRepository(
     private val _connected = MutableStateFlow(false)
     val connected: StateFlow<Boolean> = _connected
 
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error
+
     private var websocket: WebSocket? = null
     private var accessToken: String = ""
 
@@ -81,6 +84,7 @@ class ChatRepository(
 
                 override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                     _connected.value = false
+                    _error.value = t.message ?: "Chat connection failed"
                 }
             },
         )
@@ -115,9 +119,15 @@ class ChatRepository(
         displayName: String,
     ) {
         scope.launch(Dispatchers.IO) {
-            register(registerUrl, displayName)
-            loadHistory(historyUrl)
-            connect(webSocketUrl)
+            runCatching {
+                _error.value = null
+                register(registerUrl, displayName)
+                loadHistory(historyUrl)
+                connect(webSocketUrl)
+            }.onFailure {
+                _connected.value = false
+                _error.value = it.message ?: "Unable to join BounceCast chat"
+            }
         }
     }
 }

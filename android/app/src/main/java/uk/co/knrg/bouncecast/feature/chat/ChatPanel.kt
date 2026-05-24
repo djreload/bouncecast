@@ -36,6 +36,7 @@ fun ChatPanel(config: MobileConfig) {
     val repository = remember { ChatRepository(BounceCastApi(), scope) }
     val events by repository.events.collectAsState()
     val connected by repository.connected.collectAsState()
+    val error by repository.error.collectAsState()
     var draft by remember { mutableStateOf("") }
 
     LaunchedEffect(config.bouncecast.chatWebSocketUrl) {
@@ -57,9 +58,20 @@ fun ChatPanel(config: MobileConfig) {
             .padding(12.dp),
     ) {
         Text(
-            text = if (connected) "Live chat" else "Connecting chat",
+            text = when {
+                connected -> "Live chat"
+                error != null -> "Chat unavailable"
+                else -> "Connecting chat"
+            },
             style = MaterialTheme.typography.titleMedium,
         )
+        error?.let {
+            Text(
+                text = it,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
         Spacer(Modifier.height(8.dp))
         LazyColumn(
             modifier = Modifier

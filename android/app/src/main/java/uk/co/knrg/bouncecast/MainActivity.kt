@@ -41,10 +41,6 @@ private fun BounceCastAndroidApp(
 ) {
     val config by configRepository.config.collectAsState()
 
-    LaunchedEffect(Unit) {
-        configRepository.refresh()
-    }
-
     LaunchedEffect(config?.ads) {
         config?.ads?.let { adManager.configure(it) }
     }
@@ -57,4 +53,3 @@ private fun BounceCastAndroidApp(
         )
     }
 }
-
