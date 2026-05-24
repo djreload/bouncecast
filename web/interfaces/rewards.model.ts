@@ -170,6 +170,16 @@ export interface RewardTask {
   active: boolean;
 }
 
+export interface RewardTaskCompletion {
+  id: number;
+  userId: string;
+  taskId: number;
+  taskTitle?: string;
+  ledgerId?: number;
+  status: string;
+  completedAt: string;
+}
+
 export interface RewardAchievement {
   id: number;
   name: string;
@@ -178,10 +188,23 @@ export interface RewardAchievement {
   active: boolean;
 }
 
+export interface RewardAchievementUnlock {
+  id: number;
+  userId: string;
+  achievementId: number;
+  achievementName?: string;
+  conditionKey: string;
+  referenceId?: string;
+  ledgerId?: number;
+  unlockedAt: string;
+}
+
 export interface RewardWheelData {
   settings: RewardSettings;
   balance: RewardSpinBalance;
   prizes: RewardPrize[];
+  tasks?: RewardTask[];
+  taskCompletions?: RewardTaskCompletion[];
 }
 
 export interface RewardSpinResult {
@@ -207,6 +230,8 @@ export interface RewardAdminSummary {
   adminMessages: RewardMessage[];
   notifications: RewardNotification[];
   tasks: RewardTask[];
+  taskCompletions: RewardTaskCompletion[];
   achievements: RewardAchievement[];
+  achievementUnlocks: RewardAchievementUnlock[];
   unreadCount: number;
 }

@@ -21,6 +21,7 @@ import {
   REWARDS_NOTIFICATION_READ,
   REWARDS_NOTIFICATIONS,
   REWARDS_SPIN,
+  REWARDS_TASK_COMPLETE,
   REWARDS_WHEEL,
   getUnauthedData,
 } from '../utils/apis';
@@ -95,6 +96,11 @@ export default function RewardsPage() {
   }, []);
 
   const eligiblePrizes = wheelData?.prizes || [];
+  const rewardTasks = wheelData?.tasks || [];
+  const completedTaskIDs = useMemo(
+    () => new Set((wheelData?.taskCompletions || []).map(completion => completion.taskId)),
+    [wheelData?.taskCompletions],
+  );
   const highlightedPrize = result?.prize || eligiblePrizes[0];
   const enabled = Boolean(wheelData?.settings?.enabled);
 
@@ -165,6 +171,23 @@ export default function RewardsPage() {
       data: { id: notification.id },
     });
     loadRewards(token);
+  };
+
+  const completeTask = async (taskId: number) => {
+    try {
+      const response = await getUnauthedData(withToken(REWARDS_TASK_COMPLETE, token), {
+        method: 'POST',
+        data: { taskId },
+      });
+      if (response.awarded) {
+        message.success('Spin Credits added');
+      } else {
+        message.info('Task already completed');
+      }
+      loadRewards(token);
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : 'Unable to complete task');
+    }
   };
 
   if (!token) {
@@ -266,6 +289,39 @@ export default function RewardsPage() {
                           <p>{prize.description || prize.terms || 'Rewards Wheel prize'}</p>
                         </article>
                       ))}
+                    </div>
+                  ),
+                },
+                {
+                  key: 'tasks',
+                  label: 'Tasks',
+                  children: (
+                    <div className={styles.list}>
+                      {rewardTasks.length === 0 && (
+                        <article className={styles.listItem}>
+                          <strong>No reward tasks are active yet.</strong>
+                          <p>Check back when the site team adds new ways to earn Spin Credits.</p>
+                        </article>
+                      )}
+                      {rewardTasks.map(task => {
+                        const completed = completedTaskIDs.has(task.id);
+                        return (
+                          <article className={styles.listItem} key={task.id}>
+                            <Space wrap>
+                              <strong>{task.title}</strong>
+                              <Tag color="cyan">+{task.creditReward} credits</Tag>
+                              {completed ? (
+                                <Tag color="green">Completed</Tag>
+                              ) : (
+                                <Button size="small" onClick={() => completeTask(task.id)}>
+                                  Complete
+                                </Button>
+                              )}
+                            </Space>
+                            <p>{task.description || 'Complete this task to earn Spin Credits.'}</p>
+                          </article>
+                        );
+                      })}
                     </div>
                   ),
                 },

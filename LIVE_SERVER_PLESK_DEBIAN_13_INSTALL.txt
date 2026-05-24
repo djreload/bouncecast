@@ -532,6 +532,38 @@ Logged-in viewers can save reminders from:
 
   https://live.example.com/account
 
+Rewards Wheel deployment notes
+==============================
+
+Migration `00013_bouncecast_rewards_wheel.sql` adds the internal Rewards Wheel,
+Spin Credit ledger, prize, claim, fulfilment order, admin message, viewer
+notification, task, achievement, and reward settings tables.
+
+Migration `00014_bouncecast_rewards_automation.sql` adds chat reward counters,
+one-time task completion records, and achievement unlock tracking.
+
+After updating, verify the container logs show goose migration version 14 and
+check:
+
+  curl -I https://live.example.com/rewards
+  curl -I https://live.example.com/admin/rewards
+
+Then log in as an owner/admin and open:
+
+  https://live.example.com/admin/rewards
+
+Recommended first setup:
+
+1. Keep Rewards Wheel disabled until prizes and terms are configured.
+2. Add at least one active `sorry` prize.
+3. Add any real physical/digital prizes with stock quantities.
+4. Enable chat rewards only after choosing a message threshold and cooldown.
+5. Add viewer tasks if you want logged-in users to earn Spin Credits from
+   one-time actions.
+6. Grant a test user Spin Credits and test:
+
+   https://live.example.com/rewards
+
 Current reminder behavior:
 
 - Email reminders are queued when the related schedule goes live and the set

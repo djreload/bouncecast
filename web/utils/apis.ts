@@ -214,6 +214,8 @@ export const REWARDS_SPIN = `${NEXT_PUBLIC_API_HOST}api/rewards/spin`;
 
 export const REWARDS_HISTORY = `${NEXT_PUBLIC_API_HOST}api/rewards/history`;
 
+export const REWARDS_TASK_COMPLETE = `${NEXT_PUBLIC_API_HOST}api/rewards/tasks/complete`;
+
 export const REWARDS_CLAIMS = `${NEXT_PUBLIC_API_HOST}api/rewards/claims`;
 
 export const REWARDS_CLAIM_SUBMIT = `${NEXT_PUBLIC_API_HOST}api/rewards/claims/submit`;

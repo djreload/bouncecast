@@ -11,6 +11,7 @@ import (
 	"github.com/owncast/owncast/core/webhooks"
 	"github.com/owncast/owncast/persistence/chatmessagerepository"
 	"github.com/owncast/owncast/persistence/configrepository"
+	"github.com/owncast/owncast/persistence/rewardsrepository"
 	"github.com/owncast/owncast/persistence/userrepository"
 	"github.com/owncast/owncast/utils"
 	log "github.com/sirupsen/logrus"
@@ -188,6 +189,13 @@ func (s *Server) userMessageSent(eventData chatClientEvent) {
 	chatMessageRepository := chatmessagerepository.Get()
 	chatMessageRepository.SaveUserMessage(event)
 	eventData.client.MessageCount++
+	go func(userID string, body string, messageID string) {
+		if _, awarded, err := rewardsrepository.Get().RecordChatActivity(userID, body, messageID); err != nil {
+			log.Debugln("error recording reward chat activity", err)
+		} else if awarded {
+			log.Debugln("Spin Credits awarded for chat activity")
+		}
+	}(event.User.ID, event.RawBody, event.ID)
 }
 
 func (s *Server) messageReactionUpdated(eventData chatClientEvent) {

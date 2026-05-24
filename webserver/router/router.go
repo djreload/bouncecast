@@ -208,6 +208,8 @@ func Start(enableVerboseLogging bool) error {
 	r.Post("/api/rewards/spin", middleware.RequireUserAccessToken(handlers.SpinRewardsWheel))
 	r.Options("/api/rewards/history", handlers.BounceCastAccountOptions)
 	r.Get("/api/rewards/history", middleware.RequireUserAccessToken(handlers.GetRewardsHistory))
+	r.Options("/api/rewards/tasks/complete", handlers.BounceCastAccountOptions)
+	r.Post("/api/rewards/tasks/complete", middleware.RequireUserAccessToken(handlers.CompleteRewardTask))
 	r.Options("/api/rewards/claims", handlers.BounceCastAccountOptions)
 	r.Get("/api/rewards/claims", middleware.RequireUserAccessToken(handlers.GetRewardsClaims))
 	r.Options("/api/rewards/claims/submit", handlers.BounceCastAccountOptions)

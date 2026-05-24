@@ -61,6 +61,30 @@ func GetRewardsHistory(user models.User, w http.ResponseWriter, r *http.Request)
 	writeJSON(w, spins)
 }
 
+func CompleteRewardTask(user models.User, w http.ResponseWriter, r *http.Request) {
+	middleware.EnableCors(w)
+	if r.Method != http.MethodPost {
+		webutils.WriteSimpleResponse(w, false, r.Method+" not supported")
+		return
+	}
+	if !enforceBounceCastRateLimit(w, r, bounceCastRewardsTaskRateLimit, bounceCastRateLimitUserSubject(user.ID), bounceCastRateLimitIPSubject(r)) {
+		return
+	}
+	var request struct {
+		TaskID int64 `json:"taskId"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil || request.TaskID <= 0 {
+		webutils.WriteSimpleResponse(w, false, "task ID is required")
+		return
+	}
+	completion, balance, awarded, err := rewardsrepository.Get().CompleteTask(user.ID, request.TaskID)
+	if err != nil {
+		webutils.WriteSimpleResponse(w, false, err.Error())
+		return
+	}
+	writeJSON(w, webutils.J{"completion": completion, "balance": balance, "awarded": awarded})
+}
+
 func GetRewardsClaims(user models.User, w http.ResponseWriter, r *http.Request) {
 	middleware.EnableCors(w)
 	claims, err := rewardsrepository.Get().ListUserClaims(user.ID)

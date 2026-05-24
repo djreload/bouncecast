@@ -8,7 +8,7 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 
 - Continue expanding audit records around older Owncast-compatible admin actions.
 - Continue reviewing moderator-specific admin surfaces before exposing moderator dashboard pages.
-- Wire automated chat/task/achievement/top-supporter reward triggers into the new Rewards Wheel credit hooks.
+- Wire achievement unlocks and top-supporter reward automation into the Rewards Wheel credit hooks.
 - Continue live VPS deployment notes as production configuration changes.
 
 ## 2026-05-24
@@ -16,7 +16,11 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 ### Added
 
 - Added database migration `00013_bouncecast_rewards_wheel.sql` for internal Rewards Wheel prizes, Spin Credit balances and ledger entries, spins, winners, claims, fulfilment orders, admin messages, viewer notifications, tasks, achievements, and reward settings.
+- Added database migration `00014_bouncecast_rewards_automation.sql` for chat activity reward counters, one-time task completions, and achievement unlock tracking.
 - Added a modular Rewards Wheel backend with server-side weighted prize selection, atomic credit spending, stock reduction, claim/order creation, admin message creation, and viewer notification records.
+- Added chat activity Spin Credit automation with repeated-message protection, configurable message thresholds, and cooldown enforcement.
+- Added one-time viewer task completion rewards on `/rewards`, backed by ledger entries so task credits cannot be granted twice.
+- Added admin visibility for recent task completions and achievement unlock placeholders in the Rewards Wheel automation tab.
 - Added `/rewards` as a logged-in viewer Rewards Wheel page with balance display, prize list, spin animation, personal history, claim forms, and reward notifications.
 - Added Admin -> Studio -> Rewards Wheel for settings, prize management, credit grants/deductions, fulfilment orders, admin messages, CSV export, task placeholders, and achievement placeholders.
 - Added a `REWARD_WHEEL_WIN` websocket event that reuses the existing Stars overlay queue for real prize wins.
@@ -28,6 +32,7 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 
 - Updated the public user menu with a Rewards Wheel entry.
 - Updated the admin sidebar so owner/admin sessions can reach the Rewards Wheel dashboard.
+- Updated Debian 13/Plesk live server notes with Rewards Wheel migration and setup checks through migration version 14.
 
 ### Security
 

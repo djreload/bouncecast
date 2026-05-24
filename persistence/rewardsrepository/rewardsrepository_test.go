@@ -60,6 +60,100 @@ func TestAwardSpinCreditsCreatesLedgerAndIsIdempotent(t *testing.T) {
 	}
 }
 
+func TestChatActivityAwardsAfterThresholdAndIgnoresRepeatedMessages(t *testing.T) {
+	repository, _ := newTestRepository(t)
+	settings, err := repository.GetSettings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings.Enabled = true
+	settings.ChatRewardsEnabled = true
+	settings.ChatValidMessageCount = 2
+	settings.ChatCooldownSeconds = 0
+	settings.ChatCreditReward = 2
+	if err := repository.SetSettings(settings); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, awarded, err := repository.RecordChatActivity("user-1", "same message", "chat-1"); err != nil || awarded {
+		t.Fatalf("first chat message should not award: awarded=%v err=%v", awarded, err)
+	}
+	if _, awarded, err := repository.RecordChatActivity("user-1", "same message", "chat-2"); err != nil || awarded {
+		t.Fatalf("repeated chat message should be ignored: awarded=%v err=%v", awarded, err)
+	}
+	balance, awarded, err := repository.RecordChatActivity("user-1", "fresh message", "chat-3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !awarded || balance.Balance != 2 || balance.LifetimeEarned != 2 {
+		t.Fatalf("expected chat threshold award, got awarded=%v balance=%+v", awarded, balance)
+	}
+}
+
+func TestChatActivityCooldownPreventsImmediateRepeatAward(t *testing.T) {
+	repository, _ := newTestRepository(t)
+	settings, err := repository.GetSettings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings.Enabled = true
+	settings.ChatRewardsEnabled = true
+	settings.ChatValidMessageCount = 1
+	settings.ChatCooldownSeconds = 600
+	settings.ChatCreditReward = 1
+	if err := repository.SetSettings(settings); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, awarded, err := repository.RecordChatActivity("user-1", "first", "cooldown-1"); err != nil || !awarded {
+		t.Fatalf("first message should award: awarded=%v err=%v", awarded, err)
+	}
+	if _, awarded, err := repository.RecordChatActivity("user-1", "second", "cooldown-2"); err != nil || awarded {
+		t.Fatalf("cooldown should prevent second award: awarded=%v err=%v", awarded, err)
+	}
+	balance, err := repository.GetBalance("user-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if balance.Balance != 1 {
+		t.Fatalf("cooldown should keep balance at one reward: %+v", balance)
+	}
+}
+
+func TestCompleteTaskAwardsOnce(t *testing.T) {
+	repository, _ := newTestRepository(t)
+	task, err := repository.UpsertTask(models.RewardTask{Title: "Set profile picture", Description: "Add an avatar", CreditReward: 3, Active: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	completion, balance, awarded, err := repository.CompleteTask("user-1", task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !awarded || completion.TaskID != task.ID || balance.Balance != 3 {
+		t.Fatalf("expected task award, completion=%+v balance=%+v awarded=%v", completion, balance, awarded)
+	}
+	_, balance, awarded, err = repository.CompleteTask("user-1", task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if awarded || balance.Balance != 3 || balance.LifetimeEarned != 3 {
+		t.Fatalf("task completion should be idempotent: balance=%+v awarded=%v", balance, awarded)
+	}
+}
+
+func TestInactiveTaskCannotBeCompleted(t *testing.T) {
+	repository, _ := newTestRepository(t)
+	task, err := repository.UpsertTask(models.RewardTask{Title: "Old task", CreditReward: 1, Active: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := repository.CompleteTask("user-1", task.ID); err == nil {
+		t.Fatal("expected inactive task completion to fail")
+	}
+}
+
 func TestSpinRequiresCredit(t *testing.T) {
 	repository, _ := newTestRepository(t)
 	enableRewards(t, repository)

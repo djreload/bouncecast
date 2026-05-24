@@ -2,6 +2,7 @@ package rewardsrepository
 
 import (
 	crand "crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -25,6 +26,8 @@ type Repository interface {
 	AdminAdjustSpinCredits(userID string, amount int, note string) (models.RewardSpinBalance, error)
 	GetBalance(userID string) (models.RewardSpinBalance, error)
 	GetWheelData(userID string) (models.RewardWheelData, error)
+	RecordChatActivity(userID string, messageBody string, referenceID string) (models.RewardSpinBalance, bool, error)
+	CompleteTask(userID string, taskID int64) (models.RewardTaskCompletion, models.RewardSpinBalance, bool, error)
 	SpinWheel(user models.User) (models.RewardSpinResult, error)
 	ListUserSpins(userID string) ([]models.RewardSpin, error)
 	ListUserClaims(userID string) ([]models.RewardClaim, error)
@@ -38,6 +41,8 @@ type Repository interface {
 	UpsertTask(task models.RewardTask) (models.RewardTask, error)
 	UpsertAchievement(achievement models.RewardAchievement) (models.RewardAchievement, error)
 }
+
+const repeatedChatMessageWindow = 2 * time.Minute
 
 type SqlRepository struct {
 	datastore *data.Datastore
@@ -269,7 +274,193 @@ func (r *SqlRepository) GetWheelData(userID string) (models.RewardWheelData, err
 	if err != nil {
 		return models.RewardWheelData{}, err
 	}
-	return models.RewardWheelData{Settings: settings, Balance: balance, Prizes: prizes}, nil
+	tasks, err := r.listActiveTasks()
+	if err != nil {
+		return models.RewardWheelData{}, err
+	}
+	taskCompletions, err := r.listTaskCompletionsForUser(userID)
+	if err != nil {
+		return models.RewardWheelData{}, err
+	}
+	return models.RewardWheelData{Settings: settings, Balance: balance, Prizes: prizes, Tasks: tasks, TaskCompletions: taskCompletions}, nil
+}
+
+func (r *SqlRepository) RecordChatActivity(userID string, messageBody string, referenceID string) (models.RewardSpinBalance, bool, error) {
+	userID = strings.TrimSpace(userID)
+	messageBody = strings.TrimSpace(messageBody)
+	if userID == "" || messageBody == "" {
+		return models.RewardSpinBalance{}, false, nil
+	}
+
+	settings, err := r.GetSettings()
+	if err != nil {
+		return models.RewardSpinBalance{}, false, err
+	}
+	if !settings.Enabled || !settings.ChatRewardsEnabled {
+		return models.RewardSpinBalance{}, false, nil
+	}
+	settings = normalizeSettings(settings)
+
+	now := time.Now().UTC()
+	messageHash := hashChatRewardMessage(messageBody)
+	referenceID = strings.TrimSpace(referenceID)
+	if referenceID == "" {
+		referenceID = fmt.Sprintf("chat:%s:%d", userID, now.UnixNano())
+	} else {
+		referenceID = "chat:" + referenceID
+	}
+
+	r.datastore.DbLock.Lock()
+	defer r.datastore.DbLock.Unlock()
+
+	tx, err := r.datastore.DB.Begin()
+	if err != nil {
+		return models.RewardSpinBalance{}, false, err
+	}
+	defer tx.Rollback() //nolint
+
+	if err := ensureUserExistsTx(tx, userID); err != nil {
+		return models.RewardSpinBalance{}, false, err
+	}
+
+	var messageCount int
+	var lastHash sql.NullString
+	var lastMessageAt sql.NullTime
+	var lastAwardedAt sql.NullTime
+	err = tx.QueryRow(`SELECT message_count_window, last_message_body_hash, last_message_at, last_awarded_at
+		FROM reward_chat_activity WHERE user_id=?`, userID).Scan(&messageCount, &lastHash, &lastMessageAt, &lastAwardedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		if _, err = tx.Exec(`INSERT INTO reward_chat_activity(user_id, message_count_window, last_message_body_hash, last_message_at, updated_at)
+			VALUES(?, 0, ?, ?, CURRENT_TIMESTAMP)`, userID, messageHash, now); err != nil {
+			return models.RewardSpinBalance{}, false, err
+		}
+		messageCount = 0
+		lastHash = sql.NullString{}
+		lastMessageAt = sql.NullTime{}
+	} else if err != nil {
+		return models.RewardSpinBalance{}, false, err
+	}
+
+	if lastHash.Valid && lastHash.String == messageHash && lastMessageAt.Valid && now.Sub(lastMessageAt.Time) <= repeatedChatMessageWindow {
+		if _, err = tx.Exec(`UPDATE reward_chat_activity
+			SET last_message_at=?, updated_at=CURRENT_TIMESTAMP WHERE user_id=?`, now, userID); err != nil {
+			return models.RewardSpinBalance{}, false, err
+		}
+		return models.RewardSpinBalance{}, false, tx.Commit()
+	}
+
+	nextCount := messageCount + 1
+	onCooldown := settings.ChatCooldownSeconds > 0 && lastAwardedAt.Valid && now.Sub(lastAwardedAt.Time) < time.Duration(settings.ChatCooldownSeconds)*time.Second
+	if onCooldown && nextCount > settings.ChatValidMessageCount {
+		nextCount = settings.ChatValidMessageCount
+	}
+
+	if !onCooldown && nextCount >= settings.ChatValidMessageCount {
+		balance, err := ensureBalanceTx(tx, userID)
+		if err != nil {
+			return models.RewardSpinBalance{}, false, err
+		}
+		nextBalance := balance.Balance + settings.ChatCreditReward
+		lifetimeEarned := balance.LifetimeEarned + settings.ChatCreditReward
+		if _, err := insertLedgerTx(tx, userID, settings.ChatCreditReward, nextBalance, models.RewardCreditSourceChatActivity, referenceID, "Chat activity reward"); err != nil {
+			return models.RewardSpinBalance{}, false, err
+		}
+		if _, err = tx.Exec(`UPDATE reward_spin_balances
+			SET balance=?, lifetime_earned=?, updated_at=CURRENT_TIMESTAMP WHERE user_id=?`, nextBalance, lifetimeEarned, userID); err != nil {
+			return models.RewardSpinBalance{}, false, err
+		}
+		if _, err = tx.Exec(`UPDATE reward_chat_activity
+			SET message_count_window=0, last_message_body_hash=?, last_message_at=?, last_awarded_at=?, updated_at=CURRENT_TIMESTAMP
+			WHERE user_id=?`, messageHash, now, now, userID); err != nil {
+			return models.RewardSpinBalance{}, false, err
+		}
+		if err = tx.Commit(); err != nil {
+			return models.RewardSpinBalance{}, false, err
+		}
+		balance.Balance = nextBalance
+		balance.LifetimeEarned = lifetimeEarned
+		balance.UpdatedAt = now
+		return balance, true, nil
+	}
+
+	if _, err = tx.Exec(`UPDATE reward_chat_activity
+		SET message_count_window=?, last_message_body_hash=?, last_message_at=?, updated_at=CURRENT_TIMESTAMP
+		WHERE user_id=?`, nextCount, messageHash, now, userID); err != nil {
+		return models.RewardSpinBalance{}, false, err
+	}
+	return models.RewardSpinBalance{}, false, tx.Commit()
+}
+
+func (r *SqlRepository) CompleteTask(userID string, taskID int64) (models.RewardTaskCompletion, models.RewardSpinBalance, bool, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" || taskID <= 0 {
+		return models.RewardTaskCompletion{}, models.RewardSpinBalance{}, false, errors.New("task and user are required")
+	}
+
+	r.datastore.DbLock.Lock()
+	defer r.datastore.DbLock.Unlock()
+
+	tx, err := r.datastore.DB.Begin()
+	if err != nil {
+		return models.RewardTaskCompletion{}, models.RewardSpinBalance{}, false, err
+	}
+	defer tx.Rollback() //nolint
+
+	if err := ensureUserExistsTx(tx, userID); err != nil {
+		return models.RewardTaskCompletion{}, models.RewardSpinBalance{}, false, err
+	}
+	task, err := getTaskTx(tx, taskID)
+	if err != nil {
+		return models.RewardTaskCompletion{}, models.RewardSpinBalance{}, false, err
+	}
+	if !task.Active {
+		return models.RewardTaskCompletion{}, models.RewardSpinBalance{}, false, errors.New("reward task is not active")
+	}
+
+	completion, err := getTaskCompletionTx(tx, userID, taskID)
+	if err == nil {
+		balance, balanceErr := ensureBalanceTx(tx, userID)
+		if balanceErr != nil {
+			return models.RewardTaskCompletion{}, models.RewardSpinBalance{}, false, balanceErr
+		}
+		return completion, balance, false, tx.Commit()
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return models.RewardTaskCompletion{}, models.RewardSpinBalance{}, false, err
+	}
+
+	balance, err := ensureBalanceTx(tx, userID)
+	if err != nil {
+		return models.RewardTaskCompletion{}, models.RewardSpinBalance{}, false, err
+	}
+	nextBalance := balance.Balance + task.CreditReward
+	lifetimeEarned := balance.LifetimeEarned + task.CreditReward
+	ledgerID, err := insertLedgerTx(tx, userID, task.CreditReward, nextBalance, models.RewardCreditSourceTaskCompleted, fmt.Sprintf("task:%d:%s", task.ID, userID), "Reward task completed: "+task.Title)
+	if err != nil {
+		return models.RewardTaskCompletion{}, models.RewardSpinBalance{}, false, err
+	}
+	if _, err = tx.Exec(`UPDATE reward_spin_balances SET balance=?, lifetime_earned=?, updated_at=CURRENT_TIMESTAMP WHERE user_id=?`, nextBalance, lifetimeEarned, userID); err != nil {
+		return models.RewardTaskCompletion{}, models.RewardSpinBalance{}, false, err
+	}
+	result, err := tx.Exec(`INSERT INTO reward_task_completions(user_id, task_id, ledger_id, status) VALUES(?, ?, ?, 'completed')`, userID, task.ID, ledgerID)
+	if err != nil {
+		return models.RewardTaskCompletion{}, models.RewardSpinBalance{}, false, err
+	}
+	completionID, err := result.LastInsertId()
+	if err != nil {
+		return models.RewardTaskCompletion{}, models.RewardSpinBalance{}, false, err
+	}
+	completion, err = getTaskCompletionByIDTx(tx, completionID)
+	if err != nil {
+		return models.RewardTaskCompletion{}, models.RewardSpinBalance{}, false, err
+	}
+	if err = tx.Commit(); err != nil {
+		return models.RewardTaskCompletion{}, models.RewardSpinBalance{}, false, err
+	}
+	balance.Balance = nextBalance
+	balance.LifetimeEarned = lifetimeEarned
+	balance.UpdatedAt = time.Now().UTC()
+	return completion, balance, true, nil
 }
 
 func (r *SqlRepository) SpinWheel(user models.User) (models.RewardSpinResult, error) {
@@ -605,7 +796,15 @@ func (r *SqlRepository) GetAdminSummary() (models.RewardAdminSummary, error) {
 	if err != nil {
 		return models.RewardAdminSummary{}, err
 	}
+	taskCompletions, err := r.listTaskCompletions()
+	if err != nil {
+		return models.RewardAdminSummary{}, err
+	}
 	achievements, err := r.listAchievements()
+	if err != nil {
+		return models.RewardAdminSummary{}, err
+	}
+	achievementUnlocks, err := r.listAchievementUnlocks()
 	if err != nil {
 		return models.RewardAdminSummary{}, err
 	}
@@ -616,19 +815,21 @@ func (r *SqlRepository) GetAdminSummary() (models.RewardAdminSummary, error) {
 		}
 	}
 	return models.RewardAdminSummary{
-		Settings:      settings,
-		Prizes:        prizes,
-		Balances:      balances,
-		Ledger:        ledger,
-		Spins:         spins,
-		Winners:       winners,
-		Claims:        claims,
-		Orders:        orders,
-		AdminMessages: messages,
-		Notifications: notifications,
-		Tasks:         tasks,
-		Achievements:  achievements,
-		UnreadCount:   unread,
+		Settings:           settings,
+		Prizes:             prizes,
+		Balances:           balances,
+		Ledger:             ledger,
+		Spins:              spins,
+		Winners:            winners,
+		Claims:             claims,
+		Orders:             orders,
+		AdminMessages:      messages,
+		Notifications:      notifications,
+		Tasks:              tasks,
+		TaskCompletions:    taskCompletions,
+		Achievements:       achievements,
+		AchievementUnlocks: achievementUnlocks,
+		UnreadCount:        unread,
 	}, nil
 }
 
@@ -979,6 +1180,21 @@ func (r *SqlRepository) getTask(id int64) (models.RewardTask, error) {
 	return scanTask(row)
 }
 
+func getTaskTx(tx *sql.Tx, id int64) (models.RewardTask, error) {
+	row := tx.QueryRow(`SELECT id, title, description, credit_reward, active, created_at, updated_at FROM reward_tasks WHERE id=?`, id)
+	return scanTask(row)
+}
+
+func getTaskCompletionTx(tx *sql.Tx, userID string, taskID int64) (models.RewardTaskCompletion, error) {
+	row := tx.QueryRow(taskCompletionSelectQuery()+` WHERE c.user_id=? AND c.task_id=?`, userID, taskID)
+	return scanTaskCompletion(row)
+}
+
+func getTaskCompletionByIDTx(tx *sql.Tx, id int64) (models.RewardTaskCompletion, error) {
+	row := tx.QueryRow(taskCompletionSelectQuery()+` WHERE c.id=?`, id)
+	return scanTaskCompletion(row)
+}
+
 func (r *SqlRepository) getAchievement(id int64) (models.RewardAchievement, error) {
 	row := r.datastore.DB.QueryRow(`SELECT id, name, condition_key, reward_amount, active, created_at, updated_at FROM reward_achievements WHERE id=?`, id)
 	return scanAchievement(row)
@@ -1138,6 +1354,42 @@ func (r *SqlRepository) listTasks() ([]models.RewardTask, error) {
 	return results, rows.Err()
 }
 
+func (r *SqlRepository) listActiveTasks() ([]models.RewardTask, error) {
+	rows, err := r.datastore.DB.Query(`SELECT id, title, description, credit_reward, active, created_at, updated_at
+		FROM reward_tasks WHERE active=1 ORDER BY created_at DESC, id DESC LIMIT 100`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	results := []models.RewardTask{}
+	for rows.Next() {
+		item, err := scanTask(rows)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, item)
+	}
+	return results, rows.Err()
+}
+
+func (r *SqlRepository) listTaskCompletions() ([]models.RewardTaskCompletion, error) {
+	rows, err := r.datastore.DB.Query(taskCompletionSelectQuery() + ` ORDER BY c.completed_at DESC, c.id DESC LIMIT 200`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanTaskCompletions(rows)
+}
+
+func (r *SqlRepository) listTaskCompletionsForUser(userID string) ([]models.RewardTaskCompletion, error) {
+	rows, err := r.datastore.DB.Query(taskCompletionSelectQuery()+` WHERE c.user_id=? ORDER BY c.completed_at DESC, c.id DESC LIMIT 100`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanTaskCompletions(rows)
+}
+
 func (r *SqlRepository) listAchievements() ([]models.RewardAchievement, error) {
 	rows, err := r.datastore.DB.Query(`SELECT id, name, condition_key, reward_amount, active, created_at, updated_at FROM reward_achievements ORDER BY created_at DESC, id DESC LIMIT 100`)
 	if err != nil {
@@ -1153,6 +1405,15 @@ func (r *SqlRepository) listAchievements() ([]models.RewardAchievement, error) {
 		results = append(results, item)
 	}
 	return results, rows.Err()
+}
+
+func (r *SqlRepository) listAchievementUnlocks() ([]models.RewardAchievementUnlock, error) {
+	rows, err := r.datastore.DB.Query(achievementUnlockSelectQuery() + ` ORDER BY u.unlocked_at DESC, u.id DESC LIMIT 200`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanAchievementUnlocks(rows)
 }
 
 type scanner interface {
@@ -1427,6 +1688,32 @@ func scanTask(row scanner) (models.RewardTask, error) {
 	return task, nil
 }
 
+func scanTaskCompletion(row scanner) (models.RewardTaskCompletion, error) {
+	var completion models.RewardTaskCompletion
+	var ledgerID sql.NullInt64
+	var taskTitle sql.NullString
+	if err := row.Scan(&completion.ID, &completion.UserID, &completion.TaskID, &taskTitle, &ledgerID, &completion.Status, &completion.CompletedAt); err != nil {
+		return models.RewardTaskCompletion{}, err
+	}
+	completion.TaskTitle = taskTitle.String
+	if ledgerID.Valid {
+		completion.LedgerID = ledgerID.Int64
+	}
+	return completion, nil
+}
+
+func scanTaskCompletions(rows *sql.Rows) ([]models.RewardTaskCompletion, error) {
+	results := []models.RewardTaskCompletion{}
+	for rows.Next() {
+		item, err := scanTaskCompletion(rows)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, item)
+	}
+	return results, rows.Err()
+}
+
 func scanAchievement(row scanner) (models.RewardAchievement, error) {
 	var achievement models.RewardAchievement
 	var active int
@@ -1435,6 +1722,34 @@ func scanAchievement(row scanner) (models.RewardAchievement, error) {
 	}
 	achievement.Active = active == 1
 	return achievement, nil
+}
+
+func scanAchievementUnlock(row scanner) (models.RewardAchievementUnlock, error) {
+	var unlock models.RewardAchievementUnlock
+	var achievementName sql.NullString
+	var referenceID sql.NullString
+	var ledgerID sql.NullInt64
+	if err := row.Scan(&unlock.ID, &unlock.UserID, &unlock.AchievementID, &achievementName, &unlock.ConditionKey, &referenceID, &ledgerID, &unlock.UnlockedAt); err != nil {
+		return models.RewardAchievementUnlock{}, err
+	}
+	unlock.AchievementName = achievementName.String
+	unlock.ReferenceID = referenceID.String
+	if ledgerID.Valid {
+		unlock.LedgerID = ledgerID.Int64
+	}
+	return unlock, nil
+}
+
+func scanAchievementUnlocks(rows *sql.Rows) ([]models.RewardAchievementUnlock, error) {
+	results := []models.RewardAchievementUnlock{}
+	for rows.Next() {
+		item, err := scanAchievementUnlock(rows)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, item)
+	}
+	return results, rows.Err()
 }
 
 func claimListQuery() string {
@@ -1452,6 +1767,18 @@ func orderSelectQuery() string {
 		address_snapshot, order_status, dispatch_status, admin_notes, courier, tracking_reference, tracking_url,
 		dispatch_note, dispatch_date, delivered_date, dispatched_by_admin_id, dispatched_at, created_at, updated_at
 		FROM reward_orders`
+}
+
+func taskCompletionSelectQuery() string {
+	return `SELECT c.id, c.user_id, c.task_id, COALESCE(t.title, ''), c.ledger_id, c.status, c.completed_at
+		FROM reward_task_completions c
+		LEFT JOIN reward_tasks t ON t.id = c.task_id`
+}
+
+func achievementUnlockSelectQuery() string {
+	return `SELECT u.id, u.user_id, u.achievement_id, COALESCE(a.name, ''), u.condition_key, u.reference_id, u.ledger_id, u.unlocked_at
+		FROM reward_achievement_unlocks u
+		LEFT JOIN reward_achievements a ON a.id = u.achievement_id`
 }
 
 func normalizeSettings(settings models.RewardSettings) models.RewardSettings {
@@ -1630,6 +1957,12 @@ func valueOrDefault(value string, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func hashChatRewardMessage(value string) string {
+	normalized := strings.Join(strings.Fields(strings.ToLower(strings.TrimSpace(value))), " ")
+	sum := sha256.Sum256([]byte(normalized))
+	return fmt.Sprintf("%x", sum[:])
 }
 
 func nullableString(value string) interface{} {

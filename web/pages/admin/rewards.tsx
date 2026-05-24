@@ -77,7 +77,9 @@ export default function RewardsAdmin() {
   const [orderModalOpen, setOrderModalOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<RewardOrder>(null);
   const [taskModalOpen, setTaskModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<RewardTask>(null);
   const [achievementModalOpen, setAchievementModalOpen] = useState(false);
+  const [editingAchievement, setEditingAchievement] = useState<RewardAchievement>(null);
   const [settingsForm] = Form.useForm<RewardSettings>();
   const [prizeForm] = Form.useForm<RewardPrize>();
   const [creditForm] = Form.useForm();
@@ -199,18 +201,40 @@ export default function RewardsAdmin() {
     }
   };
 
+  const openTask = (task?: RewardTask) => {
+    setEditingTask(task || null);
+    taskForm.setFieldsValue(task || { title: '', description: '', creditReward: 1, active: true });
+    setTaskModalOpen(true);
+  };
+
   const saveTask = async () => {
     const values = await taskForm.validateFields();
-    await fetchData(BOUNCECAST_REWARDS_TASKS, { method: 'POST', data: values });
+    await fetchData(BOUNCECAST_REWARDS_TASKS, {
+      method: 'POST',
+      data: { ...values, id: editingTask?.id || 0 },
+    });
     setTaskModalOpen(false);
+    setEditingTask(null);
     taskForm.resetFields();
     loadRewards();
   };
 
+  const openAchievement = (achievement?: RewardAchievement) => {
+    setEditingAchievement(achievement || null);
+    achievementForm.setFieldsValue(
+      achievement || { name: '', conditionKey: '', rewardAmount: 1, active: true },
+    );
+    setAchievementModalOpen(true);
+  };
+
   const saveAchievement = async () => {
     const values = await achievementForm.validateFields();
-    await fetchData(BOUNCECAST_REWARDS_ACHIEVEMENTS, { method: 'POST', data: values });
+    await fetchData(BOUNCECAST_REWARDS_ACHIEVEMENTS, {
+      method: 'POST',
+      data: { ...values, id: editingAchievement?.id || 0 },
+    });
     setAchievementModalOpen(false);
+    setEditingAchievement(null);
     achievementForm.resetFields();
     loadRewards();
   };
@@ -469,7 +493,7 @@ export default function RewardsAdmin() {
             children: (
               <Row gutter={16}>
                 <Col xs={24} md={12}>
-                  <Button onClick={() => setTaskModalOpen(true)} style={{ marginBottom: 12 }}>
+                  <Button onClick={() => openTask()} style={{ marginBottom: 12 }}>
                     Add task
                   </Button>
                   <Table
@@ -483,14 +507,19 @@ export default function RewardsAdmin() {
                         dataIndex: 'active',
                         render: value => (value ? 'Yes' : 'No'),
                       },
+                      {
+                        title: 'Actions',
+                        render: (_, record: RewardTask) => (
+                          <Button size="small" onClick={() => openTask(record)}>
+                            Edit
+                          </Button>
+                        ),
+                      },
                     ]}
                   />
                 </Col>
                 <Col xs={24} md={12}>
-                  <Button
-                    onClick={() => setAchievementModalOpen(true)}
-                    style={{ marginBottom: 12 }}
-                  >
+                  <Button onClick={() => openAchievement()} style={{ marginBottom: 12 }}>
                     Add achievement
                   </Button>
                   <Table
@@ -500,6 +529,40 @@ export default function RewardsAdmin() {
                       { title: 'Achievement', dataIndex: 'name' },
                       { title: 'Condition', dataIndex: 'conditionKey' },
                       { title: 'Credits', dataIndex: 'rewardAmount' },
+                      {
+                        title: 'Actions',
+                        render: (_, record: RewardAchievement) => (
+                          <Button size="small" onClick={() => openAchievement(record)}>
+                            Edit
+                          </Button>
+                        ),
+                      },
+                    ]}
+                  />
+                </Col>
+                <Col xs={24} md={12} style={{ marginTop: 16 }}>
+                  <Title level={4}>Recent task completions</Title>
+                  <Table
+                    rowKey="id"
+                    dataSource={summary?.taskCompletions || []}
+                    columns={[
+                      { title: 'User ID', dataIndex: 'userId' },
+                      { title: 'Task', dataIndex: 'taskTitle' },
+                      { title: 'Status', dataIndex: 'status' },
+                      { title: 'Completed', dataIndex: 'completedAt' },
+                    ]}
+                  />
+                </Col>
+                <Col xs={24} md={12} style={{ marginTop: 16 }}>
+                  <Title level={4}>Recent achievement unlocks</Title>
+                  <Table
+                    rowKey="id"
+                    dataSource={summary?.achievementUnlocks || []}
+                    columns={[
+                      { title: 'User ID', dataIndex: 'userId' },
+                      { title: 'Achievement', dataIndex: 'achievementName' },
+                      { title: 'Condition', dataIndex: 'conditionKey' },
+                      { title: 'Unlocked', dataIndex: 'unlockedAt' },
                     ]}
                   />
                 </Col>
@@ -628,8 +691,11 @@ export default function RewardsAdmin() {
 
       <Modal
         open={taskModalOpen}
-        title="Reward task"
-        onCancel={() => setTaskModalOpen(false)}
+        title={editingTask ? 'Edit reward task' : 'Reward task'}
+        onCancel={() => {
+          setTaskModalOpen(false);
+          setEditingTask(null);
+        }}
         onOk={saveTask}
       >
         <Form form={taskForm} layout="vertical" initialValues={{ creditReward: 1, active: true }}>
@@ -650,8 +716,11 @@ export default function RewardsAdmin() {
 
       <Modal
         open={achievementModalOpen}
-        title="Reward achievement"
-        onCancel={() => setAchievementModalOpen(false)}
+        title={editingAchievement ? 'Edit reward achievement' : 'Reward achievement'}
+        onCancel={() => {
+          setAchievementModalOpen(false);
+          setEditingAchievement(null);
+        }}
         onOk={saveAchievement}
       >
         <Form

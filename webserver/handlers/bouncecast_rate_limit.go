@@ -43,6 +43,7 @@ var (
 	bounceCastStarsSendRateLimit            = bounceCastRateLimitRule{Name: "stars-send", MaxRequests: 10, Window: time.Minute, Message: "Too many Stars sends. Please wait before trying again."}
 	bounceCastRewardsSpinRateLimit          = bounceCastRateLimitRule{Name: "rewards-spin", MaxRequests: 12, Window: time.Minute, Message: "Too many Rewards Wheel spins. Please wait before trying again."}
 	bounceCastRewardsClaimRateLimit         = bounceCastRateLimitRule{Name: "rewards-claim", MaxRequests: 10, Window: 15 * time.Minute, Message: "Too many reward claim updates. Please wait before trying again."}
+	bounceCastRewardsTaskRateLimit          = bounceCastRateLimitRule{Name: "rewards-task", MaxRequests: 20, Window: 10 * time.Minute, Message: "Too many reward task updates. Please wait before trying again."}
 	bounceCastMessengerWebhookRateLimit     = bounceCastRateLimitRule{Name: "messenger-webhook", MaxRequests: 120, Window: time.Minute, Message: "Too many Messenger webhook requests. Please wait before trying again."}
 )
 

@@ -231,6 +231,16 @@ type RewardTask struct {
 	UpdatedAt    time.Time `json:"updatedAt,omitempty"`
 }
 
+type RewardTaskCompletion struct {
+	ID          int64     `json:"id"`
+	UserID      string    `json:"userId"`
+	TaskID      int64     `json:"taskId"`
+	TaskTitle   string    `json:"taskTitle,omitempty"`
+	LedgerID    int64     `json:"ledgerId,omitempty"`
+	Status      string    `json:"status"`
+	CompletedAt time.Time `json:"completedAt"`
+}
+
 type RewardAchievement struct {
 	ID           int64     `json:"id"`
 	Name         string    `json:"name"`
@@ -241,10 +251,23 @@ type RewardAchievement struct {
 	UpdatedAt    time.Time `json:"updatedAt,omitempty"`
 }
 
+type RewardAchievementUnlock struct {
+	ID              int64     `json:"id"`
+	UserID          string    `json:"userId"`
+	AchievementID   int64     `json:"achievementId"`
+	AchievementName string    `json:"achievementName,omitempty"`
+	ConditionKey    string    `json:"conditionKey"`
+	ReferenceID     string    `json:"referenceId,omitempty"`
+	LedgerID        int64     `json:"ledgerId,omitempty"`
+	UnlockedAt      time.Time `json:"unlockedAt"`
+}
+
 type RewardWheelData struct {
-	Settings RewardSettings    `json:"settings"`
-	Balance  RewardSpinBalance `json:"balance"`
-	Prizes   []RewardPrize     `json:"prizes"`
+	Settings        RewardSettings         `json:"settings"`
+	Balance         RewardSpinBalance      `json:"balance"`
+	Prizes          []RewardPrize          `json:"prizes"`
+	Tasks           []RewardTask           `json:"tasks,omitempty"`
+	TaskCompletions []RewardTaskCompletion `json:"taskCompletions,omitempty"`
 }
 
 type RewardSpinResult struct {
@@ -260,17 +283,19 @@ type RewardSpinResult struct {
 }
 
 type RewardAdminSummary struct {
-	Settings      RewardSettings           `json:"settings"`
-	Prizes        []RewardPrize            `json:"prizes"`
-	Balances      []RewardSpinBalance      `json:"balances"`
-	Ledger        []RewardSpinLedgerEntry  `json:"ledger"`
-	Spins         []RewardSpin             `json:"spins"`
-	Winners       []RewardWinner           `json:"winners"`
-	Claims        []RewardClaim            `json:"claims"`
-	Orders        []RewardOrder            `json:"orders"`
-	AdminMessages []RewardAdminMessage     `json:"adminMessages"`
-	Notifications []RewardUserNotification `json:"notifications"`
-	Tasks         []RewardTask             `json:"tasks"`
-	Achievements  []RewardAchievement      `json:"achievements"`
-	UnreadCount   int                      `json:"unreadCount"`
+	Settings           RewardSettings            `json:"settings"`
+	Prizes             []RewardPrize             `json:"prizes"`
+	Balances           []RewardSpinBalance       `json:"balances"`
+	Ledger             []RewardSpinLedgerEntry   `json:"ledger"`
+	Spins              []RewardSpin              `json:"spins"`
+	Winners            []RewardWinner            `json:"winners"`
+	Claims             []RewardClaim             `json:"claims"`
+	Orders             []RewardOrder             `json:"orders"`
+	AdminMessages      []RewardAdminMessage      `json:"adminMessages"`
+	Notifications      []RewardUserNotification  `json:"notifications"`
+	Tasks              []RewardTask              `json:"tasks"`
+	TaskCompletions    []RewardTaskCompletion    `json:"taskCompletions"`
+	Achievements       []RewardAchievement       `json:"achievements"`
+	AchievementUnlocks []RewardAchievementUnlock `json:"achievementUnlocks"`
+	UnreadCount        int                       `json:"unreadCount"`
 }

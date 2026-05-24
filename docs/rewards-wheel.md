@@ -5,7 +5,7 @@ BounceCast Rewards Wheel is an internal/manual prize system. It does not use Woo
 ## Viewer Flow
 
 1. Viewers log in with a BounceCast account.
-2. Viewers earn Spin Credits from admin grants today, with chat, task, achievement, and top-supporter hooks ready for deeper automation.
+2. Viewers earn Spin Credits from admin grants, configured chat activity rewards, and manually completed viewer tasks.
 3. Viewers open `/rewards`.
 4. Viewers spend 1 Spin Credit per spin by default.
 5. The server selects the prize with weighted odds and records the spin before the frontend animation reveals the result.
@@ -24,12 +24,12 @@ Open `Admin -> Studio -> Rewards Wheel`.
 
 Admin tabs include:
 
-- Settings: enable/disable the wheel, spin cost, chat reward placeholders, top supporter placeholder values, and overlay template/sound.
+- Settings: enable/disable the wheel, spin cost, chat reward rules, top supporter placeholder values, and overlay template/sound.
 - Prizes: create and edit physical, digital, discount placeholder, and sorry prizes.
 - Spin Credits: manually grant or deduct credits with a ledger entry.
 - Fulfilment: manage internal orders, update status, mark dispatched, and export CSV.
 - Messages: review unread reward win alerts.
-- Tasks & Achievements: configure placeholder reward tasks and achievement records.
+- Tasks & Achievements: configure viewer task rewards, review recent task completions, and manage achievement placeholder records.
 
 ## Prize Types
 
@@ -59,6 +59,24 @@ Supported award sources:
 
 Spin spending is recorded internally as `spin_spend`.
 
+### Chat Activity Rewards
+
+When Rewards Wheel and chat rewards are enabled, normal chat messages are counted toward the configured threshold. Repeated messages inside a short anti-spam window are ignored, and the configured cooldown prevents the same viewer from earning chat credits too frequently.
+
+Chat rewards write:
+
+- `reward_chat_activity` for per-viewer message count/cooldown state
+- `reward_spin_ledger` with source `chat_activity` when credits are awarded
+
+### Viewer Tasks
+
+Admins can create active tasks in `Admin -> Studio -> Rewards Wheel -> Tasks & Achievements`. Logged-in viewers see active tasks on `/rewards`, can complete each task once, and receive the configured Spin Credits through the ledger.
+
+Task completions write:
+
+- `reward_task_completions`
+- `reward_spin_ledger` with source `task_completed`
+
 ## Security Notes
 
 - Frontend never chooses a prize.
@@ -87,6 +105,12 @@ Migration `00013_bouncecast_rewards_wheel.sql` adds:
 - `reward_tasks`
 - `reward_achievements`
 
+Migration `00014_bouncecast_rewards_automation.sql` adds:
+
+- `reward_chat_activity`
+- `reward_task_completions`
+- `reward_achievement_unlocks`
+
 ## API Endpoints
 
 Viewer:
@@ -95,6 +119,7 @@ Viewer:
 - `GET /api/rewards/balance`
 - `POST /api/rewards/spin`
 - `GET /api/rewards/history`
+- `POST /api/rewards/tasks/complete`
 - `GET /api/rewards/claims`
 - `POST /api/rewards/claims/submit`
 - `GET /api/rewards/notifications`
@@ -120,7 +145,7 @@ For a live Debian 13/Plesk Docker install:
 1. Pull the latest BounceCast image or rebuild the Docker image from this branch.
 2. Stop the old container.
 3. Start the new container with the same mounted data volume.
-4. Watch logs for migration `00013_bouncecast_rewards_wheel.sql`.
+4. Watch logs for migrations `00013_bouncecast_rewards_wheel.sql` and `00014_bouncecast_rewards_automation.sql`.
 5. Log in as owner/admin and open `Admin -> Studio -> Rewards Wheel`.
 6. Keep the wheel disabled until prizes and fulfilment terms are configured.
 7. Add at least one sorry prize and any real prizes with stock quantities.
@@ -128,6 +153,6 @@ For a live Debian 13/Plesk Docker install:
 
 ## Known Limitations
 
-- Chat activity, tasks, achievements, and top-supporter rewards have storage/config placeholders and service entry points, but broader automation rules should be expanded carefully in a later pass.
+- Achievement unlocks and top-supporter rewards still have storage/config placeholders and should be wired into product events carefully in a later pass.
 - Reward win and dispatch emails use the existing BounceCast SMTP settings. If SMTP is disabled or an address is missing, the system records the failure and keeps the in-panel notification/admin message.
 - Discount prizes are placeholders only and do not connect to any shop, checkout, or external fulfilment system.
