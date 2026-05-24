@@ -71,6 +71,7 @@ class ChatRepository(
                             val event = runCatching { api.json.decodeFromString<ChatEvent>(line) }.getOrNull()
                             when (event?.type) {
                                 "PING" -> webSocket.send("""{"type":"PONG"}""")
+                                "PONG", "CONNECTED_USER_INFO", "USER_JOINED", "USER_PARTED" -> Unit
                                 "VISIBILITY-UPDATE" -> applyVisibility(event)
                                 null -> Unit
                                 else -> _events.value = (_events.value + event).takeLast(200)
