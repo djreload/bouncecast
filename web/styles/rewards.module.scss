@@ -1,0 +1,169 @@
+.page {
+  min-height: 100vh;
+  padding: clamp(1rem, 3vw, 2.5rem);
+  color: #fff;
+  background:
+    radial-gradient(circle at 20% 10%, rgb(255 54 188 / 24%), transparent 34%),
+    radial-gradient(circle at 82% 0%, rgb(32 228 255 / 24%), transparent 30%),
+    linear-gradient(135deg, #050712 0%, #101426 48%, #060811 100%);
+}
+
+.shell {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+}
+
+.hero {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 4rem);
+  font-weight: 950;
+  letter-spacing: 0;
+}
+
+.subtitle {
+  max-width: 680px;
+  margin: 0.35rem 0 0;
+  color: rgb(255 255 255 / 78%);
+}
+
+.balance {
+  min-width: 180px;
+  padding: 1rem 1.2rem;
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 8%);
+  box-shadow: 0 0 28px rgb(32 228 255 / 12%);
+  text-align: center;
+}
+
+.balance strong {
+  display: block;
+  color: #ffe58f;
+  font-size: 2.2rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(280px, 0.85fr);
+  gap: 1.2rem;
+}
+
+.panel {
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 16px;
+  background: rgb(8 12 28 / 78%);
+  box-shadow: 0 22px 80px rgb(0 0 0 / 32%);
+  backdrop-filter: blur(16px);
+}
+
+.wheelPanel {
+  display: grid;
+  place-items: center;
+  min-height: 560px;
+  padding: 1.25rem;
+}
+
+.wheel {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(520px, 88vw);
+  aspect-ratio: 1;
+  border: 8px solid rgb(255 255 255 / 12%);
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    #ff36bc 0 16%,
+    #20e4ff 16% 32%,
+    #ffe58f 32% 48%,
+    #55f7c2 48% 64%,
+    #7c4dff 64% 82%,
+    #ff7a18 82% 100%
+  );
+  box-shadow:
+    0 0 48px rgb(255 54 188 / 24%),
+    inset 0 0 48px rgb(0 0 0 / 42%);
+  transition: transform 3s cubic-bezier(0.18, 0.88, 0.22, 1);
+}
+
+.wheel::after {
+  content: '';
+  position: absolute;
+  inset: 13%;
+  border-radius: 50%;
+  background: #050712;
+  box-shadow: inset 0 0 30px rgb(32 228 255 / 18%);
+}
+
+.pointer {
+  position: absolute;
+  top: -0.2rem;
+  left: 50%;
+  z-index: 3;
+  width: 0;
+  height: 0;
+  border-right: 18px solid transparent;
+  border-left: 18px solid transparent;
+  border-top: 34px solid #ffe58f;
+  filter: drop-shadow(0 0 12px rgb(255 229 143 / 70%));
+  transform: translateX(-50%);
+}
+
+.wheelLabel {
+  position: relative;
+  z-index: 2;
+  width: 58%;
+  color: #fff;
+  text-align: center;
+}
+
+.wheelLabel strong {
+  display: block;
+  color: #ffe58f;
+  font-size: 1.6rem;
+}
+
+.spinButton {
+  height: 54px;
+  min-width: 180px;
+  margin-top: 1.4rem;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ff36bc, #20e4ff);
+  font-weight: 900;
+  box-shadow: 0 0 26px rgb(255 54 188 / 34%);
+}
+
+.list {
+  display: grid;
+  gap: 0.75rem;
+  max-height: 540px;
+  overflow: auto;
+}
+
+.listItem {
+  padding: 0.85rem;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 6%);
+}
+
+.listItem p {
+  margin: 0.2rem 0 0;
+  color: rgb(255 255 255 / 72%);
+}
+
+@media (width <= 920px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

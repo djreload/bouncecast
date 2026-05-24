@@ -12,6 +12,7 @@ export enum MessageType {
   CHAT_ACTION = 'CHAT_ACTION',
   CHAT_REACTION = 'CHAT_REACTION',
   STARS_SENT = 'STARS_SENT',
+  REWARD_WHEEL_WIN = 'REWARD_WHEEL_WIN',
   FEDIVERSE_ENGAGEMENT_FOLLOW = 'FEDIVERSE_ENGAGEMENT_FOLLOW',
   FEDIVERSE_ENGAGEMENT_LIKE = 'FEDIVERSE_ENGAGEMENT_LIKE',
   FEDIVERSE_ENGAGEMENT_REPOST = 'FEDIVERSE_ENGAGEMENT_REPOST',
@@ -73,10 +74,13 @@ export interface MessageReactionEvent extends SocketEvent {
 
 export interface StarsSentSocketEvent extends SocketEvent {
   displayName: string;
-  amount: number;
+  amount?: number;
   message?: string;
   effect: string;
   soundEnabled?: boolean;
+  prizeName?: string;
+  prizeImage?: string;
+  overlayKind?: 'stars' | 'reward';
 }
 
 export interface FediverseEvent extends SocketEvent {

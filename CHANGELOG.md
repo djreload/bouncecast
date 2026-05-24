@@ -8,7 +8,32 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 
 - Continue expanding audit records around older Owncast-compatible admin actions.
 - Continue reviewing moderator-specific admin surfaces before exposing moderator dashboard pages.
+- Wire automated chat/task/achievement/top-supporter reward triggers into the new Rewards Wheel credit hooks.
 - Continue live VPS deployment notes as production configuration changes.
+
+## 2026-05-24
+
+### Added
+
+- Added database migration `00013_bouncecast_rewards_wheel.sql` for internal Rewards Wheel prizes, Spin Credit balances and ledger entries, spins, winners, claims, fulfilment orders, admin messages, viewer notifications, tasks, achievements, and reward settings.
+- Added a modular Rewards Wheel backend with server-side weighted prize selection, atomic credit spending, stock reduction, claim/order creation, admin message creation, and viewer notification records.
+- Added `/rewards` as a logged-in viewer Rewards Wheel page with balance display, prize list, spin animation, personal history, claim forms, and reward notifications.
+- Added Admin -> Studio -> Rewards Wheel for settings, prize management, credit grants/deductions, fulfilment orders, admin messages, CSV export, task placeholders, and achievement placeholders.
+- Added a `REWARD_WHEEL_WIN` websocket event that reuses the existing Stars overlay queue for real prize wins.
+- Added reward win admin email attempts and dispatched-prize winner email attempts using the existing BounceCast SMTP settings, with failures recorded as admin/in-panel status.
+- Added `docs/rewards-wheel.md` covering admin setup, viewer flow, database tables, endpoints, security notes, VPS deployment notes, and current limitations.
+- Added backend tests for Spin Credit ledger idempotency, zero-credit spin rejection, sorry prize handling, real prize fulfilment records, claim submission, dispatch notifications, weighted selection, and overlay payloads.
+
+### Changed
+
+- Updated the public user menu with a Rewards Wheel entry.
+- Updated the admin sidebar so owner/admin sessions can reach the Rewards Wheel dashboard.
+
+### Security
+
+- Kept the Rewards Wheel fully internal/manual with no payment, checkout, shop, creator payout, or withdrawal paths.
+- Added rate limiting around viewer spins and claim submissions.
+- Kept prize selection, credit spending, stock changes, and fulfilment record creation server-side.
 
 ## 2026-05-23
 

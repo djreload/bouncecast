@@ -20,6 +20,8 @@ const (
 	MessageReactionUpdate EventType = "CHAT_REACTION"
 	// StarsSent is the event sent when a viewer sends Stars.
 	StarsSent EventType = "STARS_SENT"
+	// RewardWheelWin is the event sent when a viewer wins a real Rewards Wheel prize.
+	RewardWheelWin EventType = "REWARD_WHEEL_WIN"
 	// PING is a ping message.
 	PING EventType = "PING"
 	// PONG is a pong message.

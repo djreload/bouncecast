@@ -168,6 +168,26 @@ export const BOUNCECAST_STARS_WALLET_ADJUST = `${API_LOCATION}bouncecast/stars/w
 
 export const BOUNCECAST_STARS_TEST_OVERLAY = `${API_LOCATION}bouncecast/stars/test-overlay`;
 
+export const BOUNCECAST_REWARDS_ADMIN = `${API_LOCATION}bouncecast/rewards`;
+
+export const BOUNCECAST_REWARDS_SETTINGS = `${API_LOCATION}bouncecast/rewards/settings`;
+
+export const BOUNCECAST_REWARDS_PRIZES = `${API_LOCATION}bouncecast/rewards/prizes`;
+
+export const BOUNCECAST_REWARDS_CREDITS_ADJUST = `${API_LOCATION}bouncecast/rewards/credits/adjust`;
+
+export const BOUNCECAST_REWARDS_ORDER_UPDATE = `${API_LOCATION}bouncecast/rewards/orders/update`;
+
+export const BOUNCECAST_REWARDS_ORDER_DISPATCH = `${API_LOCATION}bouncecast/rewards/orders/dispatch`;
+
+export const BOUNCECAST_REWARDS_ORDERS_EXPORT = `${API_LOCATION}bouncecast/rewards/orders/export`;
+
+export const BOUNCECAST_REWARDS_MESSAGE_READ = `${API_LOCATION}bouncecast/rewards/messages/read`;
+
+export const BOUNCECAST_REWARDS_TASKS = `${API_LOCATION}bouncecast/rewards/tasks`;
+
+export const BOUNCECAST_REWARDS_ACHIEVEMENTS = `${API_LOCATION}bouncecast/rewards/achievements`;
+
 export const BOUNCECAST_USERS = `${API_LOCATION}bouncecast/users`;
 
 export const BOUNCECAST_USER_PERMISSIONS = `${API_LOCATION}bouncecast/users/permissions`;
@@ -185,6 +205,22 @@ export const STARS_PAYPAL_ORDER = `${NEXT_PUBLIC_API_HOST}api/stars/paypal/order
 export const STARS_PAYPAL_CAPTURE = `${NEXT_PUBLIC_API_HOST}api/stars/paypal/capture`;
 
 export const STARS_SEND = `${NEXT_PUBLIC_API_HOST}api/stars/send`;
+
+export const REWARDS_WHEEL = `${NEXT_PUBLIC_API_HOST}api/rewards/wheel`;
+
+export const REWARDS_BALANCE = `${NEXT_PUBLIC_API_HOST}api/rewards/balance`;
+
+export const REWARDS_SPIN = `${NEXT_PUBLIC_API_HOST}api/rewards/spin`;
+
+export const REWARDS_HISTORY = `${NEXT_PUBLIC_API_HOST}api/rewards/history`;
+
+export const REWARDS_CLAIMS = `${NEXT_PUBLIC_API_HOST}api/rewards/claims`;
+
+export const REWARDS_CLAIM_SUBMIT = `${NEXT_PUBLIC_API_HOST}api/rewards/claims/submit`;
+
+export const REWARDS_NOTIFICATIONS = `${NEXT_PUBLIC_API_HOST}api/rewards/notifications`;
+
+export const REWARDS_NOTIFICATION_READ = `${NEXT_PUBLIC_API_HOST}api/rewards/notifications/read`;
 
 const STUDIO_API_LOCATION = `${NEXT_PUBLIC_API_HOST}api/bouncecast/studio/`;
 

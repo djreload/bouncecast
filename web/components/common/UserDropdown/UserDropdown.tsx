@@ -38,6 +38,10 @@ const TeamOutlined = dynamic(() => import('@ant-design/icons/TeamOutlined'), {
   ssr: false,
 });
 
+const GiftOutlined = dynamic(() => import('@ant-design/icons/GiftOutlined'), {
+  ssr: false,
+});
+
 const ShrinkOutlined = dynamic(() => import('@ant-design/icons/ShrinkOutlined'), {
   ssr: false,
 });
@@ -185,6 +189,14 @@ export const UserDropdown: FC<UserDropdownProps> = ({
     },
     {
       key: 2,
+      icon: <GiftOutlined />,
+      label: 'Rewards Wheel',
+      onClick: () => {
+        window.location.href = '/rewards';
+      },
+    },
+    {
+      key: 3,
       icon: <TeamOutlined />,
       label: 'DJ lineup',
       onClick: () => {
@@ -192,7 +204,7 @@ export const UserDropdown: FC<UserDropdownProps> = ({
       },
     },
     {
-      key: 3,
+      key: 4,
       icon: <DashboardOutlined />,
       label: 'Login',
       onClick: () => {
@@ -200,13 +212,13 @@ export const UserDropdown: FC<UserDropdownProps> = ({
       },
     },
     {
-      key: 4,
+      key: 5,
       icon: <EditOutlined />,
       label: 'Change name',
       onClick: handleChangeName,
     },
     {
-      key: 5,
+      key: 6,
       icon: <LockOutlined />,
       label: 'Indie/Fediverse auth',
       onClick: () => setShowAuthModal(true),
@@ -214,7 +226,7 @@ export const UserDropdown: FC<UserDropdownProps> = ({
   ];
   if (canShowHideChat)
     items.push({
-      key: 6,
+      key: 7,
       'aria-expanded': chatState === ChatState.VISIBLE,
       className: styles.chatToggle, // TODO why do we hide this button on tablets?
       icon: <MessageOutlined />,
@@ -223,7 +235,7 @@ export const UserDropdown: FC<UserDropdownProps> = ({
     } as MenuProps['items'][0]);
   if (canShowChatPopup)
     items.push({
-      key: 7,
+      key: 8,
       icon: popupWindow ? <ShrinkOutlined /> : <ExpandAltOutlined />,
       label: popupWindow ? 'Put chat back' : 'Pop out chat',
       onClick: popupWindow ? closeChatPopup : openChatPopup,

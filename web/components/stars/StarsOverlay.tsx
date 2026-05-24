@@ -122,6 +122,7 @@ export const StarsOverlay: FC = () => {
   }
 
   const effectClass = styles[activeEvent.effect] || styles.sparkle;
+  const isReward = activeEvent.overlayKind === 'reward' || Boolean(activeEvent.prizeName);
 
   return (
     <div className={classNames(styles.root, effectClass)} aria-live="polite">
@@ -131,7 +132,14 @@ export const StarsOverlay: FC = () => {
         data-effect={activeEvent.effect}
         data-testid="stars-overlay-toast"
       >
-        <span className={styles.amount}>{activeEvent.amount} Stars &#11088;</span>
+        {isReward && activeEvent.prizeImage && (
+          <img className={styles.rewardImage} src={activeEvent.prizeImage} alt="" />
+        )}
+        <span className={styles.amount}>
+          {isReward
+            ? activeEvent.prizeName || 'Rewards Wheel win'
+            : `${activeEvent.amount} Stars ⭐`}
+        </span>
         <span className={styles.sender}>{activeEvent.displayName}</span>
         {activeEvent.message && <p className={styles.message}>{activeEvent.message}</p>}
       </div>

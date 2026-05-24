@@ -271,6 +271,10 @@ export const MainLayout: FC<MainLayoutProps> = ({ children }) => {
       label: <Link href="/admin/stars">Stars</Link>,
       key: '/admin/stars',
     },
+    {
+      label: <Link href="/admin/rewards">Rewards Wheel</Link>,
+      key: '/admin/rewards',
+    },
   ]);
 
   const utilitiesMenu = compactMenuItems([

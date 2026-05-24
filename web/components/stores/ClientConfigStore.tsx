@@ -419,7 +419,13 @@ export const ClientConfigStore: FC = () => {
       case MessageType.STARS_SENT:
         setStarsOverlayEvents(currentState => [
           ...currentState.slice(-4),
-          message as StarsSentSocketEvent,
+          { ...(message as StarsSentSocketEvent), overlayKind: 'stars' },
+        ]);
+        break;
+      case MessageType.REWARD_WHEEL_WIN:
+        setStarsOverlayEvents(currentState => [
+          ...currentState.slice(-4),
+          { ...(message as StarsSentSocketEvent), overlayKind: 'reward' },
         ]);
         break;
       case MessageType.ERROR_USER_DISABLED:
