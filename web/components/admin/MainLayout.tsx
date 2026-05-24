@@ -220,6 +220,10 @@ export const MainLayout: FC<MainLayoutProps> = ({ children }) => {
 
   const integrationsMenu = compactMenuItems([
     isOwner && {
+      label: <Link href="/admin/integrations/mobile-app">Mobile App Platform</Link>,
+      key: '/admin/integrations/mobile-app',
+    },
+    isOwner && {
       label: (
         <Link href="/admin/integrations/facebook-messenger-alerts">Facebook Messenger Alerts</Link>
       ),

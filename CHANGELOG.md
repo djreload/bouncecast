@@ -9,12 +9,22 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 - Continue expanding audit records around older Owncast-compatible admin actions.
 - Continue reviewing moderator-specific admin surfaces before exposing moderator dashboard pages.
 - Add richer custom achievement conditions beyond the current supported event keys.
+- Add server-side FCM go-live fan-out and mobile notification delivery logs.
+- Wire the Android app into the unified BounceCast account login/token flow instead of the first-pass anonymous chat registration.
+- Add native Android Stars, Rewards, GIF picker, reactions, and moderation-state rendering.
 - Continue live VPS deployment notes as production configuration changes.
 
 ## 2026-05-24
 
 ### Added
 
+- Added database migration `00015_bouncecast_mobile_platform.sql` for mobile app settings, branding, navigation, feature flags, ad settings, FCM notification settings, Android device tokens, legal pages, mobile assets, and notification logs.
+- Added a versioned public mobile API under `/api/mobile/v1/*` that exposes remote app config, theme, navigation, features, assets, legal pages, stream status, chat config, ads, notification config, and device token preferences.
+- Added Admin -> Integrations -> Mobile App Platform for owner-managed Android/mobile app configuration.
+- Added `docs/mobile/android-platform.md` and `docs/mobile/android-env.example` covering the inspected BounceCast stream/chat architecture, mobile adapter strategy, staged Android plan, API contract, environment defaults, and production risks.
+- Added a native Android project scaffold under `android/` using Kotlin, Jetpack Compose, Material 3, Media3/ExoPlayer, DataStore, OkHttp, Firebase Messaging, Google Mobile Ads, and Unity Ads.
+- Added Android remote config loading/cache, backend-driven theme support, HLS playback against the existing BounceCast stream, websocket chat against the existing BounceCast chat server, FCM notification receiver/deep link foundation, and Google/Unity ad provider fallback scaffolding.
+- Added Android unit coverage for ad provider priority and fallback behavior.
 - Added database migration `00013_bouncecast_rewards_wheel.sql` for internal Rewards Wheel prizes, Spin Credit balances and ledger entries, spins, winners, claims, fulfilment orders, admin messages, viewer notifications, tasks, achievements, and reward settings.
 - Added database migration `00014_bouncecast_rewards_automation.sql` for chat activity reward counters, one-time task completions, and achievement unlock tracking.
 - Added a modular Rewards Wheel backend with server-side weighted prize selection, atomic credit spending, stock reduction, claim/order creation, admin message creation, and viewer notification records.
@@ -32,6 +42,8 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 
 ### Changed
 
+- Updated the admin sidebar with a Mobile App Platform integration entry for owner accounts.
+- Installed a local Gradle 8.12.1 distribution under `C:\tools\gradle-8.12.1` after winget/Chocolatey system installs were unavailable without admin elevation.
 - Updated the public user menu with a Rewards Wheel entry.
 - Updated the admin sidebar so owner/admin sessions can reach the Rewards Wheel dashboard.
 - Updated Debian 13/Plesk live server notes with Rewards Wheel migration and setup checks through migration version 14.
@@ -39,6 +51,9 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 
 ### Security
 
+- Kept the mobile platform layer as an adapter over the existing HLS stream, websocket chat, user tokens, and moderation system instead of adding duplicate mobile-only stream/chat state.
+- Added rate limiting around mobile device-token registration and preference endpoints.
+- Added protected storage support for Android device tokens when `BOUNCECAST_SECRET_KEY` is configured.
 - Kept the Rewards Wheel fully internal/manual with no payment, checkout, shop, creator payout, or withdrawal paths.
 - Added rate limiting around viewer spins and claim submissions.
 - Kept prize selection, credit spending, stock changes, and fulfilment record creation server-side.

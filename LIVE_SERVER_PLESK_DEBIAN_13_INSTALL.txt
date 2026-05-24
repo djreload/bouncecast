@@ -1,7 +1,7 @@
 BounceCast live server install guide
 Debian 13 VPS with Plesk already installed
 
-Last updated: 2026-05-19
+Last updated: 2026-05-24
 Repository: https://github.com/djreload/bouncecast
 
 Purpose
@@ -56,6 +56,12 @@ Important compatibility notes
    settings, Stars payment settings, packages, and manual wallet adjustments.
    Stored admin accounts can still use normal admin views but should not be
    treated as owners.
+
+8. The mobile platform foundation adds migration 00015 and public
+   /api/mobile/v1/* endpoints for the future Android app. It reuses the same
+   HLS stream, websocket chat, user tokens, and moderation state as the web app.
+   Set BOUNCECAST_SECRET_KEY in production before accepting Android device
+   tokens so stored push tokens can be protected at rest.
 
 
 Recommended server layout

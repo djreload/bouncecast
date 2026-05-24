@@ -1,0 +1,17 @@
+# BounceCast mobile platform optional environment defaults.
+# Do not put real secrets in source control.
+
+# Public URL Android clients should use when the admin setting is blank.
+BOUNCECAST_MOBILE_BASE_URL=https://k-nrg.co.uk
+
+# Used to protect stored mobile device tokens and other future server-side
+# mobile secrets at rest. Use a long random value in production.
+BOUNCECAST_SECRET_KEY=replace-with-a-long-random-secret
+
+# Public FCM project metadata. Server credentials for sending notifications
+# must stay server-side and should not be exposed through the mobile API.
+FIREBASE_PROJECT_ID=your-firebase-project-id
+
+# Future server-side-only FCM credential path, if enabled in a later stage.
+FIREBASE_SERVICE_ACCOUNT_FILE=/etc/bouncecast/firebase-service-account.json
+

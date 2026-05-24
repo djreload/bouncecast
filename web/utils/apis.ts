@@ -148,6 +148,10 @@ export const BOUNCECAST_FACEBOOK_MESSENGER_ALERTS_PREVIEW = `${API_LOCATION}boun
 
 export const BOUNCECAST_PUSH_SETTINGS = `${API_LOCATION}bouncecast/push-settings`;
 
+export const BOUNCECAST_MOBILE_ADMIN = `${API_LOCATION}bouncecast/mobile`;
+
+export const BOUNCECAST_MOBILE_SETTINGS = `${API_LOCATION}bouncecast/mobile/settings`;
+
 export const BOUNCECAST_ADMIN_SESSION = `${API_LOCATION}bouncecast/session`;
 
 export const BOUNCECAST_SCHEDULE = `${API_LOCATION}bouncecast/schedule`;

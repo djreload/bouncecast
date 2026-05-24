@@ -45,6 +45,7 @@ var (
 	bounceCastRewardsClaimRateLimit         = bounceCastRateLimitRule{Name: "rewards-claim", MaxRequests: 10, Window: 15 * time.Minute, Message: "Too many reward claim updates. Please wait before trying again."}
 	bounceCastRewardsTaskRateLimit          = bounceCastRateLimitRule{Name: "rewards-task", MaxRequests: 20, Window: 10 * time.Minute, Message: "Too many reward task updates. Please wait before trying again."}
 	bounceCastMessengerWebhookRateLimit     = bounceCastRateLimitRule{Name: "messenger-webhook", MaxRequests: 120, Window: time.Minute, Message: "Too many Messenger webhook requests. Please wait before trying again."}
+	bounceCastMobileDeviceRateLimit         = bounceCastRateLimitRule{Name: "mobile-device", MaxRequests: 30, Window: 10 * time.Minute, Message: "Too many mobile device requests. Please wait before trying again."}
 )
 
 func enforceBounceCastRateLimit(w http.ResponseWriter, r *http.Request, rule bounceCastRateLimitRule, subjects ...string) bool {
