@@ -56,7 +56,7 @@ type bounceCastUnifiedSession struct {
 // BounceCastUnifiedAuthOptions handles CORS preflight for the single
 // user-facing login/logout flow.
 func BounceCastUnifiedAuthOptions(w http.ResponseWriter, r *http.Request) {
-	setBounceCastUnifiedAuthHeaders(w)
+	setBounceCastUnifiedAuthHeaders(w, r)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -64,7 +64,7 @@ func BounceCastUnifiedAuthOptions(w http.ResponseWriter, r *http.Request) {
 // the original Owncast admin password, BounceCast account roles, and existing
 // Studio streamer accounts, then returns every session token the browser needs.
 func BounceCastUnifiedLogin(w http.ResponseWriter, r *http.Request) {
-	setBounceCastUnifiedAuthHeaders(w)
+	setBounceCastUnifiedAuthHeaders(w, r)
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -112,7 +112,7 @@ func BounceCastUnifiedLogin(w http.ResponseWriter, r *http.Request) {
 // bearer/access tokens supplied by the frontend. Legacy Basic auth is not a
 // server-side session, so it cannot be cleared here.
 func BounceCastUnifiedLogout(w http.ResponseWriter, r *http.Request) {
-	setBounceCastUnifiedAuthHeaders(w)
+	setBounceCastUnifiedAuthHeaders(w, r)
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -500,10 +500,8 @@ func isSafeBounceCastRedirect(value string) bool {
 	return strings.HasPrefix(value, "/") && !strings.HasPrefix(value, "//") && !strings.HasPrefix(strings.ToLower(value), "/\\")
 }
 
-func setBounceCastUnifiedAuthHeaders(w http.ResponseWriter) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+func setBounceCastUnifiedAuthHeaders(w http.ResponseWriter, r *http.Request) {
+	middleware.SetBounceCastCORSHeaders(w, r, "GET, POST, OPTIONS")
 }
 
 func writeBounceCastUnifiedUnauthorized(w http.ResponseWriter) {

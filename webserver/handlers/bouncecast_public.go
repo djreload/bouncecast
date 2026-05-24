@@ -14,6 +14,7 @@ import (
 	"github.com/owncast/owncast/models"
 	"github.com/owncast/owncast/persistence/starsrepository"
 	"github.com/owncast/owncast/utils"
+	"github.com/owncast/owncast/webserver/router/middleware"
 	webutils "github.com/owncast/owncast/webserver/utils"
 )
 
@@ -125,14 +126,14 @@ type bounceCastAccountReminderStatus struct {
 
 // BounceCastPublicOptions handles preflight for public BounceCast discovery APIs.
 func BounceCastPublicOptions(w http.ResponseWriter, r *http.Request) {
-	setBounceCastPublicHeaders(w)
+	setBounceCastPublicHeaders(w, r)
 	w.WriteHeader(http.StatusNoContent)
 }
 
 // GetBounceCastPublicDJs returns active DJ profiles without exposing emails,
 // stream keys, or dashboard-only account state.
 func GetBounceCastPublicDJs(w http.ResponseWriter, r *http.Request) {
-	setBounceCastPublicHeaders(w)
+	setBounceCastPublicHeaders(w, r)
 
 	djs, err := queryBounceCastPublicDJs("")
 	if err != nil {
@@ -144,7 +145,7 @@ func GetBounceCastPublicDJs(w http.ResponseWriter, r *http.Request) {
 
 // GetBounceCastPublicDJProfile returns one active DJ profile by public handle.
 func GetBounceCastPublicDJProfile(w http.ResponseWriter, r *http.Request) {
-	setBounceCastPublicHeaders(w)
+	setBounceCastPublicHeaders(w, r)
 
 	handle := normalizeBounceCastPublicHandle(chi.URLParam(r, "handle"))
 	if handle == "" {
@@ -188,7 +189,7 @@ func GetBounceCastPublicDJProfile(w http.ResponseWriter, r *http.Request) {
 
 // GetBounceCastPublicSchedule returns the public lineup for the homepage and DJ pages.
 func GetBounceCastPublicSchedule(w http.ResponseWriter, r *http.Request) {
-	setBounceCastPublicHeaders(w)
+	setBounceCastPublicHeaders(w, r)
 
 	filter, err := parseBounceCastPublicScheduleFilter(r)
 	if err != nil {
@@ -206,7 +207,7 @@ func GetBounceCastPublicSchedule(w http.ResponseWriter, r *http.Request) {
 // BounceCastAccountHub combines the current public account, role destinations,
 // Stars summary, and public DJ/schedule context for the unified Account Hub.
 func BounceCastAccountHub(user models.User, w http.ResponseWriter, r *http.Request) {
-	setBounceCastAccountHeaders(w)
+	setBounceCastAccountHeaders(w, r)
 
 	notificationPreferences, err := getBounceCastAccountNotificationPreferences(user.ID)
 	if err != nil {
@@ -266,7 +267,7 @@ func BounceCastAccountHub(user models.User, w http.ResponseWriter, r *http.Reque
 // SetBounceCastScheduleReminder stores a logged-in viewer's reminder choices
 // for a public scheduled set.
 func SetBounceCastScheduleReminder(user models.User, w http.ResponseWriter, r *http.Request) {
-	setBounceCastAccountHeaders(w)
+	setBounceCastAccountHeaders(w, r)
 	if !enforceBounceCastRateLimit(w, r, bounceCastAccountProfileRateLimit, bounceCastRateLimitUserSubject(user.ID), bounceCastRateLimitIPSubject(r)) {
 		return
 	}
@@ -763,8 +764,6 @@ func parseBounceCastSQLiteTime(value string) (time.Time, error) {
 	return time.Time{}, errors.New("unsupported time format")
 }
 
-func setBounceCastPublicHeaders(w http.ResponseWriter) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+func setBounceCastPublicHeaders(w http.ResponseWriter, r *http.Request) {
+	middleware.SetBounceCastCORSHeaders(w, r, "GET, OPTIONS")
 }

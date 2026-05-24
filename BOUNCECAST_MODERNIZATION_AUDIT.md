@@ -20,6 +20,8 @@ This audit captures the first pass at updating BounceCast toward current enginee
 - Added schedule validation so set end times must be after start times.
 - Updated same-major Go dependencies for router, storage, markdown, system metrics, and `golang.org/x/*` packages.
 - Updated frontend package-lock dependencies within the current Next 14 / React 18 architecture and ran `npm audit fix` without force.
+- Replaced wildcard CORS on BounceCast browser-facing account, unified login, Studio, Stars, and public APIs with same-origin checks, localhost-only development allowance, and an explicit `BOUNCECAST_ALLOWED_ORIGINS` escape hatch for trusted split deployments.
+- Expanded page CSP enough for the PayPal Stars checkout SDK while adding `object-src 'none'`, `base-uri 'self'`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy: strict-origin-when-cross-origin`.
 
 ## Dependency Findings
 

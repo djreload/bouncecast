@@ -32,7 +32,7 @@ type facebookMessengerWebhookPayload struct {
 // GetBounceCastMessengerAlertsPublicConfig exposes only the public CTA data
 // needed by the stream/DJ pages.
 func GetBounceCastMessengerAlertsPublicConfig(w http.ResponseWriter, r *http.Request) {
-	setBounceCastPublicHeaders(w)
+	setBounceCastPublicHeaders(w, r)
 	webutils.WriteResponse(w, facebookmessenger.GetPublicConfig(data.GetDatabase()))
 }
 

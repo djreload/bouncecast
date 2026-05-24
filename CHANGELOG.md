@@ -35,12 +35,15 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 - Updated the public user menu with a Rewards Wheel entry.
 - Updated the admin sidebar so owner/admin sessions can reach the Rewards Wheel dashboard.
 - Updated Debian 13/Plesk live server notes with Rewards Wheel migration and setup checks through migration version 14.
+- Updated the modernization audit and live server notes with BounceCast browser API CORS guidance.
 
 ### Security
 
 - Kept the Rewards Wheel fully internal/manual with no payment, checkout, shop, creator payout, or withdrawal paths.
 - Added rate limiting around viewer spins and claim submissions.
 - Kept prize selection, credit spending, stock changes, and fulfilment record creation server-side.
+- Replaced wildcard CORS on BounceCast browser-facing account/login/Studio/Stars/public APIs with same-origin checks, localhost-only dev allowance, and explicit `BOUNCECAST_ALLOWED_ORIGINS` support.
+- Expanded the web CSP to allow the PayPal Stars checkout SDK while adding safer browser headers.
 
 ## 2026-05-23
 

@@ -8,13 +8,12 @@ import (
 	"github.com/owncast/owncast/core/stars"
 	"github.com/owncast/owncast/models"
 	"github.com/owncast/owncast/persistence/starsrepository"
-	"github.com/owncast/owncast/webserver/router/middleware"
 	webutils "github.com/owncast/owncast/webserver/utils"
 	log "github.com/sirupsen/logrus"
 )
 
 func GetStarsConfig(w http.ResponseWriter, r *http.Request) {
-	middleware.EnableCors(w)
+	setBounceCastPublicHeaders(w, r)
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -29,7 +28,7 @@ func GetStarsConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetStarsLeaderboard(w http.ResponseWriter, r *http.Request) {
-	middleware.EnableCors(w)
+	setBounceCastPublicHeaders(w, r)
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -55,7 +54,7 @@ func GetStarsLeaderboard(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetStarsWallet(user models.User, w http.ResponseWriter, r *http.Request) {
-	middleware.EnableCors(w)
+	setBounceCastAccountHeaders(w, r)
 	summary, err := starsrepository.Get().GetWalletSummary(user.ID)
 	if err != nil {
 		webutils.InternalErrorHandler(w, err)
@@ -65,7 +64,7 @@ func GetStarsWallet(user models.User, w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateStarsPayPalOrder(user models.User, w http.ResponseWriter, r *http.Request) {
-	middleware.EnableCors(w)
+	setBounceCastAccountHeaders(w, r)
 	if r.Method != http.MethodPost {
 		webutils.WriteSimpleResponse(w, false, r.Method+" not supported")
 		return
@@ -91,7 +90,7 @@ func CreateStarsPayPalOrder(user models.User, w http.ResponseWriter, r *http.Req
 }
 
 func CaptureStarsPayPalOrder(user models.User, w http.ResponseWriter, r *http.Request) {
-	middleware.EnableCors(w)
+	setBounceCastAccountHeaders(w, r)
 	if r.Method != http.MethodPost {
 		webutils.WriteSimpleResponse(w, false, r.Method+" not supported")
 		return
@@ -117,7 +116,7 @@ func CaptureStarsPayPalOrder(user models.User, w http.ResponseWriter, r *http.Re
 }
 
 func SendStars(user models.User, w http.ResponseWriter, r *http.Request) {
-	middleware.EnableCors(w)
+	setBounceCastAccountHeaders(w, r)
 	if r.Method != http.MethodPost {
 		webutils.WriteSimpleResponse(w, false, r.Method+" not supported")
 		return

@@ -18,7 +18,7 @@ type bounceCastAdminLoginRequest struct {
 // BounceCastAdminLogin creates a browser admin session cookie so admins can use
 // a normal login form instead of only relying on the HTTP Basic Auth prompt.
 func BounceCastAdminLogin(w http.ResponseWriter, r *http.Request) {
-	setBounceCastAdminSessionHeaders(w)
+	setBounceCastAdminSessionHeaders(w, r)
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -71,8 +71,6 @@ func writeBounceCastAdminUnauthorized(w http.ResponseWriter) {
 	_ = json.NewEncoder(w).Encode(webutils.J{"error": "invalid admin credentials"})
 }
 
-func setBounceCastAdminSessionHeaders(w http.ResponseWriter) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization")
-	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+func setBounceCastAdminSessionHeaders(w http.ResponseWriter, r *http.Request) {
+	middleware.SetBounceCastCORSHeaders(w, r, "POST, OPTIONS")
 }

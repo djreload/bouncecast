@@ -95,7 +95,7 @@ type revokeBounceCastStudioStreamKeyRequest struct {
 
 // BounceCastStudioSchedule returns the current DJ's own scheduled sets.
 func BounceCastStudioSchedule(w http.ResponseWriter, r *http.Request) {
-	setBounceCastStudioAPIHeaders(w)
+	setBounceCastStudioAPIHeaders(w, r)
 
 	session, err := authenticateBounceCastStudioRequest(r)
 	if err != nil {
@@ -150,7 +150,7 @@ func BounceCastStudioSchedule(w http.ResponseWriter, r *http.Request) {
 
 // BounceCastStudioCreateSchedule creates a scheduled set owned by the current DJ.
 func BounceCastStudioCreateSchedule(w http.ResponseWriter, r *http.Request) {
-	setBounceCastStudioAPIHeaders(w)
+	setBounceCastStudioAPIHeaders(w, r)
 
 	session, err := authenticateBounceCastStudioRequest(r)
 	if err != nil {
@@ -185,7 +185,7 @@ func BounceCastStudioCreateSchedule(w http.ResponseWriter, r *http.Request) {
 
 // BounceCastStudioUpdateSchedule updates one planned scheduled set owned by the current DJ.
 func BounceCastStudioUpdateSchedule(w http.ResponseWriter, r *http.Request) {
-	setBounceCastStudioAPIHeaders(w)
+	setBounceCastStudioAPIHeaders(w, r)
 
 	session, err := authenticateBounceCastStudioRequest(r)
 	if err != nil {
@@ -229,7 +229,7 @@ func BounceCastStudioUpdateSchedule(w http.ResponseWriter, r *http.Request) {
 
 // BounceCastStudioCancelSchedule cancels one planned scheduled set owned by the current DJ.
 func BounceCastStudioCancelSchedule(w http.ResponseWriter, r *http.Request) {
-	setBounceCastStudioAPIHeaders(w)
+	setBounceCastStudioAPIHeaders(w, r)
 
 	session, err := authenticateBounceCastStudioRequest(r)
 	if err != nil {
@@ -266,7 +266,7 @@ func BounceCastStudioCancelSchedule(w http.ResponseWriter, r *http.Request) {
 
 // BounceCastStudioStreamKeys returns masked metadata for the current DJ's stream keys.
 func BounceCastStudioStreamKeys(w http.ResponseWriter, r *http.Request) {
-	setBounceCastStudioAPIHeaders(w)
+	setBounceCastStudioAPIHeaders(w, r)
 
 	session, err := authenticateBounceCastStudioRequest(r)
 	if err != nil {
@@ -309,7 +309,7 @@ func BounceCastStudioStreamKeys(w http.ResponseWriter, r *http.Request) {
 
 // BounceCastStudioCreateStreamKey creates a stream key owned by the current DJ and returns it once.
 func BounceCastStudioCreateStreamKey(w http.ResponseWriter, r *http.Request) {
-	setBounceCastStudioAPIHeaders(w)
+	setBounceCastStudioAPIHeaders(w, r)
 
 	session, err := authenticateBounceCastStudioRequest(r)
 	if err != nil {
@@ -357,7 +357,7 @@ func BounceCastStudioCreateStreamKey(w http.ResponseWriter, r *http.Request) {
 
 // BounceCastStudioRevokeStreamKey revokes one of the current DJ's stream keys.
 func BounceCastStudioRevokeStreamKey(w http.ResponseWriter, r *http.Request) {
-	setBounceCastStudioAPIHeaders(w)
+	setBounceCastStudioAPIHeaders(w, r)
 
 	session, err := authenticateBounceCastStudioRequest(r)
 	if err != nil {
@@ -394,7 +394,7 @@ func BounceCastStudioRevokeStreamKey(w http.ResponseWriter, r *http.Request) {
 
 // BounceCastStudioLiveEvents returns recent go-live events for the current DJ.
 func BounceCastStudioLiveEvents(w http.ResponseWriter, r *http.Request) {
-	setBounceCastStudioAPIHeaders(w)
+	setBounceCastStudioAPIHeaders(w, r)
 
 	session, err := authenticateBounceCastStudioRequest(r)
 	if err != nil {
@@ -447,7 +447,7 @@ func BounceCastStudioLiveEvents(w http.ResponseWriter, r *http.Request) {
 
 // BounceCastStudioUpdateProfile updates the current DJ's public profile fields.
 func BounceCastStudioUpdateProfile(w http.ResponseWriter, r *http.Request) {
-	setBounceCastStudioAPIHeaders(w)
+	setBounceCastStudioAPIHeaders(w, r)
 
 	session, err := authenticateBounceCastStudioRequest(r)
 	if err != nil {

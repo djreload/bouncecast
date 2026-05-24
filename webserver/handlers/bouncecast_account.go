@@ -20,6 +20,7 @@ import (
 	"github.com/owncast/owncast/persistence/notificationsrepository"
 	"github.com/owncast/owncast/persistence/userrepository"
 	"github.com/owncast/owncast/utils"
+	"github.com/owncast/owncast/webserver/router/middleware"
 	webutils "github.com/owncast/owncast/webserver/utils"
 	"github.com/teris-io/shortid"
 )
@@ -70,7 +71,7 @@ type bounceCastAccountNotificationPreferences struct {
 
 // BounceCastAccountOptions handles CORS preflight for public account APIs.
 func BounceCastAccountOptions(w http.ResponseWriter, r *http.Request) {
-	setBounceCastAccountHeaders(w)
+	setBounceCastAccountHeaders(w, r)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -78,7 +79,7 @@ func BounceCastAccountOptions(w http.ResponseWriter, r *http.Request) {
 // a valid anonymous chat access token is supplied it upgrades that identity in
 // place so chat history, color, wallet, and moderation state are preserved.
 func BounceCastAccountRegister(w http.ResponseWriter, r *http.Request) {
-	setBounceCastAccountHeaders(w)
+	setBounceCastAccountHeaders(w, r)
 	if !enforceBounceCastRateLimit(w, r, bounceCastAccountRegisterIPRateLimit, bounceCastRateLimitIPSubject(r)) {
 		return
 	}
@@ -174,7 +175,7 @@ func BounceCastAccountRegister(w http.ResponseWriter, r *http.Request) {
 // BounceCastAccountLogin verifies a registered account and issues a normal chat
 // access token for the existing user.
 func BounceCastAccountLogin(w http.ResponseWriter, r *http.Request) {
-	setBounceCastAccountHeaders(w)
+	setBounceCastAccountHeaders(w, r)
 	if !enforceBounceCastRateLimit(w, r, bounceCastAccountLoginIPRateLimit, bounceCastRateLimitIPSubject(r)) {
 		return
 	}
@@ -227,7 +228,7 @@ func BounceCastAccountLogin(w http.ResponseWriter, r *http.Request) {
 
 // BounceCastAccountMe returns the authenticated chat account.
 func BounceCastAccountMe(user models.User, w http.ResponseWriter, r *http.Request) {
-	setBounceCastAccountHeaders(w)
+	setBounceCastAccountHeaders(w, r)
 	notificationPreferences, _ := getBounceCastAccountNotificationPreferences(user.ID)
 	webutils.WriteResponse(w, bounceCastAccountResponse{User: &user, NotificationPreferences: notificationPreferences})
 }
@@ -235,7 +236,7 @@ func BounceCastAccountMe(user models.User, w http.ResponseWriter, r *http.Reques
 // BounceCastAccountUpdateProfile updates public chat profile details for a
 // connected chat identity.
 func BounceCastAccountUpdateProfile(user models.User, w http.ResponseWriter, r *http.Request) {
-	setBounceCastAccountHeaders(w)
+	setBounceCastAccountHeaders(w, r)
 	if !enforceBounceCastRateLimit(w, r, bounceCastAccountProfileRateLimit, bounceCastRateLimitUserSubject(user.ID), bounceCastRateLimitIPSubject(r)) {
 		return
 	}
@@ -329,7 +330,7 @@ func BounceCastAccountUpdateProfile(user models.User, w http.ResponseWriter, r *
 // BounceCastAccountUpdateNotifications updates opt-in preferences for the
 // current public viewer account. It does not grant admin or Studio access.
 func BounceCastAccountUpdateNotifications(user models.User, w http.ResponseWriter, r *http.Request) {
-	setBounceCastAccountHeaders(w)
+	setBounceCastAccountHeaders(w, r)
 
 	var request bounceCastNotificationPreferencesRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
@@ -695,8 +696,6 @@ func writeBounceCastAccountUnauthorized(w http.ResponseWriter) {
 	_ = json.NewEncoder(w).Encode(webutils.J{"error": "invalid email or password"})
 }
 
-func setBounceCastAccountHeaders(w http.ResponseWriter) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+func setBounceCastAccountHeaders(w http.ResponseWriter, r *http.Request) {
+	middleware.SetBounceCastCORSHeaders(w, r, "GET, POST, OPTIONS")
 }

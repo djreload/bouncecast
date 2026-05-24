@@ -39,7 +39,7 @@ var bounceCastProfileImageContentTypes = map[string]string{
 // BounceCastAccountUploadProfileImage validates and stores a local profile
 // picture for the current chat account under data/public/profiles.
 func BounceCastAccountUploadProfileImage(user models.User, w http.ResponseWriter, r *http.Request) {
-	setBounceCastAccountHeaders(w)
+	setBounceCastAccountHeaders(w, r)
 	if r.Method != http.MethodPost {
 		webutils.WriteSimpleResponse(w, false, r.Method+" not supported")
 		return

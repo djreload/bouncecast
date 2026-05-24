@@ -16,6 +16,7 @@ import (
 	"github.com/owncast/owncast/core/data"
 	"github.com/owncast/owncast/models"
 	"github.com/owncast/owncast/utils"
+	"github.com/owncast/owncast/webserver/router/middleware"
 	webutils "github.com/owncast/owncast/webserver/utils"
 )
 
@@ -63,13 +64,13 @@ type bounceCastStudioSession struct {
 
 // BounceCastStudioOptions handles CORS preflight for the additive DJ dashboard APIs.
 func BounceCastStudioOptions(w http.ResponseWriter, r *http.Request) {
-	setBounceCastStudioAPIHeaders(w)
+	setBounceCastStudioAPIHeaders(w, r)
 	w.WriteHeader(http.StatusNoContent)
 }
 
 // BounceCastStudioLogin verifies a streamer account and issues a scoped Studio bearer session.
 func BounceCastStudioLogin(w http.ResponseWriter, r *http.Request) {
-	setBounceCastStudioAPIHeaders(w)
+	setBounceCastStudioAPIHeaders(w, r)
 	if !enforceBounceCastRateLimit(w, r, bounceCastUnifiedLoginIPRateLimit, bounceCastRateLimitIPSubject(r)) {
 		return
 	}
@@ -117,7 +118,7 @@ func BounceCastStudioLogin(w http.ResponseWriter, r *http.Request) {
 
 // BounceCastStudioRegister creates an inactive DJ dashboard account for admin approval.
 func BounceCastStudioRegister(w http.ResponseWriter, r *http.Request) {
-	setBounceCastStudioAPIHeaders(w)
+	setBounceCastStudioAPIHeaders(w, r)
 	if !enforceBounceCastRateLimit(w, r, bounceCastStudioRegisterIPRateLimit, bounceCastRateLimitIPSubject(r)) {
 		return
 	}
@@ -186,7 +187,7 @@ func BounceCastStudioRegister(w http.ResponseWriter, r *http.Request) {
 
 // BounceCastStudioMe returns the current authenticated DJ dashboard session.
 func BounceCastStudioMe(w http.ResponseWriter, r *http.Request) {
-	setBounceCastStudioAPIHeaders(w)
+	setBounceCastStudioAPIHeaders(w, r)
 
 	session, err := authenticateBounceCastStudioRequest(r)
 	if err != nil {
@@ -202,7 +203,7 @@ func BounceCastStudioMe(w http.ResponseWriter, r *http.Request) {
 
 // BounceCastStudioLogout revokes the current DJ dashboard bearer session.
 func BounceCastStudioLogout(w http.ResponseWriter, r *http.Request) {
-	setBounceCastStudioAPIHeaders(w)
+	setBounceCastStudioAPIHeaders(w, r)
 
 	session, err := authenticateBounceCastStudioRequest(r)
 	if err != nil {
@@ -512,10 +513,8 @@ func isBounceCastStudioDuplicateAccountError(err error) bool {
 	return err != nil && strings.Contains(strings.ToLower(fmt.Sprint(err)), "unique constraint failed")
 }
 
-func setBounceCastStudioAPIHeaders(w http.ResponseWriter) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+func setBounceCastStudioAPIHeaders(w http.ResponseWriter, r *http.Request) {
+	middleware.SetBounceCastCORSHeaders(w, r, "GET, POST, OPTIONS")
 }
 
 func writeBounceCastStudioUnauthorized(w http.ResponseWriter) {

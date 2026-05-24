@@ -202,6 +202,9 @@ Paste:
       environment:
         # Keep this stable once set. It encrypts newly saved Messenger secrets.
         BOUNCECAST_SECRET_KEY: "replace-with-a-long-random-secret"
+        # Optional: only required when a trusted separate frontend origin must
+        # call BounceCast browser/account APIs directly.
+        BOUNCECAST_ALLOWED_ORIGINS: ""
         # Optional defaults. Admin settings can override these values.
         FACEBOOK_MESSENGER_ENABLED: "false"
         FACEBOOK_GRAPH_API_VERSION: "v25.0"
@@ -865,6 +868,8 @@ Production checklist
 - RTMP port 1935 is open.
 - Admin password changed from default.
 - Stream keys reviewed.
+- `BOUNCECAST_ALLOWED_ORIGINS` left empty unless you intentionally run a
+  separate trusted frontend origin.
 - PayPal sandbox tested before live mode.
 - PayPal webhook URL points at BounceCast.
 - Email/Brevo sending tested.

@@ -55,12 +55,7 @@ func RequireAdminAuth(handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		realm := "Owncast Authenticated Request"
 
-		// Alow CORS only for localhost:3000 to support Owncast development.
-		validAdminHost := "http://localhost:3000"
-		w.Header().Set("Access-Control-Allow-Origin", validAdminHost)
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
-		w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		SetBounceCastCORSHeaders(w, r, "GET, POST, PUT, DELETE, OPTIONS")
 
 		// For request needing CORS, send a 204.
 		if r.Method == "OPTIONS" {
@@ -105,11 +100,7 @@ func RequireAdminRole(handler http.HandlerFunc, roles ...string) http.HandlerFun
 	return func(w http.ResponseWriter, r *http.Request) {
 		realm := "Owncast Authenticated Request"
 
-		validAdminHost := "http://localhost:3000"
-		w.Header().Set("Access-Control-Allow-Origin", validAdminHost)
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
-		w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		SetBounceCastCORSHeaders(w, r, "GET, POST, PUT, DELETE, OPTIONS")
 
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusNoContent)
