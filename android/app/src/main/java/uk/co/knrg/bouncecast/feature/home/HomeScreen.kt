@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import uk.co.knrg.bouncecast.core.config.MobileConfigRepository
 import uk.co.knrg.bouncecast.core.model.MobileConfig
 import uk.co.knrg.bouncecast.feature.ads.AdBanner
@@ -39,8 +40,11 @@ fun HomeScreen(
     var refreshError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
-        runCatching { configRepository.refresh() }
-            .onFailure { refreshError = it.message ?: "Unable to refresh mobile config" }
+        while (true) {
+            runCatching { configRepository.refresh() }
+                .onFailure { refreshError = it.message ?: "Unable to refresh mobile config" }
+            delay(15_000)
+        }
     }
 
     Surface(
