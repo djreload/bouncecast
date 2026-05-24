@@ -11,6 +11,11 @@ const (
 	RewardCreditSourceAdminAdjustment       = "admin_adjustment"
 	RewardCreditSourceSpinSpend             = "spin_spend"
 	RewardCreditSourceSpinSpendRefund       = "spin_spend_refund"
+	RewardAchievementConditionFirstSpin     = "reward_first_spin"
+	RewardAchievementConditionPrizeWin      = "reward_prize_win"
+	RewardAchievementConditionTaskCompleted = "reward_task_completed"
+	RewardAchievementConditionStarsSent     = "stars_sent"
+	RewardAchievementConditionTopSupporter  = "top_supporter_reward"
 	RewardPrizeTypePhysical                 = "physical"
 	RewardPrizeTypeDigital                  = "digital"
 	RewardPrizeTypeDiscountFuture           = "discount_future_placeholder"
@@ -260,6 +265,17 @@ type RewardAchievementUnlock struct {
 	ReferenceID     string    `json:"referenceId,omitempty"`
 	LedgerID        int64     `json:"ledgerId,omitempty"`
 	UnlockedAt      time.Time `json:"unlockedAt"`
+}
+
+type RewardTopSupporterAwardResult struct {
+	Rank         int    `json:"rank"`
+	UserID       string `json:"userId,omitempty"`
+	DisplayName  string `json:"displayName,omitempty"`
+	TotalSent    int    `json:"totalSent,omitempty"`
+	Credits      int    `json:"credits"`
+	BalanceAfter int    `json:"balanceAfter,omitempty"`
+	Awarded      bool   `json:"awarded"`
+	Reason       string `json:"reason,omitempty"`
 }
 
 type RewardWheelData struct {

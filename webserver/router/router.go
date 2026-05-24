@@ -111,6 +111,7 @@ func Start(enableVerboseLogging bool) error {
 	r.Post("/api/admin/bouncecast/rewards/settings", middleware.RequireAdminRole(adminhandlers.SetRewardsSettings, "owner", "admin"))
 	r.Post("/api/admin/bouncecast/rewards/prizes", middleware.RequireAdminRole(adminhandlers.UpsertRewardPrize, "owner", "admin"))
 	r.Post("/api/admin/bouncecast/rewards/credits/adjust", middleware.RequireAdminRole(adminhandlers.AdjustRewardCredits, "owner", "admin"))
+	r.Post("/api/admin/bouncecast/rewards/top-supporters/award", middleware.RequireAdminRole(adminhandlers.AwardTopSupporterRewards, "owner", "admin"))
 	r.Post("/api/admin/bouncecast/rewards/orders/update", middleware.RequireAdminRole(adminhandlers.UpdateRewardOrder, "owner", "admin"))
 	r.Post("/api/admin/bouncecast/rewards/orders/dispatch", middleware.RequireAdminRole(adminhandlers.DispatchRewardOrder, "owner", "admin"))
 	r.Get("/api/admin/bouncecast/rewards/orders/export", middleware.RequireAdminRole(adminhandlers.ExportRewardOrdersCSV, "owner", "admin"))

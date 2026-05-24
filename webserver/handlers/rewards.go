@@ -77,7 +77,7 @@ func CompleteRewardTask(user models.User, w http.ResponseWriter, r *http.Request
 		webutils.WriteSimpleResponse(w, false, "task ID is required")
 		return
 	}
-	completion, balance, awarded, err := rewardsrepository.Get().CompleteTask(user.ID, request.TaskID)
+	completion, balance, awarded, err := rewards.GetService().CompleteTask(user.ID, request.TaskID)
 	if err != nil {
 		webutils.WriteSimpleResponse(w, false, err.Error())
 		return

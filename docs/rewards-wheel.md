@@ -5,7 +5,7 @@ BounceCast Rewards Wheel is an internal/manual prize system. It does not use Woo
 ## Viewer Flow
 
 1. Viewers log in with a BounceCast account.
-2. Viewers earn Spin Credits from admin grants, configured chat activity rewards, and manually completed viewer tasks.
+2. Viewers earn Spin Credits from admin grants, configured chat activity rewards, manually completed viewer tasks, configured achievements, and admin-triggered top-supporter rewards.
 3. Viewers open `/rewards`.
 4. Viewers spend 1 Spin Credit per spin by default.
 5. The server selects the prize with weighted odds and records the spin before the frontend animation reveals the result.
@@ -24,12 +24,12 @@ Open `Admin -> Studio -> Rewards Wheel`.
 
 Admin tabs include:
 
-- Settings: enable/disable the wheel, spin cost, chat reward rules, top supporter placeholder values, and overlay template/sound.
+- Settings: enable/disable the wheel, spin cost, chat reward rules, top supporter reward values, and overlay template/sound.
 - Prizes: create and edit physical, digital, discount placeholder, and sorry prizes.
 - Spin Credits: manually grant or deduct credits with a ledger entry.
 - Fulfilment: manage internal orders, update status, mark dispatched, and export CSV.
 - Messages: review unread reward win alerts.
-- Tasks & Achievements: configure viewer task rewards, review recent task completions, and manage achievement placeholder records.
+- Tasks & Achievements: configure viewer task rewards, configure event-based achievements, award current Stars top supporters, and review recent task/achievement activity.
 
 ## Prize Types
 
@@ -76,6 +76,22 @@ Task completions write:
 
 - `reward_task_completions`
 - `reward_spin_ledger` with source `task_completed`
+
+### Achievements
+
+Achievements unlock once per user when their configured condition is triggered. Each unlock writes to `reward_achievement_unlocks` and grants Spin Credits through `reward_spin_ledger` with source `achievement_unlocked`.
+
+Supported condition keys:
+
+- `reward_first_spin`: first Rewards Wheel spin
+- `reward_prize_win`: real Rewards Wheel prize win
+- `reward_task_completed`: first matching task completion trigger
+- `stars_sent`: first Stars send trigger
+- `top_supporter_reward`: top-supporter Spin Credit reward granted
+
+### Top Supporter Rewards
+
+Admins can click `Award top Stars supporters` from `Admin -> Studio -> Rewards Wheel -> Tasks & Achievements`. BounceCast reads the current Stars leaderboard top 3 and awards the configured rank credits. Each rank can only be awarded once per UTC day because the ledger reference is idempotent.
 
 ## Security Notes
 
@@ -131,6 +147,7 @@ Admin:
 - `POST /api/admin/bouncecast/rewards/settings`
 - `POST /api/admin/bouncecast/rewards/prizes`
 - `POST /api/admin/bouncecast/rewards/credits/adjust`
+- `POST /api/admin/bouncecast/rewards/top-supporters/award`
 - `POST /api/admin/bouncecast/rewards/orders/update`
 - `POST /api/admin/bouncecast/rewards/orders/dispatch`
 - `GET /api/admin/bouncecast/rewards/orders/export`
@@ -149,10 +166,11 @@ For a live Debian 13/Plesk Docker install:
 5. Log in as owner/admin and open `Admin -> Studio -> Rewards Wheel`.
 6. Keep the wheel disabled until prizes and fulfilment terms are configured.
 7. Add at least one sorry prize and any real prizes with stock quantities.
-8. Grant Spin Credits to a test account and test `/rewards`.
+8. Configure optional achievement conditions and top-supporter credit values.
+9. Grant Spin Credits to a test account and test `/rewards`.
 
 ## Known Limitations
 
-- Achievement unlocks and top-supporter rewards still have storage/config placeholders and should be wired into product events carefully in a later pass.
+- Achievement conditions are intentionally limited to the supported event keys above; richer custom achievement logic should be added as explicit server-side conditions.
 - Reward win and dispatch emails use the existing BounceCast SMTP settings. If SMTP is disabled or an address is missing, the system records the failure and keeps the in-panel notification/admin message.
 - Discount prizes are placeholders only and do not connect to any shop, checkout, or external fulfilment system.

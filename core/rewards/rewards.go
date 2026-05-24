@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"html"
 	"strings"
+	"time"
 
 	"github.com/owncast/owncast/core/chat"
 	"github.com/owncast/owncast/core/chat/events"
 	"github.com/owncast/owncast/models"
 	"github.com/owncast/owncast/persistence/rewardsrepository"
+	"github.com/owncast/owncast/persistence/starsrepository"
 )
 
 const (
@@ -39,13 +41,36 @@ func (s *Service) AwardSpinCredits(userID string, amount int, source string, ref
 	return s.repository.AwardSpinCredits(userID, amount, source, referenceID, note)
 }
 
+func (s *Service) CompleteTask(userID string, taskID int64) (models.RewardTaskCompletion, models.RewardSpinBalance, bool, error) {
+	completion, balance, awarded, err := s.repository.CompleteTask(userID, taskID)
+	if err != nil {
+		return models.RewardTaskCompletion{}, models.RewardSpinBalance{}, false, err
+	}
+	if awarded {
+		if _, updatedBalance, unlockErr := s.repository.UnlockAchievements(userID, models.RewardAchievementConditionTaskCompleted, fmt.Sprintf("reward_task:%d", taskID)); unlockErr == nil {
+			balance = updatedBalance
+		}
+	}
+	return completion, balance, awarded, nil
+}
+
+func (s *Service) AwardTopSupporterRewards() ([]models.RewardTopSupporterAwardResult, error) {
+	leaderboard, err := starsrepository.Get().GetLeaderboard(3)
+	if err != nil {
+		return nil, err
+	}
+	return s.repository.AwardTopSupporters(leaderboard, time.Now().UTC().Format("2006-01-02"))
+}
+
 func (s *Service) SpinWheel(user models.User) (models.RewardSpinResult, error) {
 	result, err := s.repository.SpinWheel(user)
 	if err != nil {
 		return models.RewardSpinResult{}, err
 	}
+	_, _, _ = s.repository.UnlockAchievements(user.ID, models.RewardAchievementConditionFirstSpin, fmt.Sprintf("reward_spin:%d", result.Spin.ID))
 
 	if result.Winner != nil {
+		_, _, _ = s.repository.UnlockAchievements(user.ID, models.RewardAchievementConditionPrizeWin, fmt.Sprintf("reward_win:%d", result.Winner.ID))
 		settings, _ := s.repository.GetSettings()
 		message := renderOverlayTemplate(settings.OverlayTemplate, user.DisplayName, result.Prize.Name)
 		_ = chat.SendSystemAction(message, false)

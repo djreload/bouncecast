@@ -13,6 +13,7 @@ import (
 	"github.com/owncast/owncast/core/chat"
 	"github.com/owncast/owncast/core/chat/events"
 	"github.com/owncast/owncast/models"
+	"github.com/owncast/owncast/persistence/rewardsrepository"
 	"github.com/owncast/owncast/persistence/starsrepository"
 )
 
@@ -270,6 +271,8 @@ func (s *Service) SendStars(user models.User, amount int, message string, effect
 	}
 
 	chatLine := fmt.Sprintf("%s sent %d Stars ⭐", user.DisplayName, amount)
+	_, _, _ = rewardsrepository.Get().UnlockAchievements(user.ID, models.RewardAchievementConditionStarsSent, fmt.Sprintf("star_send:%d", sendEvent.ID))
+
 	if message != "" {
 		chatLine += " - " + message
 	}

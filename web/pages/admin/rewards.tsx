@@ -30,6 +30,7 @@ import {
   BOUNCECAST_REWARDS_PRIZES,
   BOUNCECAST_REWARDS_SETTINGS,
   BOUNCECAST_REWARDS_TASKS,
+  BOUNCECAST_REWARDS_TOP_SUPPORTERS_AWARD,
   fetchData,
 } from '../../utils/apis';
 import {
@@ -39,6 +40,7 @@ import {
   RewardPrize,
   RewardSettings,
   RewardTask,
+  RewardTopSupporterAwardResult,
 } from '../../interfaces/rewards.model';
 
 const { Title, Text } = Typography;
@@ -80,6 +82,9 @@ export default function RewardsAdmin() {
   const [editingTask, setEditingTask] = useState<RewardTask>(null);
   const [achievementModalOpen, setAchievementModalOpen] = useState(false);
   const [editingAchievement, setEditingAchievement] = useState<RewardAchievement>(null);
+  const [topSupporterResults, setTopSupporterResults] = useState<
+    RewardTopSupporterAwardResult[]
+  >([]);
   const [settingsForm] = Form.useForm<RewardSettings>();
   const [prizeForm] = Form.useForm<RewardPrize>();
   const [creditForm] = Form.useForm();
@@ -242,6 +247,26 @@ export default function RewardsAdmin() {
   const markMessageRead = async (id: number) => {
     await fetchData(BOUNCECAST_REWARDS_MESSAGE_READ, { method: 'POST', data: { id } });
     loadRewards();
+  };
+
+  const awardTopSupporters = async () => {
+    try {
+      const response = await fetchData(BOUNCECAST_REWARDS_TOP_SUPPORTERS_AWARD, {
+        method: 'POST',
+        data: {},
+      });
+      const results = response.results || [];
+      setTopSupporterResults(results);
+      const awardedCount = results.filter(result => result.awarded).length;
+      message.success(
+        awardedCount
+          ? `Awarded ${awardedCount} top supporter reward${awardedCount === 1 ? '' : 's'}`
+          : 'No new top supporter rewards were awarded',
+      );
+      loadRewards();
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : 'Unable to award top supporters');
+    }
   };
 
   return (
@@ -492,6 +517,44 @@ export default function RewardsAdmin() {
             label: 'Tasks & Achievements',
             children: (
               <Row gutter={16}>
+                <Col xs={24}>
+                  <Card style={{ marginBottom: 16 }}>
+                    <Space direction="vertical" style={{ width: '100%' }}>
+                      <Space wrap align="center">
+                        <Button type="primary" onClick={awardTopSupporters}>
+                          Award top Stars supporters
+                        </Button>
+                        <Text type="secondary">
+                          Grants today&apos;s configured Spin Credit rewards to the current Stars
+                          leaderboard top 3. Each rank can only be awarded once per day.
+                        </Text>
+                      </Space>
+                      {topSupporterResults.length > 0 && (
+                        <Table
+                          size="small"
+                          rowKey={record => `${record.rank}-${record.userId || record.reason}`}
+                          dataSource={topSupporterResults}
+                          pagination={false}
+                          columns={[
+                            { title: 'Rank', dataIndex: 'rank' },
+                            { title: 'Viewer', dataIndex: 'displayName' },
+                            { title: 'Stars sent', dataIndex: 'totalSent' },
+                            { title: 'Credits', dataIndex: 'credits' },
+                            {
+                              title: 'Result',
+                              render: (_, record: RewardTopSupporterAwardResult) =>
+                                record.awarded ? (
+                                  <Tag color="green">Awarded</Tag>
+                                ) : (
+                                  <Tag color="gold">{record.reason || 'Skipped'}</Tag>
+                                ),
+                            },
+                          ]}
+                        />
+                      )}
+                    </Space>
+                  </Card>
+                </Col>
                 <Col xs={24} md={12}>
                   <Button onClick={() => openTask()} style={{ marginBottom: 12 }}>
                     Add task
@@ -732,7 +795,15 @@ export default function RewardsAdmin() {
             <Input />
           </Form.Item>
           <Form.Item name="conditionKey" label="Condition key" rules={[{ required: true }]}>
-            <Input />
+            <Select
+              options={[
+                { label: 'First Rewards Wheel spin', value: 'reward_first_spin' },
+                { label: 'Rewards Wheel prize win', value: 'reward_prize_win' },
+                { label: 'Reward task completed', value: 'reward_task_completed' },
+                { label: 'Stars sent', value: 'stars_sent' },
+                { label: 'Top supporter reward granted', value: 'top_supporter_reward' },
+              ]}
+            />
           </Form.Item>
           <Form.Item name="rewardAmount" label="Reward amount">
             <InputNumber min={1} />

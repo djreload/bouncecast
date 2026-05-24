@@ -560,7 +560,18 @@ Recommended first setup:
 4. Enable chat rewards only after choosing a message threshold and cooldown.
 5. Add viewer tasks if you want logged-in users to earn Spin Credits from
    one-time actions.
-6. Grant a test user Spin Credits and test:
+6. Add optional achievements with supported condition keys:
+
+   reward_first_spin
+   reward_prize_win
+   reward_task_completed
+   stars_sent
+   top_supporter_reward
+
+7. Use "Award top Stars supporters" only when you want to grant the current
+   Stars leaderboard top 3 their configured Spin Credit rewards. Each rank is
+   idempotent once per UTC day.
+8. Grant a test user Spin Credits and test:
 
    https://live.example.com/rewards
 

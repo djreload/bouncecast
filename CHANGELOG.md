@@ -8,7 +8,7 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 
 - Continue expanding audit records around older Owncast-compatible admin actions.
 - Continue reviewing moderator-specific admin surfaces before exposing moderator dashboard pages.
-- Wire achievement unlocks and top-supporter reward automation into the Rewards Wheel credit hooks.
+- Add richer custom achievement conditions beyond the current supported event keys.
 - Continue live VPS deployment notes as production configuration changes.
 
 ## 2026-05-24
@@ -21,6 +21,8 @@ This changelog tracks the BounceCast fork work from the first visible rebrand on
 - Added chat activity Spin Credit automation with repeated-message protection, configurable message thresholds, and cooldown enforcement.
 - Added one-time viewer task completion rewards on `/rewards`, backed by ledger entries so task credits cannot be granted twice.
 - Added admin visibility for recent task completions and achievement unlock placeholders in the Rewards Wheel automation tab.
+- Added one-time achievement unlock rewards for Rewards Wheel spins, real prize wins, task completions, Stars sends, and top-supporter reward grants.
+- Added an admin top-supporter reward action that grants configured Spin Credits to the current Stars leaderboard top 3 with once-per-day idempotency.
 - Added `/rewards` as a logged-in viewer Rewards Wheel page with balance display, prize list, spin animation, personal history, claim forms, and reward notifications.
 - Added Admin -> Studio -> Rewards Wheel for settings, prize management, credit grants/deductions, fulfilment orders, admin messages, CSV export, task placeholders, and achievement placeholders.
 - Added a `REWARD_WHEEL_WIN` websocket event that reuses the existing Stars overlay queue for real prize wins.

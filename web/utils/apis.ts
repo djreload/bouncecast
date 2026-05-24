@@ -176,6 +176,8 @@ export const BOUNCECAST_REWARDS_PRIZES = `${API_LOCATION}bouncecast/rewards/priz
 
 export const BOUNCECAST_REWARDS_CREDITS_ADJUST = `${API_LOCATION}bouncecast/rewards/credits/adjust`;
 
+export const BOUNCECAST_REWARDS_TOP_SUPPORTERS_AWARD = `${API_LOCATION}bouncecast/rewards/top-supporters/award`;
+
 export const BOUNCECAST_REWARDS_ORDER_UPDATE = `${API_LOCATION}bouncecast/rewards/orders/update`;
 
 export const BOUNCECAST_REWARDS_ORDER_DISPATCH = `${API_LOCATION}bouncecast/rewards/orders/dispatch`;

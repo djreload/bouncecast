@@ -28,6 +28,8 @@ type Repository interface {
 	GetWheelData(userID string) (models.RewardWheelData, error)
 	RecordChatActivity(userID string, messageBody string, referenceID string) (models.RewardSpinBalance, bool, error)
 	CompleteTask(userID string, taskID int64) (models.RewardTaskCompletion, models.RewardSpinBalance, bool, error)
+	UnlockAchievements(userID string, conditionKey string, referenceID string) ([]models.RewardAchievementUnlock, models.RewardSpinBalance, error)
+	AwardTopSupporters(entries []models.StarLeaderboardEntry, period string) ([]models.RewardTopSupporterAwardResult, error)
 	SpinWheel(user models.User) (models.RewardSpinResult, error)
 	ListUserSpins(userID string) ([]models.RewardSpin, error)
 	ListUserClaims(userID string) ([]models.RewardClaim, error)
@@ -461,6 +463,129 @@ func (r *SqlRepository) CompleteTask(userID string, taskID int64) (models.Reward
 	balance.LifetimeEarned = lifetimeEarned
 	balance.UpdatedAt = time.Now().UTC()
 	return completion, balance, true, nil
+}
+
+func (r *SqlRepository) UnlockAchievements(userID string, conditionKey string, referenceID string) ([]models.RewardAchievementUnlock, models.RewardSpinBalance, error) {
+	userID = strings.TrimSpace(userID)
+	conditionKey = normalizeAchievementCondition(conditionKey)
+	if userID == "" || conditionKey == "" {
+		return nil, models.RewardSpinBalance{}, errors.New("user and achievement condition are required")
+	}
+
+	r.datastore.DbLock.Lock()
+	defer r.datastore.DbLock.Unlock()
+
+	tx, err := r.datastore.DB.Begin()
+	if err != nil {
+		return nil, models.RewardSpinBalance{}, err
+	}
+	defer tx.Rollback() //nolint
+
+	balance, err := ensureBalanceTx(tx, userID)
+	if err != nil {
+		return nil, models.RewardSpinBalance{}, err
+	}
+	unlocks, balance, err := unlockAchievementsForConditionTx(tx, userID, conditionKey, referenceID, balance)
+	if err != nil {
+		return nil, models.RewardSpinBalance{}, err
+	}
+	if err = tx.Commit(); err != nil {
+		return nil, models.RewardSpinBalance{}, err
+	}
+	return unlocks, balance, nil
+}
+
+func (r *SqlRepository) AwardTopSupporters(entries []models.StarLeaderboardEntry, period string) ([]models.RewardTopSupporterAwardResult, error) {
+	settings, err := r.GetSettings()
+	if err != nil {
+		return nil, err
+	}
+	settings = normalizeSettings(settings)
+	period = strings.TrimSpace(period)
+	if period == "" {
+		period = time.Now().UTC().Format("2006-01-02")
+	}
+
+	r.datastore.DbLock.Lock()
+	defer r.datastore.DbLock.Unlock()
+
+	tx, err := r.datastore.DB.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback() //nolint
+
+	results := []models.RewardTopSupporterAwardResult{}
+	for _, entry := range entries {
+		if entry.Rank < 1 || entry.Rank > 3 {
+			continue
+		}
+		credits := topSupporterCreditsForRank(settings, entry.Rank)
+		result := models.RewardTopSupporterAwardResult{
+			Rank:        entry.Rank,
+			UserID:      entry.UserID,
+			DisplayName: entry.DisplayName,
+			TotalSent:   entry.TotalSent,
+			Credits:     credits,
+		}
+		if credits <= 0 {
+			result.Reason = "no credits configured for this rank"
+			results = append(results, result)
+			continue
+		}
+		if strings.TrimSpace(entry.UserID) == "" {
+			result.Reason = "missing user"
+			results = append(results, result)
+			continue
+		}
+		if err := ensureUserExistsTx(tx, entry.UserID); err != nil {
+			if strings.Contains(err.Error(), "user not found") {
+				result.Reason = "user not found"
+				results = append(results, result)
+				continue
+			}
+			return nil, err
+		}
+
+		referenceID := fmt.Sprintf("top-supporter:%s:rank:%d", period, entry.Rank)
+		var existingID int64
+		err := tx.QueryRow(`SELECT id FROM reward_spin_ledger WHERE source=? AND reference_id=?`, models.RewardCreditSourceTopSupporterReward, referenceID).Scan(&existingID)
+		if err == nil {
+			result.Reason = "already awarded for this period and rank"
+			results = append(results, result)
+			continue
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, err
+		}
+
+		balance, err := ensureBalanceTx(tx, entry.UserID)
+		if err != nil {
+			return nil, err
+		}
+		nextBalance := balance.Balance + credits
+		lifetimeEarned := balance.LifetimeEarned + credits
+		if _, err := insertLedgerTx(tx, entry.UserID, credits, nextBalance, models.RewardCreditSourceTopSupporterReward, referenceID, fmt.Sprintf("Top supporter rank %d reward for %s", entry.Rank, period)); err != nil {
+			return nil, err
+		}
+		if _, err = tx.Exec(`UPDATE reward_spin_balances SET balance=?, lifetime_earned=?, updated_at=CURRENT_TIMESTAMP WHERE user_id=?`, nextBalance, lifetimeEarned, entry.UserID); err != nil {
+			return nil, err
+		}
+		balance.Balance = nextBalance
+		balance.LifetimeEarned = lifetimeEarned
+		balance.UpdatedAt = time.Now().UTC()
+		if _, balance, err = unlockAchievementsForConditionTx(tx, entry.UserID, models.RewardAchievementConditionTopSupporter, referenceID, balance); err != nil {
+			return nil, err
+		}
+		result.Awarded = true
+		result.BalanceAfter = balance.Balance
+		results = append(results, result)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+	return results, nil
 }
 
 func (r *SqlRepository) SpinWheel(user models.User) (models.RewardSpinResult, error) {
@@ -951,7 +1076,7 @@ func (r *SqlRepository) UpsertTask(task models.RewardTask) (models.RewardTask, e
 
 func (r *SqlRepository) UpsertAchievement(achievement models.RewardAchievement) (models.RewardAchievement, error) {
 	achievement.Name = strings.TrimSpace(achievement.Name)
-	achievement.ConditionKey = strings.TrimSpace(achievement.ConditionKey)
+	achievement.ConditionKey = normalizeAchievementCondition(achievement.ConditionKey)
 	if achievement.Name == "" || achievement.ConditionKey == "" {
 		return models.RewardAchievement{}, errors.New("achievement name and condition are required")
 	}
@@ -1082,6 +1207,74 @@ func insertLedgerTx(tx *sql.Tx, userID string, amount int, balanceAfter int, sou
 	return result.LastInsertId()
 }
 
+func unlockAchievementsForConditionTx(tx *sql.Tx, userID string, conditionKey string, referenceID string, balance models.RewardSpinBalance) ([]models.RewardAchievementUnlock, models.RewardSpinBalance, error) {
+	conditionKey = normalizeAchievementCondition(conditionKey)
+	if conditionKey == "" {
+		return nil, balance, nil
+	}
+	achievements, err := activeAchievementsByConditionTx(tx, conditionKey)
+	if err != nil {
+		return nil, balance, err
+	}
+	unlocks := []models.RewardAchievementUnlock{}
+	for _, achievement := range achievements {
+		var existingID int64
+		err := tx.QueryRow(`SELECT id FROM reward_achievement_unlocks WHERE user_id=? AND achievement_id=?`, userID, achievement.ID).Scan(&existingID)
+		if err == nil {
+			continue
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, balance, err
+		}
+
+		nextBalance := balance.Balance + achievement.RewardAmount
+		lifetimeEarned := balance.LifetimeEarned + achievement.RewardAmount
+		ledgerID, err := insertLedgerTx(tx, userID, achievement.RewardAmount, nextBalance, models.RewardCreditSourceAchievementUnlocked, fmt.Sprintf("achievement:%d:%s", achievement.ID, userID), "Achievement unlocked: "+achievement.Name)
+		if err != nil {
+			return nil, balance, err
+		}
+		if _, err = tx.Exec(`UPDATE reward_spin_balances SET balance=?, lifetime_earned=?, updated_at=CURRENT_TIMESTAMP WHERE user_id=?`, nextBalance, lifetimeEarned, userID); err != nil {
+			return nil, balance, err
+		}
+		result, err := tx.Exec(`INSERT INTO reward_achievement_unlocks(user_id, achievement_id, condition_key, reference_id, ledger_id)
+			VALUES(?, ?, ?, ?, ?)`, userID, achievement.ID, conditionKey, nullableString(referenceID), ledgerID)
+		if err != nil {
+			return nil, balance, err
+		}
+		unlockID, err := result.LastInsertId()
+		if err != nil {
+			return nil, balance, err
+		}
+		unlock, err := getAchievementUnlockByIDTx(tx, unlockID)
+		if err != nil {
+			return nil, balance, err
+		}
+		unlocks = append(unlocks, unlock)
+		balance.Balance = nextBalance
+		balance.LifetimeEarned = lifetimeEarned
+		balance.UpdatedAt = time.Now().UTC()
+	}
+	return unlocks, balance, nil
+}
+
+func activeAchievementsByConditionTx(tx *sql.Tx, conditionKey string) ([]models.RewardAchievement, error) {
+	rows, err := tx.Query(`SELECT id, name, condition_key, reward_amount, active, created_at, updated_at
+		FROM reward_achievements WHERE active=1 AND condition_key=? ORDER BY id ASC`, conditionKey)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	achievements := []models.RewardAchievement{}
+	for rows.Next() {
+		achievement, err := scanAchievement(rows)
+		if err != nil {
+			return nil, err
+		}
+		achievements = append(achievements, achievement)
+	}
+	return achievements, rows.Err()
+}
+
 func eligiblePrizesTx(tx *sql.Tx) ([]models.RewardPrize, error) {
 	rows, err := tx.Query(`SELECT id, name, description, image, prize_type, odds_weight, stock_quantity, active, display_order,
 		claim_required, marketing_consent_required, terms, fulfilment_notes, created_at, updated_at
@@ -1193,6 +1386,11 @@ func getTaskCompletionTx(tx *sql.Tx, userID string, taskID int64) (models.Reward
 func getTaskCompletionByIDTx(tx *sql.Tx, id int64) (models.RewardTaskCompletion, error) {
 	row := tx.QueryRow(taskCompletionSelectQuery()+` WHERE c.id=?`, id)
 	return scanTaskCompletion(row)
+}
+
+func getAchievementUnlockByIDTx(tx *sql.Tx, id int64) (models.RewardAchievementUnlock, error) {
+	row := tx.QueryRow(achievementUnlockSelectQuery()+` WHERE u.id=?`, id)
+	return scanAchievementUnlock(row)
 }
 
 func (r *SqlRepository) getAchievement(id int64) (models.RewardAchievement, error) {
@@ -1794,6 +1992,15 @@ func normalizeSettings(settings models.RewardSettings) models.RewardSettings {
 	if settings.ChatCreditReward <= 0 {
 		settings.ChatCreditReward = 1
 	}
+	if settings.TopSupporterFirstCredits < 0 {
+		settings.TopSupporterFirstCredits = 0
+	}
+	if settings.TopSupporterSecondCredits < 0 {
+		settings.TopSupporterSecondCredits = 0
+	}
+	if settings.TopSupporterThirdCredits < 0 {
+		settings.TopSupporterThirdCredits = 0
+	}
 	if settings.OverlayDurationSeconds <= 0 {
 		settings.OverlayDurationSeconds = 5
 	}
@@ -1823,6 +2030,36 @@ func normalizePrize(prize models.RewardPrize) models.RewardPrize {
 		prize.MarketingConsentRequired = false
 	}
 	return prize
+}
+
+func normalizeAchievementCondition(value string) string {
+	switch strings.TrimSpace(value) {
+	case models.RewardAchievementConditionFirstSpin:
+		return models.RewardAchievementConditionFirstSpin
+	case models.RewardAchievementConditionPrizeWin:
+		return models.RewardAchievementConditionPrizeWin
+	case models.RewardAchievementConditionTaskCompleted:
+		return models.RewardAchievementConditionTaskCompleted
+	case models.RewardAchievementConditionStarsSent:
+		return models.RewardAchievementConditionStarsSent
+	case models.RewardAchievementConditionTopSupporter:
+		return models.RewardAchievementConditionTopSupporter
+	default:
+		return strings.TrimSpace(value)
+	}
+}
+
+func topSupporterCreditsForRank(settings models.RewardSettings, rank int) int {
+	switch rank {
+	case 1:
+		return settings.TopSupporterFirstCredits
+	case 2:
+		return settings.TopSupporterSecondCredits
+	case 3:
+		return settings.TopSupporterThirdCredits
+	default:
+		return 0
+	}
 }
 
 func validatePrize(prize models.RewardPrize) error {

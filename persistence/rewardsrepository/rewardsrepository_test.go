@@ -154,6 +154,83 @@ func TestInactiveTaskCannotBeCompleted(t *testing.T) {
 	}
 }
 
+func TestUnlockAchievementsAwardsOnce(t *testing.T) {
+	repository, _ := newTestRepository(t)
+	achievement, err := repository.UpsertAchievement(models.RewardAchievement{
+		Name:         "First task",
+		ConditionKey: models.RewardAchievementConditionTaskCompleted,
+		RewardAmount: 4,
+		Active:       true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	unlocks, balance, err := repository.UnlockAchievements("user-1", models.RewardAchievementConditionTaskCompleted, "task:1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(unlocks) != 1 || unlocks[0].AchievementID != achievement.ID || balance.Balance != 4 {
+		t.Fatalf("unexpected achievement unlock result: unlocks=%+v balance=%+v", unlocks, balance)
+	}
+	unlocks, balance, err = repository.UnlockAchievements("user-1", models.RewardAchievementConditionTaskCompleted, "task:1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(unlocks) != 0 || balance.Balance != 4 || balance.LifetimeEarned != 4 {
+		t.Fatalf("duplicate achievement should not double award: unlocks=%+v balance=%+v", unlocks, balance)
+	}
+}
+
+func TestAwardTopSupportersIsIdempotentAndUnlocksAchievement(t *testing.T) {
+	repository, db := newTestRepository(t)
+	if _, err := db.Exec("INSERT INTO users(id, display_name, display_color) VALUES('user-2', 'Jess', 2)"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.UpsertAchievement(models.RewardAchievement{
+		Name:         "Top supporter",
+		ConditionKey: models.RewardAchievementConditionTopSupporter,
+		RewardAmount: 2,
+		Active:       true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	results, err := repository.AwardTopSupporters([]models.StarLeaderboardEntry{
+		{Rank: 1, UserID: "user-2", DisplayName: "Jess", TotalSent: 500},
+	}, "2026-05-24")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 || !results[0].Awarded {
+		t.Fatalf("expected top supporter award: %+v", results)
+	}
+	balance, err := repository.GetBalance("user-2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if balance.Balance != defaultSettings().TopSupporterFirstCredits+2 {
+		t.Fatalf("expected top supporter credits plus achievement, got %+v", balance)
+	}
+
+	results, err = repository.AwardTopSupporters([]models.StarLeaderboardEntry{
+		{Rank: 1, UserID: "user-2", DisplayName: "Jess", TotalSent: 500},
+	}, "2026-05-24")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 || results[0].Awarded || results[0].Reason == "" {
+		t.Fatalf("duplicate top supporter award should be skipped: %+v", results)
+	}
+	balance, err = repository.GetBalance("user-2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if balance.Balance != defaultSettings().TopSupporterFirstCredits+2 {
+		t.Fatalf("duplicate top supporter award changed balance: %+v", balance)
+	}
+}
+
 func TestSpinRequiresCredit(t *testing.T) {
 	repository, _ := newTestRepository(t)
 	enableRewards(t, repository)

@@ -199,6 +199,17 @@ export interface RewardAchievementUnlock {
   unlockedAt: string;
 }
 
+export interface RewardTopSupporterAwardResult {
+  rank: number;
+  userId?: string;
+  displayName?: string;
+  totalSent?: number;
+  credits: number;
+  balanceAfter?: number;
+  awarded: boolean;
+  reason?: string;
+}
+
 export interface RewardWheelData {
   settings: RewardSettings;
   balance: RewardSpinBalance;

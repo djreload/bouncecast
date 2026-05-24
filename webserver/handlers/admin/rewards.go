@@ -79,6 +79,19 @@ func AdjustRewardCredits(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, balance)
 }
 
+func AwardTopSupporterRewards(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		webutils.WriteSimpleResponse(w, false, r.Method+" not supported")
+		return
+	}
+	results, err := rewards.GetService().AwardTopSupporterRewards()
+	if err != nil {
+		webutils.WriteSimpleResponse(w, false, err.Error())
+		return
+	}
+	writeJSON(w, webutils.J{"results": results})
+}
+
 func UpdateRewardOrder(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		webutils.WriteSimpleResponse(w, false, r.Method+" not supported")
