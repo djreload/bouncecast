@@ -1,6 +1,7 @@
 package uk.co.knrg.bouncecast.feature.home
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,6 +23,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import uk.co.knrg.bouncecast.core.config.MobileConfigRepository
@@ -84,18 +87,52 @@ fun HomeScreen(
             )
         }
 
-        Column(modifier = Modifier.fillMaxSize()) {
-            Header(config)
-            StreamPlayer(
-                streamUrl = config.bouncecast.streamUrl,
-                online = config.stream.online,
-                title = config.stream.streamTitle,
-            )
-            if (config.ads.enabled && config.ads.bannerEnabled) {
-                AdBanner(adManager = adManager)
+        if (config.stream.online) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                StreamPlayer(
+                    streamUrl = config.bouncecast.streamUrl,
+                    online = true,
+                    title = config.stream.streamTitle,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                Header(
+                    config = config,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    overlay = true,
+                )
+                if (config.features.chat && config.chat.enabled) {
+                    ChatPanel(
+                        config = config,
+                        overlay = true,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .padding(10.dp),
+                    )
+                }
             }
-            if (config.features.chat && config.chat.enabled) {
-                ChatPanel(config = config)
+        } else {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Header(
+                    config = config,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                )
+                StreamPlayer(
+                    streamUrl = config.bouncecast.streamUrl,
+                    online = false,
+                    title = config.stream.streamTitle,
+                )
+                if (config.ads.enabled && config.ads.bannerEnabled) {
+                    AdBanner(adManager = adManager)
+                }
+                if (config.features.chat && config.chat.enabled) {
+                    ChatPanel(config = config)
+                }
             }
         }
     }
@@ -115,22 +152,32 @@ fun HomeScreen(
 }
 
 @Composable
-private fun Header(config: MobileConfig) {
+private fun Header(
+    config: MobileConfig,
+    modifier: Modifier = Modifier,
+    overlay: Boolean = false,
+) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier = modifier,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Column {
-            Text(config.app.name, style = MaterialTheme.typography.titleLarge)
+            Text(
+                config.app.name,
+                style = MaterialTheme.typography.titleLarge,
+                color = if (overlay) Color.White else MaterialTheme.colorScheme.onSurface,
+            )
             Text(
                 if (config.stream.online) "Live now" else "Offline",
                 color = if (config.stream.online) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         if (config.stream.viewerCount > 0) {
-            Text("${config.stream.viewerCount} watching", style = MaterialTheme.typography.labelLarge)
+            Text(
+                "${config.stream.viewerCount} watching",
+                style = MaterialTheme.typography.labelLarge,
+                color = if (overlay) Color.White else MaterialTheme.colorScheme.onSurface,
+            )
         }
     }
 }

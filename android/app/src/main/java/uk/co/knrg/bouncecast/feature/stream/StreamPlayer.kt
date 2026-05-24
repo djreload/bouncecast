@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 
 @Composable
@@ -23,16 +24,17 @@ fun StreamPlayer(
     streamUrl: String,
     online: Boolean,
     title: String,
+    modifier: Modifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = 12.dp)
+        .aspectRatio(16f / 9f),
 ) {
     val context = LocalContext.current
     val canPlay = online && streamUrl.isNotBlank()
 
     if (!canPlay) {
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp)
-                .aspectRatio(16f / 9f),
+            modifier = modifier,
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -58,10 +60,7 @@ fun StreamPlayer(
     }
 
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp)
-            .aspectRatio(16f / 9f),
+        modifier = modifier,
         contentAlignment = Alignment.Center,
     ) {
         AndroidView(
@@ -69,6 +68,7 @@ fun StreamPlayer(
                 PlayerView(it).apply {
                     this.player = player
                     useController = true
+                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                 }
             },
             modifier = Modifier.matchParentSize(),

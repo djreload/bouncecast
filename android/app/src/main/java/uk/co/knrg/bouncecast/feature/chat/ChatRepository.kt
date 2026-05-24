@@ -97,6 +97,12 @@ class ChatRepository(
         websocket?.send(api.json.encodeToString(ChatOutboundEvent.serializer(), ChatOutboundEvent(body = clean)))
     }
 
+    fun sendGif(url: String) {
+        val clean = url.trim()
+        if (clean.isBlank()) return
+        sendMessage("![Tenor GIF]($clean)")
+    }
+
     fun disconnect() {
         websocket?.close(1000, "Leaving BounceCast chat")
         websocket = null
