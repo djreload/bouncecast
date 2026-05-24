@@ -25,18 +25,35 @@ fun StreamPlayer(
     title: String,
 ) {
     val context = LocalContext.current
+    val canPlay = online && streamUrl.isNotBlank()
+
+    if (!canPlay) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp)
+                .aspectRatio(16f / 9f),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = title.ifBlank { "BounceCast is offline" },
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.titleMedium,
+            )
+        }
+        return
+    }
+
     val player = remember(streamUrl) {
         ExoPlayer.Builder(context).build().apply {
-            if (streamUrl.isNotBlank()) {
-                setMediaItem(MediaItem.fromUri(streamUrl))
-                prepare()
-                playWhenReady = online
-            }
+            setMediaItem(MediaItem.fromUri(streamUrl))
+            prepare()
+            playWhenReady = true
         }
     }
 
-    DisposableEffect(player, online) {
-        player.playWhenReady = online
+    DisposableEffect(player) {
+        player.playWhenReady = true
         onDispose { player.release() }
     }
 
@@ -47,23 +64,14 @@ fun StreamPlayer(
             .aspectRatio(16f / 9f),
         contentAlignment = Alignment.Center,
     ) {
-        if (online && streamUrl.isNotBlank()) {
-            AndroidView(
-                factory = {
-                    PlayerView(it).apply {
-                        this.player = player
-                        useController = true
-                    }
-                },
-                modifier = Modifier.matchParentSize(),
-            )
-        } else {
-            Text(
-                text = title.ifBlank { "BounceCast is offline" },
-                color = MaterialTheme.colorScheme.onSurface,
-                style = MaterialTheme.typography.titleMedium,
-            )
-        }
+        AndroidView(
+            factory = {
+                PlayerView(it).apply {
+                    this.player = player
+                    useController = true
+                }
+            },
+            modifier = Modifier.matchParentSize(),
+        )
     }
 }
-
