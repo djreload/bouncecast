@@ -1,6 +1,7 @@
 .lineup {
   position: relative;
-  margin: 1rem var(--content-padding) 0;
+  flex: 0 0 auto;
+  margin: 1rem 2vw 0;
   padding: 1rem;
   border: 1px solid var(--rave-line);
   border-radius: var(--theme-rounded-corners);
@@ -113,6 +114,11 @@
 }
 
 @media (width <= 900px) {
+  .lineup {
+    margin-right: var(--content-padding);
+    margin-left: var(--content-padding);
+  }
+
   .grid {
     grid-template-columns: 1fr;
   }
