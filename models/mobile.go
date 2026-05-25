@@ -46,13 +46,14 @@ type MobileAppSettings struct {
 }
 
 type MobileBrandingSettings struct {
-	LogoURL         string `json:"logo_url,omitempty"`
-	SplashURL       string `json:"splash_url,omitempty"`
-	AppIconURL      string `json:"app_icon_url,omitempty"`
-	PrimaryColor    string `json:"primary_color"`
-	AccentColor     string `json:"accent_color"`
-	BackgroundColor string `json:"background_color"`
-	ThemeMode       string `json:"theme_mode"`
+	LogoURL          string `json:"logo_url,omitempty"`
+	SplashURL        string `json:"splash_url,omitempty"`
+	AppIconURL       string `json:"app_icon_url,omitempty"`
+	AppBackgroundURL string `json:"app_background_url,omitempty"`
+	PrimaryColor     string `json:"primary_color"`
+	AccentColor      string `json:"accent_color"`
+	BackgroundColor  string `json:"background_color"`
+	ThemeMode        string `json:"theme_mode"`
 }
 
 type MobileBounceCastConnection struct {
@@ -70,6 +71,11 @@ type MobileFeatureFlags struct {
 	GIFPicker            bool `json:"gif_picker"`
 	Stickers             bool `json:"stickers"`
 	Profiles             bool `json:"profiles"`
+	Stars                bool `json:"stars"`
+	ChatReactions        bool `json:"chat_reactions"`
+	StarsOverlay         bool `json:"stars_overlay"`
+	RewardWheel          bool `json:"reward_wheel"`
+	RewardOverlay        bool `json:"reward_overlay"`
 	PushNotifications    bool `json:"push_notifications"`
 	Ads                  bool `json:"ads"`
 	ExperimentalFeatures bool `json:"experimental_features"`

@@ -92,6 +92,8 @@ func Start(enableVerboseLogging bool) error {
 	r.Options("/api/admin/bouncecast/mobile", middleware.RequireOwnerOrAdmin(adminhandlers.GetMobileAdmin))
 	r.Get("/api/admin/bouncecast/mobile", middleware.RequireOwnerOrAdmin(adminhandlers.GetMobileAdmin))
 	r.Post("/api/admin/bouncecast/mobile/settings", middleware.RequireAdminRole(adminhandlers.SetMobileAdminSettings, "owner"))
+	r.Options("/api/admin/bouncecast/mobile/assets/upload", middleware.RequireAdminRole(adminhandlers.UploadMobileAsset, "owner"))
+	r.Post("/api/admin/bouncecast/mobile/assets/upload", middleware.RequireAdminRole(adminhandlers.UploadMobileAsset, "owner"))
 	r.Options("/api/admin/bouncecast/session", middleware.RequireAdminAuth(adminhandlers.GetBounceCastAdminSession))
 	r.Get("/api/admin/bouncecast/session", middleware.RequireAdminAuth(adminhandlers.GetBounceCastAdminSession))
 	r.Options("/api/admin/bouncecast/schedule", middleware.RequireOwnerOrAdmin(adminhandlers.GetBounceCastSchedule))

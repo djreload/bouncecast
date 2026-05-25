@@ -328,9 +328,7 @@ export default function ConfigChat() {
             />
             <div className="formfield-container">
               <div className="label-side">
-                <label htmlFor="field-chat-background-opacity" className="formfield-label">
-                  Transparency
-                </label>
+                <span className="formfield-label">Transparency</span>
               </div>
               <div className="input-side">
                 <Slider

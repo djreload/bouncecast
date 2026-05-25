@@ -37,6 +37,7 @@ data class BrandingConfig(
     @SerialName("logo_url") val logoUrl: String = "",
     @SerialName("splash_url") val splashUrl: String = "",
     @SerialName("app_icon_url") val appIconUrl: String = "",
+    @SerialName("app_background_url") val appBackgroundUrl: String = "",
     @SerialName("primary_color") val primaryColor: String = "#080711",
     @SerialName("accent_color") val accentColor: String = "#ff2a8a",
     @SerialName("background_color") val backgroundColor: String = "#05050f",
@@ -60,6 +61,11 @@ data class FeatureFlags(
     @SerialName("gif_picker") val gifPicker: Boolean = true,
     val stickers: Boolean = true,
     val profiles: Boolean = true,
+    val stars: Boolean = true,
+    @SerialName("chat_reactions") val chatReactions: Boolean = true,
+    @SerialName("stars_overlay") val starsOverlay: Boolean = true,
+    @SerialName("reward_wheel") val rewardWheel: Boolean = true,
+    @SerialName("reward_overlay") val rewardOverlay: Boolean = true,
     @SerialName("push_notifications") val pushNotifications: Boolean = false,
     val ads: Boolean = false,
     @SerialName("experimental_features") val experimentalFeatures: Boolean = false,
@@ -140,4 +146,3 @@ data class ChatConfig(
     @SerialName("tenor_enabled") val tenorEnabled: Boolean = false,
     @SerialName("tenor_api_key") val tenorApiKey: String = "",
 )
-

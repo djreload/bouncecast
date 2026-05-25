@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.SerialName
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
@@ -23,6 +24,9 @@ class ChatRepository(
 ) {
     private val _events = MutableStateFlow<List<ChatEvent>>(emptyList())
     val events: StateFlow<List<ChatEvent>> = _events
+
+    private val _overlayEvents = MutableStateFlow<List<ChatEvent>>(emptyList())
+    val overlayEvents: StateFlow<List<ChatEvent>> = _overlayEvents
 
     private val _connected = MutableStateFlow(false)
     val connected: StateFlow<Boolean> = _connected
@@ -73,6 +77,10 @@ class ChatRepository(
                                 "PING" -> webSocket.send("""{"type":"PONG"}""")
                                 "PONG", "CONNECTED_USER_INFO", "USER_JOINED", "USER_PARTED" -> Unit
                                 "VISIBILITY-UPDATE" -> applyVisibility(event)
+                                "CHAT_REACTION" -> applyReaction(event)
+                                "STARS_SENT", "REWARD_WHEEL_WIN" -> {
+                                    _overlayEvents.value = (_overlayEvents.value + event).takeLast(8)
+                                }
                                 null -> Unit
                                 else -> _events.value = (_events.value + event).takeLast(200)
                             }
@@ -103,6 +111,18 @@ class ChatRepository(
         sendMessage("![Tenor GIF]($clean)")
     }
 
+    fun sendReaction(messageId: String, reaction: String) {
+        val cleanMessageId = messageId.trim()
+        val cleanReaction = reaction.trim()
+        if (cleanMessageId.isBlank() || cleanReaction.isBlank()) return
+        websocket?.send(
+            api.json.encodeToString(
+                ChatReactionOutboundEvent.serializer(),
+                ChatReactionOutboundEvent(messageId = cleanMessageId, reaction = cleanReaction),
+            ),
+        )
+    }
+
     fun disconnect() {
         websocket?.close(1000, "Leaving BounceCast chat")
         websocket = null
@@ -116,6 +136,17 @@ class ChatRepository(
             _events.value
         } else {
             _events.value.filterNot { hidden.contains(it.id) }
+        }
+    }
+
+    private fun applyReaction(event: ChatEvent) {
+        if (event.messageId.isBlank()) return
+        _events.value = _events.value.map { chatEvent ->
+            if (chatEvent.id == event.messageId) {
+                chatEvent.copy(reactions = event.counts)
+            } else {
+                chatEvent
+            }
         }
     }
 
@@ -143,6 +174,13 @@ class ChatRepository(
 private data class ChatOutboundEvent(
     val type: String = "CHAT",
     val body: String,
+)
+
+@kotlinx.serialization.Serializable
+private data class ChatReactionOutboundEvent(
+    val type: String = "CHAT_REACTION",
+    @SerialName("messageId") val messageId: String,
+    val reaction: String,
 )
 
 private fun String.urlEncode(): String = URLEncoder.encode(this, Charsets.UTF_8.name())

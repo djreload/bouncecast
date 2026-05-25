@@ -56,12 +56,13 @@ Owner/admin configuration starts at:
 - Admin -> Integrations -> Mobile App Platform
 - API: `/api/admin/bouncecast/mobile`
 - Save API: `/api/admin/bouncecast/mobile/settings`
+- Asset upload API: `/api/admin/bouncecast/mobile/assets/upload`
 
 The admin screen manages:
 
 - App display name, public BounceCast URL, maintenance mode, force update, support URL, and version gates
-- Logo/splash/icon URLs and mobile theme colors
-- Mobile feature flags
+- Logo/splash/icon/background image URLs and mobile theme colors
+- Mobile feature flags, including chat reactions, Stars, Stars overlays, Rewards Wheel, and Rewards overlays
 - Google/Unity ad IDs, provider priority, app-open behavior, fallback, timeout, retries, and consent flags
 - FCM go-live push templates and topic/project metadata
 - Navigation and legal page JSON
@@ -83,6 +84,11 @@ Migration `00015_bouncecast_mobile_platform.sql` adds:
 - `mobile_legal_pages`
 - `mobile_asset_uploads`
 - `mobile_notification_logs`
+
+Migration `00016_bouncecast_mobile_app_features.sql` extends the mobile settings with:
+
+- `mobile_branding_settings.app_background_url`
+- Mobile feature flags for Stars, chat reactions, Stars overlays, Rewards Wheel, and reward overlays
 
 The device-token table stores a token hash, preview, and protected token value. Set `BOUNCECAST_SECRET_KEY` in production so token values are encrypted at rest.
 
@@ -188,6 +194,11 @@ Initial source lives in `android/` and includes a native Kotlin/Compose app with
 - Media3 HLS player pointed at BounceCast `/hls/stream.m3u8`
 - Existing BounceCast websocket chat integration through `/ws?accessToken=...`
 - Existing chat registration/history endpoints
+- Chat reaction send/render support
+- Stars and Rewards overlay rendering from shared websocket events
+- Stars and Rewards entry buttons that open the existing BounceCast account/rewards pages
+- Admin-configured app background image rendering
+- Media3 HLS playback set to fit landscape video instead of cropping/zooming it
 - FCM receiver/deep link foundation
 - Google and Unity banner provider abstractions with fallback ordering
 - App-open ad cooldown logic placeholder
@@ -257,7 +268,7 @@ C:\tools\gradle-8.12.1\bin\gradle.bat -p android :app:testDebugUnitTest :app:ass
 
 ## Current Limitations
 
-- The Android app foundation compiles and renders the stream/chat shell, but profile login UX, persisted account token storage, full moderation controls, Stars/Rewards UI rendering, and production push sending still need deeper passes.
+- The Android app foundation compiles and renders the stream/chat shell, reactions, Stars/Rewards entry points, and live overlay events, but profile login UX, persisted account token storage, native Stars purchase/send forms, native Rewards spin forms, full moderation controls, and production push sending still need deeper passes.
 - FCM receive/deep-link scaffolding exists; server-side FCM fan-out is not implemented yet.
 - App-open ad display is a non-blocking placeholder until provider-specific loading and consent are wired.
 - The Google Services Gradle plugin is intentionally not applied until a real `google-services.json` exists outside source control.

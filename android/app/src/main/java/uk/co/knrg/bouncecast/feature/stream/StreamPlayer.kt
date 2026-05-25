@@ -68,7 +68,7 @@ fun StreamPlayer(
                 PlayerView(it).apply {
                     this.player = player
                     useController = true
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                 }
             },
             modifier = Modifier.matchParentSize(),

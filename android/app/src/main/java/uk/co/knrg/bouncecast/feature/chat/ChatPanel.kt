@@ -2,6 +2,7 @@ package uk.co.knrg.bouncecast.feature.chat
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -51,14 +52,16 @@ fun ChatPanel(
     config: MobileConfig,
     modifier: Modifier = Modifier,
     overlay: Boolean = false,
+    repository: ChatRepository? = null,
 ) {
     val scope = rememberCoroutineScope()
     val api = remember { BounceCastApi() }
-    val repository = remember { ChatRepository(api, scope) }
+    val ownsRepository = repository == null
+    val chatRepository = repository ?: remember { ChatRepository(api, scope) }
     val gifRepository = remember { TenorGifRepository(api) }
-    val events by repository.events.collectAsState()
-    val connected by repository.connected.collectAsState()
-    val error by repository.error.collectAsState()
+    val events by chatRepository.events.collectAsState()
+    val connected by chatRepository.connected.collectAsState()
+    val error by chatRepository.error.collectAsState()
     val listState = rememberLazyListState()
     var draft by remember { mutableStateOf("") }
     var gifOpen by remember { mutableStateOf(false) }
@@ -70,8 +73,14 @@ fun ChatPanel(
         config.chat.tenorEnabled &&
         config.chat.tenorApiKey.isNotBlank()
 
-    LaunchedEffect(config.bouncecast.chatWebSocketUrl) {
-        repository.registerAndConnect(
+    LaunchedEffect(
+        config.bouncecast.registerChatUrl,
+        config.bouncecast.chatHistoryUrl,
+        config.bouncecast.chatWebSocketUrl,
+        ownsRepository,
+    ) {
+        if (!ownsRepository) return@LaunchedEffect
+        chatRepository.registerAndConnect(
             registerUrl = config.bouncecast.registerChatUrl,
             historyUrl = config.bouncecast.chatHistoryUrl,
             webSocketUrl = config.bouncecast.chatWebSocketUrl,
@@ -107,8 +116,12 @@ fun ChatPanel(
         gifLoading = false
     }
 
-    DisposableEffect(Unit) {
-        onDispose { repository.disconnect() }
+    DisposableEffect(chatRepository, ownsRepository) {
+        onDispose {
+            if (ownsRepository) {
+                chatRepository.disconnect()
+            }
+        }
     }
 
     val panelBackground = if (overlay) {
@@ -149,7 +162,12 @@ fun ChatPanel(
             contentPadding = PaddingValues(bottom = 4.dp),
         ) {
             items(events, key = { it.id.ifBlank { "${it.timestamp}-${it.body}" } }) { event ->
-                ChatRow(event = event, overlay = overlay)
+                ChatRow(
+                    event = event,
+                    overlay = overlay,
+                    reactionsEnabled = config.features.chatReactions,
+                    onReaction = { reaction -> chatRepository.sendReaction(event.id, reaction) },
+                )
             }
         }
         if (gifOpen && tenorEnabled) {
@@ -161,7 +179,7 @@ fun ChatPanel(
                 error = gifError,
                 results = gifResults,
                 onGifSelected = {
-                    repository.sendGif(it.url)
+                    chatRepository.sendGif(it.url)
                     gifOpen = false
                 },
                 overlay = overlay,
@@ -176,7 +194,7 @@ fun ChatPanel(
                 placeholder = { Text("Say something") },
                 keyboardActions = KeyboardActions(
                     onDone = {
-                        repository.sendMessage(draft)
+                        chatRepository.sendMessage(draft)
                         draft = ""
                     },
                 ),
@@ -192,7 +210,7 @@ fun ChatPanel(
             }
             Button(
                 onClick = {
-                    repository.sendMessage(draft)
+                    chatRepository.sendMessage(draft)
                     draft = ""
                 },
                 enabled = draft.isNotBlank(),
@@ -257,12 +275,18 @@ private fun GifPicker(
 }
 
 @Composable
-private fun ChatRow(event: ChatEvent, overlay: Boolean) {
+private fun ChatRow(
+    event: ChatEvent,
+    overlay: Boolean,
+    reactionsEnabled: Boolean,
+    onReaction: (String) -> Unit,
+) {
     val name = event.user?.displayName?.ifBlank { "Viewer" } ?: "System"
     val body = event.body.ifBlank { event.type }
     val gifUrl = extractTenorGifUrl(body)
     val textBody = stripTenorGifMarkup(body)
     val foreground = if (overlay) Color.White else MaterialTheme.colorScheme.onSurface
+    val activeReactions = event.reactions.entries.filter { it.value > 0 }
 
     Column(modifier = Modifier.padding(vertical = 5.dp)) {
         Text(name, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
@@ -285,8 +309,55 @@ private fun ChatRow(event: ChatEvent, overlay: Boolean) {
                     .clip(RoundedCornerShape(12.dp)),
             )
         }
+        if (activeReactions.isNotEmpty()) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(top = 5.dp),
+            ) {
+                activeReactions.forEach { (reaction, count) ->
+                    Text(
+                        text = "$reaction $count",
+                        color = foreground,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier
+                            .background(
+                                color = if (overlay) {
+                                    Color.White.copy(alpha = 0.14f)
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant
+                                },
+                                shape = RoundedCornerShape(999.dp),
+                            )
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                    )
+                }
+            }
+        }
+        if (reactionsEnabled && event.type == "CHAT" && event.id.isNotBlank()) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(top = 5.dp),
+            ) {
+                reactionOptions.forEach { reaction ->
+                    OutlinedButton(
+                        onClick = { onReaction(reaction) },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                    ) {
+                        Text(reaction)
+                    }
+                }
+            }
+        }
     }
 }
+
+private val reactionOptions = listOf(
+    "\uD83D\uDD25",
+    "\u2764\uFE0F",
+    "\uD83D\uDE02",
+    "\uD83D\uDC4D",
+    "\uD83D\uDE22",
+)
 
 private const val tenorGifUrlPattern = """https://media\d*\.tenor\.com/[^\s<>()"]+\.gif(?:\?[^\s<>()"]*)?"""
 private val tenorGifUrlRegex = Regex(tenorGifUrlPattern, RegexOption.IGNORE_CASE)

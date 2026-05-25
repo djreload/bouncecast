@@ -1,4 +1,4 @@
-import { FC, ReactNode, useState } from 'react';
+import { FC, KeyboardEvent, MouseEvent, ReactNode, useState } from 'react';
 import cn from 'classnames';
 import { Tooltip } from 'antd';
 import { useRecoilValue } from 'recoil';
@@ -108,7 +108,7 @@ export const ChatUserMessage: FC<ChatUserMessageProps> = ({
     setReactionPickerOpen(false);
   };
 
-  const handleMessageClick = (event: React.MouseEvent<HTMLDivElement>) => {
+  const handleMessageClick = (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
     if (target.closest('a, button')) {
       return;
@@ -117,7 +117,7 @@ export const ChatUserMessage: FC<ChatUserMessageProps> = ({
     setReactionPickerOpen(isOpen => !isOpen);
   };
 
-  const handleMessageKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+  const handleMessageKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== 'Enter' && event.key !== ' ') {
       return;
     }

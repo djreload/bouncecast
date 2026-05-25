@@ -152,6 +152,8 @@ export const BOUNCECAST_MOBILE_ADMIN = `${API_LOCATION}bouncecast/mobile`;
 
 export const BOUNCECAST_MOBILE_SETTINGS = `${API_LOCATION}bouncecast/mobile/settings`;
 
+export const BOUNCECAST_MOBILE_ASSET_UPLOAD = `${API_LOCATION}bouncecast/mobile/assets/upload`;
+
 export const BOUNCECAST_ADMIN_SESSION = `${API_LOCATION}bouncecast/session`;
 
 export const BOUNCECAST_SCHEDULE = `${API_LOCATION}bouncecast/schedule`;
@@ -358,6 +360,33 @@ export async function postUnauthedFormData(url: string, data: FormData) {
     },
     body: data,
   });
+  const json = await response.json();
+  if (!response.ok) {
+    const message = json.message || json.error || `An error has occurred: ${response.status}`;
+    throw new Error(message);
+  }
+  return json;
+}
+
+export async function postAdminFormData(url: string, data: FormData) {
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+  };
+  // eslint-disable-next-line no-undef
+  const requestOptions: RequestInit = {
+    method: 'POST',
+    headers,
+    body: data,
+  };
+
+  if (ADMIN_USERNAME && ADMIN_STREAMKEY) {
+    const encoded = btoa(`${ADMIN_USERNAME}:${ADMIN_STREAMKEY}`);
+    headers.Authorization = `Basic ${encoded}`;
+    requestOptions.mode = 'cors';
+    requestOptions.credentials = 'include';
+  }
+
+  const response = await fetch(getCredentialSafeFetchURL(url), requestOptions);
   const json = await response.json();
   if (!response.ok) {
     const message = json.message || json.error || `An error has occurred: ${response.status}`;

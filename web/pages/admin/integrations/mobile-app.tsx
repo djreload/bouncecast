@@ -14,26 +14,33 @@ import {
   Switch,
   Tabs,
   Typography,
+  Upload,
   message,
 } from 'antd';
+import { RcFile } from 'antd/lib/upload/interface';
 import dynamic from 'next/dynamic';
 import { AdminLayout } from '../../../components/layouts/AdminLayout';
 import {
   BOUNCECAST_MOBILE_ADMIN,
+  BOUNCECAST_MOBILE_ASSET_UPLOAD,
   BOUNCECAST_MOBILE_SETTINGS,
   fetchData,
+  postAdminFormData,
 } from '../../../utils/apis';
 import {
   MobileAdminSettings,
   MobileLegalPage,
   MobileNavigationItem,
 } from '../../../interfaces/mobile.model';
+import { ACCEPTED_IMAGE_TYPES, readableBytes } from '../../../utils/images';
 
 const MobileOutlined = dynamic(() => import('@ant-design/icons/MobileOutlined'), { ssr: false });
 const CopyOutlined = dynamic(() => import('@ant-design/icons/CopyOutlined'), { ssr: false });
+const UploadOutlined = dynamic(() => import('@ant-design/icons/UploadOutlined'), { ssr: false });
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
+const MAX_MOBILE_ASSET_FILESIZE = 5 * 1024 * 1024;
 
 const defaultMobileSettings: MobileAdminSettings = {
   app: {
@@ -51,6 +58,11 @@ const defaultMobileSettings: MobileAdminSettings = {
     gif_picker: true,
     stickers: true,
     profiles: true,
+    stars: true,
+    chat_reactions: true,
+    stars_overlay: true,
+    reward_wheel: true,
+    reward_overlay: true,
     push_notifications: false,
     ads: false,
     experimental_features: false,
@@ -108,6 +120,72 @@ function parseJSONList<T>(value: string, label: string): T[] {
   } catch (error) {
     throw new Error(error instanceof Error ? error.message : `${label} JSON is invalid`);
   }
+}
+
+function MobileAssetUploadButton({
+  form,
+  fieldName,
+  assetType,
+}: {
+  form: any;
+  fieldName: keyof MobileAdminSettings['branding'];
+  assetType: string;
+}) {
+  const [uploading, setUploading] = useState(false);
+
+  const beforeUpload = (file: RcFile) => {
+    if (file.size > MAX_MOBILE_ASSET_FILESIZE) {
+      message.error(`Image is too large (${readableBytes(file.size)}). Maximum size is 5 MB.`);
+      return Upload.LIST_IGNORE;
+    }
+    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+      message.error(`Unsupported image type: ${file.type}`);
+      return Upload.LIST_IGNORE;
+    }
+    return true;
+  };
+
+  const uploadAsset = async ({ file, onError, onSuccess }: any) => {
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('asset', file as RcFile);
+      formData.append('type', assetType);
+      const result = await postAdminFormData(
+        `${BOUNCECAST_MOBILE_ASSET_UPLOAD}?type=${encodeURIComponent(assetType)}`,
+        formData,
+      );
+      const branding = form.getFieldValue('branding') || {};
+      form.setFieldsValue({
+        branding: {
+          ...branding,
+          [fieldName]: result.url,
+        },
+      });
+      message.success('Mobile asset uploaded');
+      onSuccess?.(result);
+    } catch (error) {
+      const uploadError = error instanceof Error ? error : new Error('Unable to upload image');
+      message.error(uploadError.message);
+      onError?.(uploadError);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <Upload
+      accept={ACCEPTED_IMAGE_TYPES.join(',')}
+      beforeUpload={beforeUpload}
+      customRequest={uploadAsset}
+      showUploadList={false}
+      disabled={uploading}
+    >
+      <Button icon={<UploadOutlined />} loading={uploading}>
+        Upload image
+      </Button>
+    </Upload>
+  );
 }
 
 export default function MobileAppAdmin() {
@@ -328,6 +406,20 @@ export default function MobileAppAdmin() {
                         <Input placeholder="/favicon.ico" />
                       </Form.Item>
                     </Col>
+                    <Col xs={24} md={12}>
+                      <Form.Item
+                        name={['branding', 'app_background_url']}
+                        label="App background image URL"
+                        extra="Used behind the native mobile livestream, offline screen, and mobile panels."
+                      >
+                        <Input placeholder="/public/mobile-assets/app-background.jpg" />
+                      </Form.Item>
+                      <MobileAssetUploadButton
+                        form={form}
+                        fieldName="app_background_url"
+                        assetType="app-background"
+                      />
+                    </Col>
                     <Col xs={24} md={6}>
                       <Form.Item name={['branding', 'primary_color']} label="Primary color">
                         <Input type="color" />
@@ -367,6 +459,11 @@ export default function MobileAppAdmin() {
                       ['gif_picker', 'GIF picker'],
                       ['stickers', 'Stickers'],
                       ['profiles', 'Profiles'],
+                      ['stars', 'Stars'],
+                      ['chat_reactions', 'Chat reactions'],
+                      ['stars_overlay', 'Stars overlays'],
+                      ['reward_wheel', 'Rewards Wheel'],
+                      ['reward_overlay', 'Reward overlays'],
                       ['push_notifications', 'Push notifications'],
                       ['ads', 'Ads'],
                       ['experimental_features', 'Experimental features'],

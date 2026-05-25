@@ -10,8 +10,10 @@ import (
 	"github.com/owncast/owncast/core"
 	"github.com/owncast/owncast/core/data"
 	mobilecore "github.com/owncast/owncast/core/mobile"
+	"github.com/owncast/owncast/core/stars"
 	"github.com/owncast/owncast/models"
 	"github.com/owncast/owncast/persistence/configrepository"
+	"github.com/owncast/owncast/persistence/rewardsrepository"
 	"github.com/owncast/owncast/persistence/userrepository"
 	"github.com/owncast/owncast/webserver/router/middleware"
 	webutils "github.com/owncast/owncast/webserver/utils"
@@ -70,9 +72,10 @@ func GetMobileAssets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, webutils.J{
-		"logo_url":     config.Branding.LogoURL,
-		"splash_url":   config.Branding.SplashURL,
-		"app_icon_url": config.Branding.AppIconURL,
+		"logo_url":           config.Branding.LogoURL,
+		"splash_url":         config.Branding.SplashURL,
+		"app_icon_url":       config.Branding.AppIconURL,
+		"app_background_url": config.Branding.AppBackgroundURL,
 	})
 }
 
@@ -199,8 +202,9 @@ func loadMobilePublicConfig(r *http.Request) (models.MobileConfigResponse, error
 func mobileRuntimeFromRequest(r *http.Request) mobilecore.Runtime {
 	configRepository := configrepository.Get()
 	status := core.GetStatus()
+	featureRuntime := mobileFeatureRuntime()
 
-	return mobilecore.Runtime{
+	runtime := mobilecore.Runtime{
 		BaseURL:                   inferMobileBaseURL(r, configRepository.GetServerURL()),
 		ServerName:                configRepository.GetServerName(),
 		ServerSummary:             configRepository.GetServerSummary(),
@@ -219,6 +223,28 @@ func mobileRuntimeFromRequest(r *http.Request) mobilecore.Runtime {
 		HideViewerCount:           configRepository.GetHideViewerCount(),
 		Status:                    status,
 	}
+	runtime.StarsEnabled = featureRuntime.StarsEnabled
+	runtime.StarsOverlayEnabled = featureRuntime.StarsOverlayEnabled
+	runtime.ChatReactionsEnabled = featureRuntime.ChatReactionsEnabled
+	runtime.RewardWheelEnabled = featureRuntime.RewardWheelEnabled
+	runtime.RewardOverlayEnabled = featureRuntime.RewardOverlayEnabled
+	return runtime
+}
+
+func mobileFeatureRuntime() mobilecore.Runtime {
+	runtime := mobilecore.Runtime{ChatReactionsEnabled: true}
+
+	if starConfig, err := stars.GetService().GetPublicConfig(); err == nil {
+		runtime.StarsEnabled = starConfig.Enabled
+		runtime.StarsOverlayEnabled = starConfig.OverlayEffectsEnabled
+	}
+
+	if rewardSettings, err := rewardsrepository.Get().GetSettings(); err == nil {
+		runtime.RewardWheelEnabled = rewardSettings.Enabled
+		runtime.RewardOverlayEnabled = rewardSettings.OverlayEnabled
+	}
+
+	return runtime
 }
 
 func inferMobileBaseURL(r *http.Request, configuredURL string) string {

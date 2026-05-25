@@ -23,6 +23,14 @@ data class ChatEvent(
     val ids: List<String> = emptyList(),
     @SerialName("messageId") val messageId: String = "",
     val counts: Map<String, Int> = emptyMap(),
+    val reactions: Map<String, Int> = emptyMap(),
+    @SerialName("displayName") val displayName: String = "",
+    val amount: Int = 0,
+    val message: String = "",
+    val effect: String = "",
+    @SerialName("soundEnabled") val soundEnabled: Boolean = false,
+    @SerialName("prizeName") val prizeName: String = "",
+    @SerialName("prizeImage") val prizeImage: String = "",
 )
 
 @Serializable
@@ -37,4 +45,3 @@ data class ChatRegistrationResponse(
     @SerialName("displayName") val displayName: String = "",
     @SerialName("displayColor") val displayColor: Int = 0,
 )
-

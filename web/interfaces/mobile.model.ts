@@ -15,6 +15,7 @@ export type MobileBrandingSettings = {
   logo_url?: string;
   splash_url?: string;
   app_icon_url?: string;
+  app_background_url?: string;
   primary_color: string;
   accent_color: string;
   background_color: string;
@@ -26,6 +27,11 @@ export type MobileFeatureFlags = {
   gif_picker: boolean;
   stickers: boolean;
   profiles: boolean;
+  stars: boolean;
+  chat_reactions: boolean;
+  stars_overlay: boolean;
+  reward_wheel: boolean;
+  reward_overlay: boolean;
   push_notifications: boolean;
   ads: boolean;
   experimental_features: boolean;

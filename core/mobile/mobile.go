@@ -45,6 +45,11 @@ type Runtime struct {
 	AppearanceVariables       map[string]string
 	MaxSocketPayloadSize      int
 	HideViewerCount           bool
+	StarsEnabled              bool
+	StarsOverlayEnabled       bool
+	ChatReactionsEnabled      bool
+	RewardWheelEnabled        bool
+	RewardOverlayEnabled      bool
 	Status                    models.Status
 }
 
@@ -129,6 +134,7 @@ func SaveAdminSettings(db *sql.DB, settings models.MobileAdminSettings) (models.
 			logo_url = ?,
 			splash_url = ?,
 			app_icon_url = ?,
+			app_background_url = ?,
 			primary_color = ?,
 			accent_color = ?,
 			background_color = ?,
@@ -136,7 +142,8 @@ func SaveAdminSettings(db *sql.DB, settings models.MobileAdminSettings) (models.
 			updated_at = CURRENT_TIMESTAMP
 		WHERE id = 1
 	`, emptyToNull(normalized.Branding.LogoURL), emptyToNull(normalized.Branding.SplashURL),
-		emptyToNull(normalized.Branding.AppIconURL), normalized.Branding.PrimaryColor,
+		emptyToNull(normalized.Branding.AppIconURL), emptyToNull(normalized.Branding.AppBackgroundURL),
+		normalized.Branding.PrimaryColor,
 		normalized.Branding.AccentColor, normalized.Branding.BackgroundColor,
 		normalized.Branding.ThemeMode); err != nil {
 		return models.MobileAdminSettings{}, err
@@ -148,6 +155,11 @@ func SaveAdminSettings(db *sql.DB, settings models.MobileAdminSettings) (models.
 			gif_picker_enabled = ?,
 			stickers_enabled = ?,
 			profiles_enabled = ?,
+			stars_enabled = ?,
+			chat_reactions_enabled = ?,
+			stars_overlay_enabled = ?,
+			reward_wheel_enabled = ?,
+			reward_overlay_enabled = ?,
 			push_notifications_enabled = ?,
 			ads_enabled = ?,
 			experimental_features_enabled = ?,
@@ -155,6 +167,9 @@ func SaveAdminSettings(db *sql.DB, settings models.MobileAdminSettings) (models.
 		WHERE id = 1
 	`, boolInt(normalized.Features.Chat), boolInt(normalized.Features.GIFPicker),
 		boolInt(normalized.Features.Stickers), boolInt(normalized.Features.Profiles),
+		boolInt(normalized.Features.Stars), boolInt(normalized.Features.ChatReactions),
+		boolInt(normalized.Features.StarsOverlay), boolInt(normalized.Features.RewardWheel),
+		boolInt(normalized.Features.RewardOverlay),
 		boolInt(normalized.Features.PushNotifications), boolInt(normalized.Features.Ads),
 		boolInt(normalized.Features.ExperimentalFeatures)); err != nil {
 		return models.MobileAdminSettings{}, err
@@ -262,6 +277,7 @@ func BuildPublicConfig(settings models.MobileAdminSettings, runtime Runtime) mod
 	settings.Branding.LogoURL = absoluteOrEmpty(baseURL, settings.Branding.LogoURL)
 	settings.Branding.SplashURL = absoluteOrEmpty(baseURL, settings.Branding.SplashURL)
 	settings.Branding.AppIconURL = absoluteOrEmpty(baseURL, settings.Branding.AppIconURL)
+	settings.Branding.AppBackgroundURL = absoluteOrEmpty(baseURL, settings.Branding.AppBackgroundURL)
 	settings.Notifications.ImageURL = absoluteOrEmpty(baseURL, settings.Notifications.ImageURL)
 	settings.Notifications.IconURL = absoluteOrEmpty(baseURL, settings.Notifications.IconURL)
 	status := runtime.Status
@@ -287,6 +303,11 @@ func BuildPublicConfig(settings models.MobileAdminSettings, runtime Runtime) mod
 	if runtime.ChatDisabled {
 		settings.Features.Chat = false
 	}
+	settings.Features.ChatReactions = settings.Features.ChatReactions && runtime.ChatReactionsEnabled
+	settings.Features.Stars = settings.Features.Stars && runtime.StarsEnabled
+	settings.Features.StarsOverlay = settings.Features.Stars && settings.Features.StarsOverlay && runtime.StarsOverlayEnabled
+	settings.Features.RewardWheel = settings.Features.RewardWheel && runtime.RewardWheelEnabled
+	settings.Features.RewardOverlay = settings.Features.RewardWheel && settings.Features.RewardOverlay && runtime.RewardOverlayEnabled
 	if !settings.Features.Ads {
 		settings.Ads.Enabled = false
 	}
@@ -438,30 +459,38 @@ func scanAppSettings(db *sql.DB, app *models.MobileAppSettings) error {
 }
 
 func scanBrandingSettings(db *sql.DB, branding *models.MobileBrandingSettings) error {
-	var logo, splash, appIcon sql.NullString
+	var logo, splash, appIcon, appBackground sql.NullString
 	err := db.QueryRow(`
-		SELECT logo_url, splash_url, app_icon_url, primary_color, accent_color,
+		SELECT logo_url, splash_url, app_icon_url, app_background_url, primary_color, accent_color,
 			background_color, theme_mode
 		FROM mobile_branding_settings WHERE id = 1
-	`).Scan(&logo, &splash, &appIcon, &branding.PrimaryColor,
+	`).Scan(&logo, &splash, &appIcon, &appBackground, &branding.PrimaryColor,
 		&branding.AccentColor, &branding.BackgroundColor, &branding.ThemeMode)
 	branding.LogoURL = nullString(logo)
 	branding.SplashURL = nullString(splash)
 	branding.AppIconURL = nullString(appIcon)
+	branding.AppBackgroundURL = nullString(appBackground)
 	return err
 }
 
 func scanFeatureFlags(db *sql.DB, features *models.MobileFeatureFlags) error {
-	var chat, gifs, stickers, profiles, push, ads, experimental int
+	var chat, gifs, stickers, profiles, stars, reactions, starsOverlay, rewardWheel, rewardOverlay, push, ads, experimental int
 	err := db.QueryRow(`
 		SELECT chat_enabled, gif_picker_enabled, stickers_enabled, profiles_enabled,
-			push_notifications_enabled, ads_enabled, experimental_features_enabled
+			stars_enabled, chat_reactions_enabled, stars_overlay_enabled, reward_wheel_enabled,
+			reward_overlay_enabled, push_notifications_enabled, ads_enabled, experimental_features_enabled
 		FROM mobile_feature_flags WHERE id = 1
-	`).Scan(&chat, &gifs, &stickers, &profiles, &push, &ads, &experimental)
+	`).Scan(&chat, &gifs, &stickers, &profiles, &stars, &reactions, &starsOverlay,
+		&rewardWheel, &rewardOverlay, &push, &ads, &experimental)
 	features.Chat = intBool(chat)
 	features.GIFPicker = intBool(gifs)
 	features.Stickers = intBool(stickers)
 	features.Profiles = intBool(profiles)
+	features.Stars = intBool(stars)
+	features.ChatReactions = intBool(reactions)
+	features.StarsOverlay = intBool(starsOverlay)
+	features.RewardWheel = intBool(rewardWheel)
+	features.RewardOverlay = intBool(rewardOverlay)
 	features.PushNotifications = intBool(push)
 	features.Ads = intBool(ads)
 	features.ExperimentalFeatures = intBool(experimental)
@@ -597,10 +626,15 @@ func defaultAdminSettings() models.MobileAdminSettings {
 			ThemeMode:       "system",
 		},
 		Features: models.MobileFeatureFlags{
-			Chat:      true,
-			GIFPicker: true,
-			Stickers:  true,
-			Profiles:  true,
+			Chat:          true,
+			GIFPicker:     true,
+			Stickers:      true,
+			Profiles:      true,
+			Stars:         true,
+			ChatReactions: true,
+			StarsOverlay:  true,
+			RewardWheel:   true,
+			RewardOverlay: true,
 		},
 		Ads: models.MobileAdSettings{
 			TestMode:                 true,
@@ -643,6 +677,7 @@ func normalizeAdminSettings(settings models.MobileAdminSettings) (models.MobileA
 	settings.Branding.LogoURL = trimURL(settings.Branding.LogoURL)
 	settings.Branding.SplashURL = trimURL(settings.Branding.SplashURL)
 	settings.Branding.AppIconURL = trimURL(settings.Branding.AppIconURL)
+	settings.Branding.AppBackgroundURL = trimURL(settings.Branding.AppBackgroundURL)
 	settings.Branding.PrimaryColor = normalizeColor(settings.Branding.PrimaryColor, "#080711")
 	settings.Branding.AccentColor = normalizeColor(settings.Branding.AccentColor, "#ff2a8a")
 	settings.Branding.BackgroundColor = normalizeColor(settings.Branding.BackgroundColor, "#05050f")
@@ -654,6 +689,7 @@ func normalizeAdminSettings(settings models.MobileAdminSettings) (models.MobileA
 		settings.Branding.LogoURL,
 		settings.Branding.SplashURL,
 		settings.Branding.AppIconURL,
+		settings.Branding.AppBackgroundURL,
 		settings.Notifications.ImageURL,
 		settings.Notifications.IconURL,
 	} {

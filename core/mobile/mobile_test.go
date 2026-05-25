@@ -26,6 +26,7 @@ func openMobileTestDB(t *testing.T) *sql.DB {
 func TestBuildPublicConfigUsesExistingBounceCastEndpoints(t *testing.T) {
 	settings := defaultAdminSettings()
 	settings.App.PublicBaseURL = "https://k-nrg.co.uk"
+	settings.Branding.AppBackgroundURL = "/public/mobile-assets/bg.png"
 	settings.Features.Ads = true
 	settings.Ads.Enabled = true
 	settings.Navigation = []models.MobileNavigationItem{
@@ -42,6 +43,11 @@ func TestBuildPublicConfigUsesExistingBounceCastEndpoints(t *testing.T) {
 		ChatTenorAPIKey:           "tenor-public-key",
 		MaxSocketPayloadSize:      4096,
 		ChatRequireAuthentication: true,
+		ChatReactionsEnabled:      true,
+		StarsEnabled:              true,
+		StarsOverlayEnabled:       true,
+		RewardWheelEnabled:        true,
+		RewardOverlayEnabled:      true,
 		Status: models.Status{
 			Online:      true,
 			StreamTitle: "Sunday Sessions",
@@ -60,6 +66,12 @@ func TestBuildPublicConfigUsesExistingBounceCastEndpoints(t *testing.T) {
 	}
 	if !config.Chat.Enabled || !config.Chat.RequireAuthentication || !config.Chat.TenorEnabled {
 		t.Fatalf("chat config did not inherit BounceCast chat settings: %+v", config.Chat)
+	}
+	if !config.Features.Stars || !config.Features.ChatReactions || !config.Features.RewardWheel {
+		t.Fatalf("mobile feature flags were not exposed: %+v", config.Features)
+	}
+	if config.Branding.AppBackgroundURL != "https://k-nrg.co.uk/public/mobile-assets/bg.png" {
+		t.Fatalf("app background URL = %q", config.Branding.AppBackgroundURL)
 	}
 	if len(config.Navigation) != 1 || config.Navigation[0].Label != "Live" {
 		t.Fatalf("disabled navigation items leaked into public config: %+v", config.Navigation)
@@ -82,7 +94,11 @@ func TestSaveAdminSettingsValidatesAndPersists(t *testing.T) {
 	}
 
 	settings.App.PublicBaseURL = "https://app.example.com"
+	settings.Branding.AppBackgroundURL = "/public/mobile-assets/background.png"
 	settings.Branding.PrimaryColor = "#111111"
+	settings.Features.Stars = true
+	settings.Features.ChatReactions = true
+	settings.Features.RewardWheel = true
 	settings.Features.PushNotifications = true
 	settings.Ads.ProviderPriority = []string{"unity", "google", "bad-provider"}
 	settings.Notifications.GoLiveEnabled = true
@@ -99,6 +115,12 @@ func TestSaveAdminSettingsValidatesAndPersists(t *testing.T) {
 	}
 	if saved.Branding.PrimaryColor != "#111111" {
 		t.Fatalf("primary color = %q", saved.Branding.PrimaryColor)
+	}
+	if saved.Branding.AppBackgroundURL != "/public/mobile-assets/background.png" {
+		t.Fatalf("app background URL = %q", saved.Branding.AppBackgroundURL)
+	}
+	if !saved.Features.Stars || !saved.Features.ChatReactions || !saved.Features.RewardWheel {
+		t.Fatalf("feature flags not saved: %+v", saved.Features)
 	}
 	if got := strings.Join(saved.Ads.ProviderPriority, ","); got != "unity,google" {
 		t.Fatalf("provider priority = %q", got)
