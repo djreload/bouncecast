@@ -57,7 +57,16 @@ export const VideoJS: FC<VideoJSProps> = ({ options, onReady }) => {
       player.autoplay(options.autoplay);
       player.src(options.sources);
     }
-  }, [options, videoRef]);
+
+    return () => {
+      if (playerRef.current && !playerRef.current.isDisposed()) {
+        playerRef.current.dispose();
+        playerRef.current = null;
+      }
+    };
+    // Video.js owns its internal state after setup. Reinitializing on each render can create
+    // overlapping playback instances, so this effect intentionally runs only for this mount.
+  }, []);
 
   React.useEffect(() => {
     videojs.getPlayer(videoRef.current).on('xhr-hooks-ready', () => {
