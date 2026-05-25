@@ -15,6 +15,7 @@ func TestSetHeadersIncludesPayPalAndHardeningHeaders(t *testing.T) {
 	for _, expected := range []string{
 		"script-src 'nonce-test' 'self' https://www.paypal.com",
 		"connect-src 'self' https://*.paypal.com",
+		"https://tenor.googleapis.com",
 		"frame-src 'self' https://*.paypal.com",
 		"object-src 'none'",
 		"base-uri 'self'",

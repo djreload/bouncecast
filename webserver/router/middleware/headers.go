@@ -11,7 +11,7 @@ func SetHeaders(w http.ResponseWriter, nonce string) {
 	// Content security policy
 	csp := []string{
 		fmt.Sprintf("script-src '%s' 'self' https://www.paypal.com https://www.sandbox.paypal.com https://www.paypalobjects.com", nonce),
-		"connect-src 'self' https://*.paypal.com https://*.paypalobjects.com",
+		"connect-src 'self' https://*.paypal.com https://*.paypalobjects.com https://tenor.googleapis.com",
 		"frame-src 'self' https://*.paypal.com",
 		"img-src 'self' data: blob: http: https:",
 		"object-src 'none'",
