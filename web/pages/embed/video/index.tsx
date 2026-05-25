@@ -19,6 +19,22 @@ import { Theme } from '../../../components/theme/Theme';
 import styles from './VideoEmbed.module.scss';
 import { OfflineEmbed } from '../../../components/ui/OfflineEmbed/OfflineEmbed';
 
+const getBooleanQueryValue = (value: string | null, defaultValue = false) => {
+  if (value === null || value === undefined) {
+    return defaultValue;
+  }
+
+  const normalized = value.toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) {
+    return true;
+  }
+  if (['0', 'false', 'no', 'off'].includes(normalized)) {
+    return false;
+  }
+
+  return defaultValue;
+};
+
 export default function VideoEmbed() {
   const status = useRecoilValue<ServerStatus>(serverStatusState);
   const clientConfig = useRecoilValue<ClientConfig>(clientConfigStateAtom);
@@ -38,17 +54,15 @@ export default function VideoEmbed() {
    * but router.asPath is initialized earlier, so we parse the
    * query parameters ourselves
    */
-  const path = router.asPath.split('?')[1] ?? '';
-  const query = path.split('&').reduce(
-    (currQuery, part) => {
-      const [key, value] = part.split('=');
-      return { ...currQuery, [key]: value };
-    },
-    {} as Record<string, string>,
+  const query = new URLSearchParams(router.asPath.split('?')[1] ?? '');
+  const autoPlay = getBooleanQueryValue(query.get('autoplay'), false);
+  const initiallyMuted = getBooleanQueryValue(
+    query.get('muted') ?? query.get('initiallyMuted'),
+    false,
   );
-
-  const initiallyMuted = query.initiallyMuted === 'true';
-  const supportsSocialFollow = socialEnabled && query.supportsSocialFollow !== 'false';
+  const initialVolume = autoPlay && !initiallyMuted ? 0.8 : undefined;
+  const supportsSocialFollow =
+    socialEnabled && getBooleanQueryValue(query.get('supportsSocialFollow'), true);
 
   const loadingState = <Skeleton active style={{ padding: '10px' }} paragraph={{ rows: 10 }} />;
 
@@ -78,7 +92,9 @@ export default function VideoEmbed() {
       <OwncastPlayer
         source="/hls/stream.m3u8"
         online={online}
+        autoPlay={autoPlay}
         initiallyMuted={initiallyMuted}
+        initialVolume={initialVolume}
         title={streamTitle || name}
       />
       <Statusbar

@@ -26,7 +26,9 @@ let latencyCompensatorEnabled = false;
 export type OwncastPlayerProps = {
   source: string;
   online: boolean;
+  autoPlay?: boolean;
   initiallyMuted?: boolean;
+  initialVolume?: number;
   title: string;
   className?: string;
 };
@@ -34,7 +36,9 @@ export type OwncastPlayerProps = {
 export const OwncastPlayer: FC<OwncastPlayerProps> = ({
   source,
   online,
+  autoPlay = false,
   initiallyMuted = false,
+  initialVolume,
   title,
   className,
 }) => {
@@ -45,6 +49,12 @@ export const OwncastPlayer: FC<OwncastPlayerProps> = ({
 
   const setSavedVolume = () => {
     try {
+      if (initialVolume !== undefined) {
+        playerRef.current.volume(initialVolume);
+        playerRef.current.muted(initiallyMuted);
+        return;
+      }
+
       playerRef.current.volume(getLocalStorage(PLAYER_VOLUME) || 1);
     } catch (err) {
       console.warn(err);
@@ -196,7 +206,7 @@ export const OwncastPlayer: FC<OwncastPlayerProps> = ({
   });
 
   const videoJsOptions = {
-    autoplay: false,
+    autoplay: autoPlay,
     controls: true,
     responsive: true,
     fluid: false,
