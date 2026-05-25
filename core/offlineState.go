@@ -2,8 +2,12 @@ package core
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
 
 	"github.com/grafov/m3u8"
 	"github.com/owncast/owncast/config"
@@ -12,12 +16,34 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const offlineSegmentDuration = 8.128
+
+var targetDurationRegex = regexp.MustCompile(`(?m)^#EXT-X-TARGETDURATION:(\d+(?:\.\d+)?)$`)
+
+func ensureMinimumTargetDuration(playlistContents []byte, minimumTargetDuration int) []byte {
+	return targetDurationRegex.ReplaceAllFunc(playlistContents, func(match []byte) []byte {
+		parts := strings.SplitN(string(match), ":", 2)
+		if len(parts) != 2 {
+			return match
+		}
+
+		currentTargetDuration, err := strconv.ParseFloat(parts[1], 64)
+		if err != nil || int(math.Ceil(currentTargetDuration)) >= minimumTargetDuration {
+			return match
+		}
+
+		return []byte(fmt.Sprintf("#EXT-X-TARGETDURATION:%d", minimumTargetDuration))
+	})
+}
+
 func appendOfflineToVariantPlaylist(index int, playlistFilePath string) {
 	existingPlaylistContents, err := os.ReadFile(playlistFilePath) // nolint: gosec
 	if err != nil {
 		log.Debugln("unable to read existing playlist file", err)
 		return
 	}
+
+	existingPlaylistContents = ensureMinimumTargetDuration(existingPlaylistContents, int(math.Ceil(offlineSegmentDuration)))
 
 	tmpFileName := fmt.Sprintf("tmp-stream-%d.m3u8", index)
 	atomicWriteTmpPlaylistFile, err := os.CreateTemp(config.TempDir, tmpFileName)
@@ -35,7 +61,7 @@ func appendOfflineToVariantPlaylist(index int, playlistFilePath string) {
 	// Manually append the offline clip to the end of the media playlist.
 	_, _ = atomicWriteTmpPlaylistFile.WriteString("#EXT-X-DISCONTINUITY\n")
 	// If "offline" content gets changed then change the duration below
-	_, _ = atomicWriteTmpPlaylistFile.WriteString("#EXTINF:8.000000,\n")
+	_, _ = atomicWriteTmpPlaylistFile.WriteString(fmt.Sprintf("#EXTINF:%.6f,\n", offlineSegmentDuration))
 	_, _ = atomicWriteTmpPlaylistFile.WriteString("offline-v2.ts\n")
 	_, _ = atomicWriteTmpPlaylistFile.WriteString("#EXT-X-ENDLIST\n")
 
@@ -77,7 +103,7 @@ func createEmptyOfflinePlaylist(playlistFilePath string, offlineFilename string)
 	}
 
 	// If "offline" content gets changed then change the duration below
-	if err := p.Append(offlineFilename, 8.0, ""); err != nil {
+	if err := p.Append(offlineFilename, offlineSegmentDuration, ""); err != nil {
 		log.Errorln(err)
 	}
 

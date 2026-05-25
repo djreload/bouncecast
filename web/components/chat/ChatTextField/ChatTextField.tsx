@@ -165,33 +165,30 @@ export const ChatTextField: FC<ChatTextFieldProps> = ({
     return graphemer.countGraphemes(message);
   };
 
-  const sendMessage = () => {
+  const sendChatBody = (body: string) => {
     if (!websocketService) {
       console.log('websocketService is not defined');
-      return;
+      return false;
     }
 
-    const message = getTextContent(contentEditable);
+    const message = body.trim();
     const count = graphemer.countGraphemes(message);
-    if (count === 0 || count > characterLimit) return;
+    if (count === 0 || count > characterLimit) return false;
 
     websocketService.send({ type: MessageType.CHAT, body: message });
     contentEditable.innerHTML = '';
     setInputDraft('');
+    setCharacterCount(0);
+    return true;
+  };
+
+  const sendMessage = () => {
+    const message = getTextContent(contentEditable);
+    sendChatBody(message);
   };
 
   const insertTextAtEnd = (textToInsert: string) => {
     contentEditable.innerHTML += textToInsert;
-  };
-
-  const insertPlainTextAtEnd = (textToInsert: string) => {
-    if (!contentEditable) {
-      return;
-    }
-
-    contentEditable.appendChild(document.createTextNode(textToInsert));
-    contentEditable.focus({ preventScroll: true });
-    handleChange();
   };
 
   const onEmojiSelect = emoji => {
@@ -205,9 +202,11 @@ export const ChatTextField: FC<ChatTextFieldProps> = ({
   };
 
   const onGifSelect = (url: string) => {
-    const prefix = getTextContent(contentEditable).length > 0 ? ' ' : '';
-    insertPlainTextAtEnd(`${prefix}![Tenor GIF](${url}) `);
-    setGifPopoverOpen(false);
+    const message = getTextContent(contentEditable);
+    const prefix = message.length > 0 ? ' ' : '';
+    if (sendChatBody(`${message}${prefix}![Tenor GIF](${url})`)) {
+      setGifPopoverOpen(false);
+    }
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {

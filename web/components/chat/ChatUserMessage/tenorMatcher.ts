@@ -9,16 +9,21 @@ export interface ChatMessageTenorGifProps {
 
 const tenorGifURLPattern = String.raw`https:\/\/media\d*\.tenor\.com\/[^\s<>()"]+\.gif(?:\?[^\s<>()"]*)?`;
 const tenorGifURLRegex = new RegExp(tenorGifURLPattern, 'i');
+const tenorGifMarkdownRegex = new RegExp(String.raw`!\[[^\]]*]\((${tenorGifURLPattern})\)`, 'gi');
 const tenorGifAnchorRegex = new RegExp(
   String.raw`<a\b[^>]*href="(${tenorGifURLPattern})"[^>]*>[\s\S]*?<\/a>`,
   'gi',
 );
 
+function renderTenorGifLink(url: string): string {
+  const safeUrl = String(url);
+  return `<a class="chat-tenor-gif-link" href="${safeUrl}" target="_blank" rel="noreferrer"><img alt="Tenor GIF" class="chat-tenor-gif" loading="lazy" src="${safeUrl}" /></a>`;
+}
+
 export function renderTenorGifEmbeds(content: string): string {
-  return (content || '').replace(tenorGifAnchorRegex, (_match, url) => {
-    const safeUrl = String(url);
-    return `<a class="chat-tenor-gif-link" href="${safeUrl}" target="_blank" rel="noopener noreferrer"><img alt="Tenor GIF" class="chat-tenor-gif" loading="lazy" src="${safeUrl}" /></a>`;
-  });
+  return (content || '')
+    .replace(tenorGifAnchorRegex, (_match, url) => renderTenorGifLink(url))
+    .replace(tenorGifMarkdownRegex, (_match, url) => renderTenorGifLink(url));
 }
 
 export class ChatMessageTenorGifMatcher extends Matcher<ChatMessageTenorGifProps> {
@@ -47,7 +52,7 @@ export class ChatMessageTenorGifMatcher extends Matcher<ChatMessageTenorGifProps
         className: 'chat-tenor-gif-link',
         href: url,
         target: '_blank',
-        rel: 'noopener noreferrer',
+        rel: 'noreferrer',
       },
       React.createElement('img', {
         alt: 'GIF reaction',

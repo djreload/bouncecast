@@ -27,7 +27,6 @@ export default function ConfigVideoSettings() {
         '  height="480"',
         '  style="border:0;aspect-ratio:16/9;width:100%;height:auto;"',
         '  allow="autoplay; fullscreen; picture-in-picture"',
-        '  allowfullscreen',
         '  referrerpolicy="strict-origin-when-cross-origin">',
         '</iframe>',
       ].join('\n'),

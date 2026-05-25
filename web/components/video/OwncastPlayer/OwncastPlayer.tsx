@@ -182,6 +182,24 @@ export const OwncastPlayer: FC<OwncastPlayerProps> = ({
     }
   };
 
+  const seekToLiveEdge = player => {
+    const liveTracker = player?.liveTracker;
+    if (!liveTracker?.isLive?.() || !liveTracker?.seekToLiveEdge) {
+      return;
+    }
+
+    const liveCurrentTime = liveTracker.liveCurrentTime?.();
+    const currentTime = player.currentTime?.();
+    const secondsBehindLive =
+      typeof liveCurrentTime === 'number' && typeof currentTime === 'number'
+        ? liveCurrentTime - currentTime
+        : 0;
+
+    if (secondsBehindLive > 15 || player.error?.()) {
+      liveTracker.seekToLiveEdge();
+    }
+  };
+
   // Register keyboard shortcut for the space bar to toggle playback
   useHotkeys('space', e => {
     e.preventDefault();
@@ -248,28 +266,29 @@ export const OwncastPlayer: FC<OwncastPlayerProps> = ({
 
     // You can handle player events here, for example:
     player.on('waiting', () => {
-      console.debug('player is waiting');
+      seekToLiveEdge(player);
     });
 
     player.on('dispose', () => {
-      console.debug('player will dispose');
       ping.stop();
     });
 
     player.on('playing', () => {
-      console.debug('player is playing');
+      seekToLiveEdge(player);
       ping.start();
       setVideoPlaying(true);
     });
 
+    player.on('play', () => {
+      seekToLiveEdge(player);
+    });
+
     player.on('pause', () => {
-      console.debug('player is paused');
       ping.stop();
       setVideoPlaying(false);
     });
 
     player.on('ended', () => {
-      console.debug('player is ended');
       ping.stop();
       setVideoPlaying(false);
     });

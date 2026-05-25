@@ -7,6 +7,25 @@ import styles from './VideoJS.module.scss';
 
 require('video.js/dist/video-js.css');
 
+const AUDIO_SESSION_CHANNEL = 'bouncecast-player-audio-session';
+
+type AudioSessionMessage = {
+  id?: string;
+  type?: 'playing' | 'pause';
+};
+
+type BounceCastPlayerWindow = Window & {
+  bouncecastVideoPlayers?: Map<string, VideoJsPlayer>;
+};
+
+const getActivePlayers = () => {
+  const bouncecastWindow = window as BounceCastPlayerWindow;
+  if (!bouncecastWindow.bouncecastVideoPlayers) {
+    bouncecastWindow.bouncecastVideoPlayers = new Map<string, VideoJsPlayer>();
+  }
+  return bouncecastWindow.bouncecastVideoPlayers;
+};
+
 const SHORTCUT_SUFFIXES: Record<string, string> = {
   Play: ' (Space)',
   Pause: ' (Space)',
@@ -26,6 +45,13 @@ export type VideoJSProps = {
 export const VideoJS: FC<VideoJSProps> = ({ options, onReady }) => {
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
   const playerRef = React.useRef<VideoJsPlayer | null>(null);
+  const playerIdRef = React.useRef(
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2),
+  );
+  const channelRef = React.useRef<BroadcastChannel | null>(null);
+  const remotePauseRef = React.useRef(false);
   const { t } = useTranslation();
 
   const addShortcutsToLanguage = (vjs: typeof videojs, langCode: string) => {
@@ -39,6 +65,42 @@ export const VideoJS: FC<VideoJSProps> = ({ options, onReady }) => {
   };
 
   React.useEffect(() => {
+    const playerId = playerIdRef.current;
+
+    const pausePlayer = (player: VideoJsPlayer | null) => {
+      if (!player || player.isDisposed() || player.paused()) {
+        return;
+      }
+
+      remotePauseRef.current = true;
+      player.pause();
+      window.setTimeout(() => {
+        remotePauseRef.current = false;
+      }, 0);
+    };
+
+    const broadcastAudioSession = (type: 'playing' | 'pause') => {
+      if (remotePauseRef.current) {
+        return;
+      }
+
+      channelRef.current?.postMessage({ id: playerId, type });
+    };
+
+    if ('BroadcastChannel' in window) {
+      channelRef.current = new BroadcastChannel(AUDIO_SESSION_CHANNEL);
+      channelRef.current.onmessage = event => {
+        const data = event?.data as AudioSessionMessage;
+        if (!data || data.id === playerId) {
+          return;
+        }
+
+        if (data.type === 'playing' || data.type === 'pause') {
+          pausePlayer(playerRef.current);
+        }
+      };
+    }
+
     // Make sure Video.js player is only initialized once
     if (!playerRef.current) {
       const videoElement = videoRef.current;
@@ -49,16 +111,36 @@ export const VideoJS: FC<VideoJSProps> = ({ options, onReady }) => {
         noUITitleAttributes: true, // Prevents videojs from adding a title attribute to UI elements, thus preventing "double tooltips".
       };
       // eslint-disable-next-line no-multi-assign
-      const player: VideoJsPlayer = (playerRef.current = videojs(videoElement, finalOptions, () => {
-        console.debug('player is ready');
-        return onReady && onReady(player, videojs);
-      }));
+      const player: VideoJsPlayer = (playerRef.current = videojs(
+        videoElement,
+        finalOptions,
+        () => onReady && onReady(player, videojs),
+      ));
+
+      const activePlayers = getActivePlayers();
+      activePlayers.forEach((activePlayer, activePlayerId) => {
+        if (activePlayerId !== playerId) {
+          pausePlayer(activePlayer);
+        }
+      });
+      activePlayers.set(playerId, player);
+
+      player.on('playing', () => broadcastAudioSession('playing'));
+      player.on('pause', () => broadcastAudioSession('pause'));
 
       player.autoplay(options.autoplay);
       player.src(options.sources);
     }
 
     return () => {
+      channelRef.current?.close();
+      channelRef.current = null;
+
+      const activePlayers = (window as BounceCastPlayerWindow).bouncecastVideoPlayers;
+      if (activePlayers instanceof Map) {
+        activePlayers.delete(playerId);
+      }
+
       if (playerRef.current && !playerRef.current.isDisposed()) {
         playerRef.current.dispose();
         playerRef.current = null;
