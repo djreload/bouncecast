@@ -34,30 +34,38 @@ class ChatRepository(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
+    private val _accessToken = MutableStateFlow("")
+    val accessToken: StateFlow<String> = _accessToken
+
     private var websocket: WebSocket? = null
-    private var accessToken: String = ""
+    private var currentAccessToken: String = ""
 
     suspend fun register(registerUrl: String, displayName: String): ChatRegistrationResponse {
+        if (currentAccessToken.isNotBlank()) {
+            return ChatRegistrationResponse(accessToken = currentAccessToken, displayName = displayName)
+        }
+
         return api.post<ChatRegistrationRequest, ChatRegistrationResponse>(
             url = registerUrl,
             body = ChatRegistrationRequest(displayName = displayName),
         ).also { response ->
-            accessToken = response.accessToken
+            currentAccessToken = response.accessToken
+            _accessToken.value = response.accessToken
         }
     }
 
     suspend fun loadHistory(historyUrl: String) {
-        if (accessToken.isBlank()) return
-        val url = "$historyUrl?accessToken=${accessToken.urlEncode()}"
+        if (currentAccessToken.isBlank()) return
+        val url = "$historyUrl?accessToken=${currentAccessToken.urlEncode()}"
         runCatching { api.get<List<ChatEvent>>(url) }
             .onSuccess { _events.value = it }
     }
 
     fun connect(webSocketUrl: String) {
-        if (accessToken.isBlank()) return
+        if (currentAccessToken.isBlank()) return
         val separator = if (webSocketUrl.contains("?")) "&" else "?"
         val request = Request.Builder()
-            .url("$webSocketUrl${separator}accessToken=${accessToken.urlEncode()}")
+            .url("$webSocketUrl${separator}accessToken=${currentAccessToken.urlEncode()}")
             .build()
 
         websocket?.cancel()

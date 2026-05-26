@@ -2,6 +2,7 @@ package uk.co.knrg.bouncecast.core.network
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -29,10 +30,13 @@ class BounceCastApi(
     suspend inline fun <reified T> get(url: String): T = withContext(Dispatchers.IO) {
         val request = Request.Builder().url(url).get().build()
         client.newCall(request).execute().use { response ->
+            val responseBody = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
-                throw IOException("GET $url failed with HTTP ${response.code}")
+                val message = decodeApiErrorMessage(json, responseBody)
+                    ?: "GET $url failed with HTTP ${response.code}"
+                throw IOException(message)
             }
-            json.decodeFromString<T>(response.body?.string().orEmpty())
+            json.decodeFromString<T>(responseBody)
         }
     }
 
@@ -43,10 +47,29 @@ class BounceCastApi(
         val requestBody = json.encodeToString(body).toRequestBody(jsonMediaType)
         val request = Request.Builder().url(url).post(requestBody).build()
         client.newCall(request).execute().use { response ->
+            val responseBody = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
-                throw IOException("POST $url failed with HTTP ${response.code}")
+                val message = decodeApiErrorMessage(json, responseBody)
+                    ?: "POST $url failed with HTTP ${response.code}"
+                throw IOException(message)
             }
-            json.decodeFromString<ResponseT>(response.body?.string().orEmpty())
+            json.decodeFromString<ResponseT>(responseBody)
         }
     }
 }
+
+@PublishedApi
+internal fun decodeApiErrorMessage(json: Json, responseBody: String): String? {
+    if (responseBody.isBlank()) return null
+    return runCatching {
+        val response = json.decodeFromString<ApiErrorResponse>(responseBody)
+        response.message.ifBlank { response.error }.takeIf { it.isNotBlank() }
+    }.getOrNull()
+}
+
+@Serializable
+private data class ApiErrorResponse(
+    val success: Boolean = false,
+    val message: String = "",
+    val error: String = "",
+)

@@ -70,6 +70,22 @@ function statusColor(status: string) {
   return 'default';
 }
 
+function activePrizeCount(summary?: RewardAdminSummary) {
+  return (summary?.prizes || []).filter(
+    prize =>
+      prize.active &&
+      prize.oddsWeight > 0 &&
+      (prize.prizeType === 'sorry' ||
+        prize.stockQuantity === undefined ||
+        prize.stockQuantity === null ||
+        prize.stockQuantity > 0),
+  ).length;
+}
+
+function activeTaskCount(summary?: RewardAdminSummary) {
+  return (summary?.tasks || []).filter(task => task.active).length;
+}
+
 export default function RewardsAdmin() {
   const [summary, setSummary] = useState<RewardAdminSummary>(null);
   const [loading, setLoading] = useState(true);
@@ -82,9 +98,9 @@ export default function RewardsAdmin() {
   const [editingTask, setEditingTask] = useState<RewardTask>(null);
   const [achievementModalOpen, setAchievementModalOpen] = useState(false);
   const [editingAchievement, setEditingAchievement] = useState<RewardAchievement>(null);
-  const [topSupporterResults, setTopSupporterResults] = useState<
-    RewardTopSupporterAwardResult[]
-  >([]);
+  const [topSupporterResults, setTopSupporterResults] = useState<RewardTopSupporterAwardResult[]>(
+    [],
+  );
   const [settingsForm] = Form.useForm<RewardSettings>();
   const [prizeForm] = Form.useForm<RewardPrize>();
   const [creditForm] = Form.useForm();
@@ -269,6 +285,14 @@ export default function RewardsAdmin() {
     }
   };
 
+  const activePrizes = activePrizeCount(summary);
+  const activeTasks = activeTaskCount(summary);
+  const hasCredits = (summary?.balances || []).some(balance => balance.balance > 0);
+  const hasCreditPath = Boolean(
+    summary?.settings?.chatRewardsEnabled || activeTasks > 0 || hasCredits,
+  );
+  const wheelEnabled = Boolean(summary?.settings?.enabled);
+
   return (
     <div className="bouncecast-studio-dashboard">
       <Title level={1}>Rewards Wheel</Title>
@@ -282,6 +306,31 @@ export default function RewardsAdmin() {
         showIcon
         message="Real prizes create internal fulfilment orders only. Discount and paid reward paths are placeholders for future approval."
       />
+      <Card loading={loading} style={{ margin: '1rem 0' }}>
+        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+          <Space wrap>
+            <Tag color={wheelEnabled ? 'green' : 'gold'}>
+              Wheel {wheelEnabled ? 'enabled' : 'disabled'}
+            </Tag>
+            <Tag color={activePrizes > 0 ? 'green' : 'red'}>
+              {activePrizes} active prize{activePrizes === 1 ? '' : 's'}
+            </Tag>
+            <Tag color={hasCreditPath ? 'green' : 'gold'}>
+              {hasCreditPath ? 'Spin Credits available' : 'No credit path yet'}
+            </Tag>
+          </Space>
+          <Text>
+            To activate the Rewards Wheel for viewers, turn on the wheel, add at least one active
+            prize with odds above zero, then give viewers Spin Credits through chat rewards, tasks,
+            top-supporter awards, or the Spin Credits tab. For the mobile app, also enable Rewards
+            Wheel in the Mobile App settings so the in-app panel appears.
+          </Text>
+          <Text type="secondary">
+            Viewers use <Text code>/rewards</Text> on the website, and mobile users tap Rewards to
+            see prizes, tasks, balance, and the Spin button.
+          </Text>
+        </Space>
+      </Card>
 
       <Tabs
         items={[

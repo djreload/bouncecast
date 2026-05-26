@@ -196,7 +196,8 @@ Initial source lives in `android/` and includes a native Kotlin/Compose app with
 - Existing chat registration/history endpoints
 - Chat reaction send/render support
 - Stars and Rewards overlay rendering from shared websocket events
-- Stars and Rewards entry buttons that open the existing BounceCast account/rewards pages
+- Stars entry button that opens the existing BounceCast account page
+- Native Rewards Wheel panel that uses the viewer access token to show active prize options, earning tasks, Spin Credits, and spin results
 - Admin-configured app background image rendering
 - Media3 HLS playback set to fit landscape video instead of cropping/zooming it
 - FCM receiver/deep link foundation
@@ -268,7 +269,7 @@ C:\tools\gradle-8.12.1\bin\gradle.bat -p android :app:testDebugUnitTest :app:ass
 
 ## Current Limitations
 
-- The Android app foundation compiles and renders the stream/chat shell, reactions, Stars/Rewards entry points, and live overlay events, but profile login UX, persisted account token storage, native Stars purchase/send forms, native Rewards spin forms, full moderation controls, and production push sending still need deeper passes.
+- The Android app foundation compiles and renders the stream/chat shell, reactions, Stars/Rewards entry points, native Rewards Wheel options/spins, and live overlay events, but profile login UX, persisted account token storage, native Stars purchase/send forms, reward claim submission forms, full moderation controls, and production push sending still need deeper passes.
 - FCM receive/deep-link scaffolding exists; server-side FCM fan-out is not implemented yet.
 - App-open ad display is a non-blocking placeholder until provider-specific loading and consent are wired.
 - The Google Services Gradle plugin is intentionally not applied until a real `google-services.json` exists outside source control.

@@ -45,6 +45,8 @@ import uk.co.knrg.bouncecast.feature.ads.AdBanner
 import uk.co.knrg.bouncecast.feature.ads.AdManager
 import uk.co.knrg.bouncecast.feature.chat.ChatPanel
 import uk.co.knrg.bouncecast.feature.chat.ChatRepository
+import uk.co.knrg.bouncecast.feature.rewards.RewardsRepository
+import uk.co.knrg.bouncecast.feature.rewards.RewardsWheelPanel
 import uk.co.knrg.bouncecast.feature.stream.StreamPlayer
 
 @Composable
@@ -57,10 +59,14 @@ fun HomeScreen(
     val chatScope = rememberCoroutineScope()
     val chatApi = remember { BounceCastApi() }
     val chatRepository = remember { ChatRepository(chatApi, chatScope) }
+    val rewardsRepository = remember { RewardsRepository(chatApi) }
     val overlayEvents by chatRepository.overlayEvents.collectAsState()
+    val rewardAccessToken by chatRepository.accessToken.collectAsState()
+    var showRewardsPanel by remember { mutableStateOf(false) }
     val shouldConnectToChat = config?.let {
         it.chat.enabled && (it.features.chat || it.features.starsOverlay || it.features.rewardOverlay)
     } == true
+    val shouldRegisterViewer = config?.let { shouldConnectToChat || it.features.rewardWheel } == true
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -74,19 +80,29 @@ fun HomeScreen(
         config?.bouncecast?.registerChatUrl,
         config?.bouncecast?.chatHistoryUrl,
         config?.bouncecast?.chatWebSocketUrl,
+        config?.features?.rewardWheel,
         shouldConnectToChat,
     ) {
         val activeConfig = config ?: return@LaunchedEffect
-        if (!shouldConnectToChat) {
+        if (!shouldRegisterViewer) {
             chatRepository.disconnect()
             return@LaunchedEffect
         }
-        chatRepository.registerAndConnect(
-            registerUrl = activeConfig.bouncecast.registerChatUrl,
-            historyUrl = activeConfig.bouncecast.chatHistoryUrl,
-            webSocketUrl = activeConfig.bouncecast.chatWebSocketUrl,
-            displayName = "Android Viewer",
-        )
+        if (shouldConnectToChat) {
+            chatRepository.registerAndConnect(
+                registerUrl = activeConfig.bouncecast.registerChatUrl,
+                historyUrl = activeConfig.bouncecast.chatHistoryUrl,
+                webSocketUrl = activeConfig.bouncecast.chatWebSocketUrl,
+                displayName = "Android Viewer",
+            )
+        } else {
+            chatRepository.disconnect()
+            runCatching {
+                chatRepository.register(activeConfig.bouncecast.registerChatUrl, "Android Viewer")
+            }.onFailure {
+                refreshError = it.message ?: "Unable to prepare Rewards Wheel"
+            }
+        }
     }
 
     DisposableEffect(chatRepository) {
@@ -159,6 +175,7 @@ fun HomeScreen(
                         MobileFeatureActions(
                             config = config,
                             overlay = true,
+                            onRewardsClick = { showRewardsPanel = true },
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
                                 .padding(top = 78.dp, end = 12.dp),
@@ -191,6 +208,7 @@ fun HomeScreen(
                         )
                         MobileFeatureActions(
                             config = config,
+                            onRewardsClick = { showRewardsPanel = true },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp),
@@ -215,6 +233,16 @@ fun HomeScreen(
         }
     }
 
+    config?.let { activeConfig ->
+        RewardsWheelPanel(
+            visible = showRewardsPanel,
+            baseUrl = activeConfig.bouncecast.baseUrl,
+            accessToken = rewardAccessToken,
+            repository = rewardsRepository,
+            onDismiss = { showRewardsPanel = false },
+        )
+    }
+
     refreshError?.let { error ->
         AlertDialog(
             onDismissRequest = { refreshError = null },
@@ -234,6 +262,7 @@ private fun MobileFeatureActions(
     config: MobileConfig,
     modifier: Modifier = Modifier,
     overlay: Boolean = false,
+    onRewardsClick: () -> Unit,
 ) {
     if (!config.features.stars && !config.features.rewardWheel) return
     val uriHandler = LocalUriHandler.current
@@ -260,7 +289,7 @@ private fun MobileFeatureActions(
         }
         if (config.features.rewardWheel) {
             Button(
-                onClick = { openBounceCastPath(uriHandler, baseUrl, "/rewards") },
+                onClick = onRewardsClick,
             ) {
                 Text("Rewards")
             }

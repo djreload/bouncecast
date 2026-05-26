@@ -103,6 +103,7 @@ export default function RewardsPage() {
   );
   const highlightedPrize = result?.prize || eligiblePrizes[0];
   const enabled = Boolean(wheelData?.settings?.enabled);
+  const spinCost = Math.max(1, wheelData?.settings?.spinCost || 1);
 
   const wheelStyle = useMemo(
     () => ({
@@ -251,7 +252,7 @@ export default function RewardsPage() {
             <Button
               className={styles.spinButton}
               type="primary"
-              disabled={!enabled || spinning || !wheelData || wheelData.balance.balance < 1}
+              disabled={!enabled || spinning || !wheelData || wheelData.balance.balance < spinCost}
               loading={spinning || loading}
               onClick={spin}
             >
@@ -275,6 +276,14 @@ export default function RewardsPage() {
                   label: 'Prizes',
                   children: (
                     <div className={styles.list}>
+                      {eligiblePrizes.length === 0 && (
+                        <article className={styles.listItem}>
+                          <strong>No active prize options are showing yet.</strong>
+                          <p>
+                            Check back when the site team adds active prizes to the Rewards Wheel.
+                          </p>
+                        </article>
+                      )}
                       {eligiblePrizes.map(prize => (
                         <article className={styles.listItem} key={prize.id}>
                           <Space wrap>
