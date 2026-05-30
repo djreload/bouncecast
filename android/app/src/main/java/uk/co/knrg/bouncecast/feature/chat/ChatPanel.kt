@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -52,6 +53,7 @@ fun ChatPanel(
     config: MobileConfig,
     modifier: Modifier = Modifier,
     overlay: Boolean = false,
+    fillAvailableHeight: Boolean = false,
     repository: ChatRepository? = null,
 ) {
     val scope = rememberCoroutineScope()
@@ -131,8 +133,9 @@ fun ChatPanel(
     }
     val foreground = if (overlay) Color.White else MaterialTheme.colorScheme.onSurface
 
+    val panelModifier = if (fillAvailableHeight) modifier.fillMaxHeight() else modifier
     Column(
-        modifier = modifier
+        modifier = panelModifier
             .imePadding()
             .background(panelBackground, RoundedCornerShape(if (overlay) 18.dp else 0.dp))
             .padding(12.dp),
@@ -154,11 +157,18 @@ fun ChatPanel(
             )
         }
         Spacer(Modifier.height(8.dp))
+        val messageListModifier = if (fillAvailableHeight) {
+            Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        } else {
+            Modifier
+                .fillMaxWidth()
+                .heightIn(max = if (overlay) 280.dp else 360.dp)
+        }
         LazyColumn(
             state = listState,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = if (overlay) 280.dp else 360.dp),
+            modifier = messageListModifier,
             contentPadding = PaddingValues(bottom = 4.dp),
         ) {
             items(events, key = { it.id.ifBlank { "${it.timestamp}-${it.body}" } }) { event ->

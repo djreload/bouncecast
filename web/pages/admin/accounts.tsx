@@ -7,6 +7,7 @@ import {
   Checkbox,
   Col,
   Input,
+  Modal,
   Row,
   Space,
   Statistic,
@@ -18,6 +19,7 @@ import {
 import { AdminLayout } from '../../components/layouts/AdminLayout';
 import {
   BOUNCECAST_USER_PERMISSIONS,
+  BOUNCECAST_USER_DELETE,
   BOUNCECAST_USERS,
   USER_ENABLED_TOGGLE,
   fetchData,
@@ -25,6 +27,7 @@ import {
 
 const SaveOutlined = dynamic(() => import('@ant-design/icons/SaveOutlined'), { ssr: false });
 const StopOutlined = dynamic(() => import('@ant-design/icons/StopOutlined'), { ssr: false });
+const DeleteOutlined = dynamic(() => import('@ant-design/icons/DeleteOutlined'), { ssr: false });
 const CheckCircleOutlined = dynamic(() => import('@ant-design/icons/CheckCircleOutlined'), {
   ssr: false,
 });
@@ -151,6 +154,35 @@ export default function AccountsAdmin() {
     }
   };
 
+  const deleteUser = (user: AccountUser) => {
+    Modal.confirm({
+      title: 'Delete user',
+      content: (
+        <>
+          Permanently delete <strong>{user.displayName}</strong> and owned records for user ID{' '}
+          <code>{user.id}</code>?
+        </>
+      ),
+      okText: 'Delete',
+      okType: 'danger',
+      onOk: async () => {
+        setSavingUserId(user.id);
+        try {
+          await fetchData(BOUNCECAST_USER_DELETE, {
+            method: 'POST',
+            data: { userId: user.id },
+          });
+          message.success('User deleted');
+          await loadUsers();
+        } catch (error) {
+          message.error(error instanceof Error ? error.message : 'Unable to delete user');
+        } finally {
+          setSavingUserId('');
+        }
+      },
+    });
+  };
+
   const registeredCount = users.filter(user => user.registered).length;
   const djCount = users.filter(user => user.permissions.includes('dj')).length;
   const moderatorCount = users.filter(user => user.permissions.includes('moderator')).length;
@@ -164,7 +196,10 @@ export default function AccountsAdmin() {
           <Avatar src={record.profileImageUrl}>{record.displayName?.slice(0, 1)}</Avatar>
           <Space direction="vertical" size={0}>
             <Text strong>{record.displayName}</Text>
-            <Text type="secondary">{record.email || record.id}</Text>
+            <Text type="secondary" copyable>
+              ID: {record.id}
+            </Text>
+            {record.email && <Text type="secondary">{record.email}</Text>}
           </Space>
         </Space>
       ),
@@ -185,7 +220,7 @@ export default function AccountsAdmin() {
           <Checkbox
             checked={activePermissions.includes(option.value)}
             onChange={event => {
-              const checked = event.target.checked;
+              const { checked } = event.target;
               const nextPermissions = checked
                 ? [...activePermissions, option.value]
                 : activePermissions.filter(permission => permission !== option.value);
@@ -259,6 +294,15 @@ export default function AccountsAdmin() {
               Disable
             </Button>
           )}
+          <Button
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
+            loading={savingUserId === record.id}
+            onClick={() => deleteUser(record)}
+          >
+            Delete
+          </Button>
         </Space>
       ),
     },

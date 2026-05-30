@@ -7,6 +7,7 @@ import { uniq } from 'lodash';
 
 import { BanUserButton } from './BanUserButton';
 import { ModeratorUserButton } from './ModeratorUserButton';
+import { DeleteUserButton } from './DeleteUserButton';
 
 import { User, UserConnectionInfo } from '../../types/chat';
 import { formatDisplayDate } from './UserTable';
@@ -16,9 +17,15 @@ export type UserPopoverProps = {
   user: User;
   connectionInfo?: UserConnectionInfo | null;
   children: ReactNode;
+  onUserChanged?: () => void;
 };
 
-export const UserPopover: FC<UserPopoverProps> = ({ user, connectionInfo, children }) => {
+export const UserPopover: FC<UserPopoverProps> = ({
+  user,
+  connectionInfo,
+  children,
+  onUserChanged,
+}) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const handleShowModal = () => {
     setIsModalOpen(true);
@@ -79,6 +86,9 @@ export const UserPopover: FC<UserPopoverProps> = ({ user, connectionInfo, childr
       >
         <div className="user-details">
           <Typography.Title level={4}>{displayName}</Typography.Title>
+          <Typography.Paragraph type="secondary" copyable>
+            User ID: {user.id}
+          </Typography.Paragraph>
           <p className="created-at">User created at {createdAtDate}.</p>
           <Row gutter={16}>
             {connectionInfo && (
@@ -126,7 +136,10 @@ export const UserPopover: FC<UserPopoverProps> = ({ user, connectionInfo, childr
                   label="Unban this user"
                   user={user}
                   isEnabled={false}
-                  onClick={handleCloseModal}
+                  onClick={() => {
+                    handleCloseModal();
+                    onUserChanged?.();
+                  }}
                 />
               </>
             ) : (
@@ -134,10 +147,26 @@ export const UserPopover: FC<UserPopoverProps> = ({ user, connectionInfo, childr
                 label="Ban this user"
                 user={user}
                 isEnabled
-                onClick={handleCloseModal}
+                onClick={() => {
+                  handleCloseModal();
+                  onUserChanged?.();
+                }}
               />
             )}
-            <ModeratorUserButton user={user} onClick={handleCloseModal} />
+            <ModeratorUserButton
+              user={user}
+              onClick={() => {
+                handleCloseModal();
+                onUserChanged?.();
+              }}
+            />
+            <DeleteUserButton
+              user={user}
+              onDeleted={() => {
+                handleCloseModal();
+                onUserChanged?.();
+              }}
+            />
           </Space>
         </div>
       </Modal>
@@ -147,4 +176,5 @@ export const UserPopover: FC<UserPopoverProps> = ({ user, connectionInfo, childr
 
 UserPopover.defaultProps = {
   connectionInfo: null,
+  onUserChanged: null,
 };

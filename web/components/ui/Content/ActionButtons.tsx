@@ -6,6 +6,7 @@ import { ActionButtonMenu } from '../../action-buttons/ActionButtonMenu/ActionBu
 import { ActionButtonRow } from '../../action-buttons/ActionButtonRow/ActionButtonRow';
 import { FollowButton } from '../../action-buttons/FollowButton';
 import { NotifyButton } from '../../action-buttons/NotifyButton';
+import { RewardsButton } from '../../action-buttons/RewardsButton';
 import styles from './Content.module.scss';
 import { ActionButton } from '../../action-buttons/ActionButton/ActionButton';
 
@@ -38,6 +39,10 @@ const ActionButtons: FC<ActionButtonProps> = ({
   externalActions,
   externalActionSelected,
 }) => {
+  const openRewardsWheel = () => {
+    window.location.href = '/rewards';
+  };
+
   const externalActionButtons = externalActions.map(action => (
     <ActionButton
       key={ExternalActionUtils.generateKey(action)}
@@ -50,6 +55,7 @@ const ActionButtons: FC<ActionButtonProps> = ({
     <div className={styles.actionButtonsContainer}>
       <div className={styles.desktopActionButtons}>
         <ActionButtonRow>
+          <RewardsButton onClick={openRewardsWheel} />
           {externalActionButtons}
           {supportFediverseFeatures && (
             <FollowButton size="small" onClick={() => setShowFollowModal(true)} />
@@ -66,18 +72,16 @@ const ActionButtons: FC<ActionButtonProps> = ({
         </ActionButtonRow>
       </div>
       <div className={styles.mobileActionButtons}>
-        {(supportsBrowserNotifications ||
-          supportsBrowserNotifications ||
-          externalActions.length > 0) && (
-          <ActionButtonMenu
-            actions={externalActions}
-            showFollowItem={supportFediverseFeatures}
-            showNotifyItem={supportsBrowserNotifications}
-            externalActionSelected={externalActionSelected}
-            notifyItemSelected={() => setShowNotifyModal(true)}
-            followItemSelected={() => setShowFollowModal(true)}
-          />
-        )}
+        <ActionButtonMenu
+          actions={externalActions}
+          showFollowItem={supportFediverseFeatures}
+          showNotifyItem={supportsBrowserNotifications}
+          showRewardsItem
+          externalActionSelected={externalActionSelected}
+          notifyItemSelected={() => setShowNotifyModal(true)}
+          followItemSelected={() => setShowFollowModal(true)}
+          rewardsItemSelected={openRewardsWheel}
+        />
       </div>
     </div>
   );

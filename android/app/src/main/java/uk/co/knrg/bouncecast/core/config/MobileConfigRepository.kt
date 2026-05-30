@@ -4,6 +4,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.decodeFromString
 import uk.co.knrg.bouncecast.core.model.MobileConfig
+import uk.co.knrg.bouncecast.core.model.ViewerIdentity
 import uk.co.knrg.bouncecast.core.network.BounceCastApi
 import uk.co.knrg.bouncecast.core.storage.ConfigStore
 
@@ -31,5 +32,17 @@ class MobileConfigRepository(
         require(config.bouncecast.streamUrl.startsWith("http")) { "Missing stream URL" }
         require(config.bouncecast.chatWebSocketUrl.startsWith("ws")) { "Missing chat websocket URL" }
         require(config.app.minimumSupportedVersion.isNotBlank()) { "Missing minimum app version" }
+    }
+
+    suspend fun readViewerIdentity(): ViewerIdentity {
+        return configStore.readViewerIdentity()
+    }
+
+    suspend fun writeViewerIdentity(identity: ViewerIdentity) {
+        configStore.writeViewerIdentity(identity)
+    }
+
+    suspend fun clearViewerIdentity() {
+        configStore.clearViewerIdentity()
     }
 }

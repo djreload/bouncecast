@@ -25,6 +25,7 @@ type UserRepository interface {
 	ChangeUsername(userID string, username string) error
 	CreateAnonymousUser(displayName string) (*models.User, string, error)
 	DeleteExternalAPIUser(token string) error
+	DeleteUser(userID string) error
 	GetDisabledUsers() []*models.User
 	GetExternalAPIUser() ([]models.ExternalAPIUser, error)
 	GetExternalAPIUserForAccessTokenAndScope(token string, scope string) (*models.ExternalAPIUser, error)
@@ -217,6 +218,134 @@ func (r *SqlUserRepository) SetEnabled(userID string, enabled bool) error {
 	}
 
 	return tx.Commit()
+}
+
+// DeleteUser permanently removes a viewer account and directly-owned records.
+func (r *SqlUserRepository) DeleteUser(userID string) error {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return errors.New("userID cannot be empty")
+	}
+
+	r.datastore.DbLock.Lock()
+	defer r.datastore.DbLock.Unlock()
+
+	tx, err := r.datastore.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint
+
+	var existingID string
+	if err := tx.QueryRow("SELECT id FROM users WHERE id = ?", userID).Scan(&existingID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return errors.New("user not found")
+		}
+		return err
+	}
+
+	deleteTargets := []struct {
+		table  string
+		column string
+	}{
+		{"auth", "user_id"},
+		{"user_access_tokens", "user_id"},
+		{"messages", "user_id"},
+		{"chat_message_reactions", "user_id"},
+		{"bouncecast_schedule_reminders", "user_id"},
+		{"bouncecast_account_push_subscriptions", "user_id"},
+		{"star_send_events", "user_id"},
+		{"star_paypal_orders", "user_id"},
+		{"star_wallet_transactions", "user_id"},
+		{"star_wallets", "user_id"},
+		{"reward_user_notifications", "user_id"},
+		{"reward_orders", "winner_user_id"},
+		{"reward_claims", "user_id"},
+		{"reward_spins", "user_id"},
+		{"reward_spin_ledger", "user_id"},
+		{"reward_spin_balances", "user_id"},
+		{"reward_winners", "user_id"},
+		{"reward_task_completions", "user_id"},
+		{"reward_achievement_unlocks", "user_id"},
+		{"reward_chat_activity", "user_id"},
+	}
+	for _, target := range deleteTargets {
+		if err := execUserCleanupIfTableExists(tx, target.table, target.column, "DELETE", userID); err != nil {
+			return err
+		}
+	}
+
+	for _, target := range []struct {
+		table  string
+		column string
+	}{
+		{"reward_admin_messages", "user_id"},
+		{"mobile_device_tokens", "user_id"},
+		{"bouncecast_audit_events", "actor_user_id"},
+	} {
+		if err := execUserCleanupIfTableExists(tx, target.table, target.column, "UPDATE", userID); err != nil {
+			return err
+		}
+	}
+
+	result, err := tx.Exec("DELETE FROM users WHERE id = ?", userID)
+	if err != nil {
+		return err
+	}
+	if rowsAffected, _ := result.RowsAffected(); rowsAffected == 0 {
+		return errors.New("user not found")
+	}
+
+	return tx.Commit()
+}
+
+func execUserCleanupIfTableExists(tx *sql.Tx, table string, column string, operation string, userID string) error {
+	var tableName string
+	if err := tx.QueryRow("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?", table).Scan(&tableName); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		return err
+	}
+
+	rows, err := tx.Query(fmt.Sprintf("PRAGMA table_info(%s)", table))
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	columnExists := false
+	for rows.Next() {
+		var cid int
+		var name string
+		var columnType string
+		var notNull int
+		var defaultValue sql.NullString
+		var primaryKey int
+		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &primaryKey); err != nil {
+			return err
+		}
+		if name == column {
+			columnExists = true
+			break
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if !columnExists {
+		return nil
+	}
+
+	var stmt string
+	switch operation {
+	case "UPDATE":
+		stmt = fmt.Sprintf("UPDATE %s SET %s = NULL WHERE %s = ?", table, column, column)
+	default:
+		stmt = fmt.Sprintf("DELETE FROM %s WHERE %s = ?", table, column)
+	}
+	_, err = tx.Exec(stmt, userID)
+	return err
 }
 
 // GetUserByToken will return a user by an access token.

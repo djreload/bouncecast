@@ -340,9 +340,9 @@ func BounceCastStudioCreateStreamKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := data.GetDatabase().Exec(`
-		INSERT INTO bouncecast_streamer_stream_keys(streamer_id, key_hash, label)
-		VALUES(?, ?, NULLIF(?, ''))
-	`, session.streamer.ID, hashedKey, label)
+		INSERT INTO bouncecast_streamer_stream_keys(streamer_id, key_hash, raw_key, label)
+		VALUES(?, ?, ?, NULLIF(?, ''))
+	`, session.streamer.ID, hashedKey, rawKey, label)
 	if err != nil {
 		webutils.InternalErrorHandler(w, err)
 		return

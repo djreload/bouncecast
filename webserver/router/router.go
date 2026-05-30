@@ -63,6 +63,8 @@ func Start(enableVerboseLogging bool) error {
 	r.Options("/api/admin/bouncecast/streamkeys", middleware.RequireOwnerOrAdmin(adminhandlers.GetBounceCastStreamKeys))
 	r.Get("/api/admin/bouncecast/streamkeys", middleware.RequireOwnerOrAdmin(adminhandlers.GetBounceCastStreamKeys))
 	r.Post("/api/admin/bouncecast/streamkeys", middleware.RequireAdminRole(adminhandlers.CreateBounceCastStreamKey, "owner", "admin"))
+	r.Options("/api/admin/bouncecast/streamkeys/reveal", middleware.RequireAdminRole(adminhandlers.RevealBounceCastStreamKey, "owner", "admin"))
+	r.Post("/api/admin/bouncecast/streamkeys/reveal", middleware.RequireAdminRole(adminhandlers.RevealBounceCastStreamKey, "owner", "admin"))
 	r.Post("/api/admin/bouncecast/streamkeys/revoke", middleware.RequireAdminRole(adminhandlers.RevokeBounceCastStreamKey, "owner", "admin"))
 	r.Options("/api/admin/bouncecast/live-events", middleware.RequireOwnerOrAdmin(adminhandlers.GetBounceCastGoLiveEvents))
 	r.Get("/api/admin/bouncecast/live-events", middleware.RequireOwnerOrAdmin(adminhandlers.GetBounceCastGoLiveEvents))
@@ -126,6 +128,8 @@ func Start(enableVerboseLogging bool) error {
 	r.Options("/api/admin/bouncecast/users", middleware.RequireOwnerOrAdmin(adminhandlers.GetBounceCastUsers))
 	r.Get("/api/admin/bouncecast/users", middleware.RequireOwnerOrAdmin(adminhandlers.GetBounceCastUsers))
 	r.Post("/api/admin/bouncecast/users/permissions", middleware.RequireAdminRole(adminhandlers.SetBounceCastUserPermissions, "owner"))
+	r.Options("/api/admin/bouncecast/users/delete", middleware.RequireAdminRole(adminhandlers.DeleteBounceCastUser, "owner"))
+	r.Post("/api/admin/bouncecast/users/delete", middleware.RequireAdminRole(adminhandlers.DeleteBounceCastUser, "owner"))
 	r.Options("/api/admin/bouncecast/command-center", middleware.RequireOwnerOrAdmin(adminhandlers.GetBounceCastCommandCenter))
 	r.Get("/api/admin/bouncecast/command-center", middleware.RequireOwnerOrAdmin(adminhandlers.GetBounceCastCommandCenter))
 
@@ -135,6 +139,8 @@ func Start(enableVerboseLogging bool) error {
 	r.Post("/api/admin/config/chat/backgroundopacity", middleware.RequireOwnerOrAdmin(adminhandlers.SetChatBackgroundOpacity))
 	r.Options("/api/admin/config/chat/tenorapikey", middleware.RequireOwnerOrAdmin(adminhandlers.SetChatTenorAPIKey))
 	r.Post("/api/admin/config/chat/tenorapikey", middleware.RequireOwnerOrAdmin(adminhandlers.SetChatTenorAPIKey))
+	r.Options("/api/admin/chat/users/delete", middleware.RequireOwner(adminhandlers.DeleteChatUser))
+	r.Post("/api/admin/chat/users/delete", middleware.RequireOwner(adminhandlers.DeleteChatUser))
 
 	r.Options("/api/bouncecast/auth/login", handlers.BounceCastUnifiedAuthOptions)
 	r.Post("/api/bouncecast/auth/login", handlers.BounceCastUnifiedLogin)

@@ -16,6 +16,7 @@ import {
   Table,
   Tag,
   Typography,
+  message,
 } from 'antd';
 import { AdminLayout } from '../../components/layouts/AdminLayout';
 import {
@@ -24,6 +25,7 @@ import {
   BOUNCECAST_STREAMER_PASSWORD,
   BOUNCECAST_STREAMER_UPDATE,
   BOUNCECAST_STREAM_KEYS,
+  BOUNCECAST_STREAM_KEY_REVEAL,
   BOUNCECAST_STREAM_KEY_REVOKE,
   fetchData,
 } from '../../utils/apis';
@@ -68,6 +70,7 @@ type StreamKey = {
   streamerId: number;
   label: string;
   enabled: boolean;
+  revealable?: boolean;
   createdAt: string;
   lastUsedAt?: string;
   revokedAt?: string;
@@ -175,7 +178,11 @@ const columns = (
   },
 ];
 
-const streamKeyColumns = (revokeStreamKey: (id: number) => void) => [
+const streamKeyColumns = (
+  revokeStreamKey: (id: number) => void,
+  revealStreamKey: (id: number) => void,
+  revealedStreamKeys: Record<number, string>,
+) => [
   {
     title: 'Label',
     dataIndex: 'label',
@@ -193,6 +200,38 @@ const streamKeyColumns = (revokeStreamKey: (id: number) => void) => [
     dataIndex: 'lastUsedAt',
     key: 'lastUsedAt',
     render: lastUsedAt => (lastUsedAt ? new Date(lastUsedAt).toLocaleString() : 'Never'),
+  },
+  {
+    title: 'Current key',
+    key: 'streamKey',
+    render: (_, key) => {
+      const revealedKey = revealedStreamKeys[key.id];
+      if (revealedKey) {
+        return (
+          <Space direction="vertical" size={4}>
+            <Input.Password value={revealedKey} readOnly visibilityToggle />
+            <Button
+              size="small"
+              icon={<CopyOutlined />}
+              onClick={() => navigator.clipboard?.writeText(revealedKey)}
+            >
+              Copy
+            </Button>
+          </Space>
+        );
+      }
+      if (!key.enabled || key.revokedAt) {
+        return <Text type="secondary">Revoked</Text>;
+      }
+      if (!key.revealable) {
+        return <Text type="secondary">Create a new key to reveal later</Text>;
+      }
+      return (
+        <Button size="small" icon={<KeyOutlined />} onClick={() => revealStreamKey(key.id)}>
+          Show key
+        </Button>
+      );
+    },
   },
   {
     title: 'Status',
@@ -237,6 +276,8 @@ type StreamerKeysTableProps = {
   streamKeys: StreamKey[];
   openKeyModal: (streamer: Streamer) => void;
   revokeStreamKey: (id: number) => void;
+  revealStreamKey: (id: number) => void;
+  revealedStreamKeys: Record<number, string>;
   canManage: boolean;
 };
 
@@ -245,6 +286,8 @@ const StreamerKeysTable = ({
   streamKeys,
   openKeyModal,
   revokeStreamKey,
+  revealStreamKey,
+  revealedStreamKeys,
   canManage,
 }: StreamerKeysTableProps) => {
   const keys = streamKeys.filter(key => key.streamerId === streamer.id);
@@ -260,8 +303,10 @@ const StreamerKeysTable = ({
       <Table
         columns={
           canManage
-            ? streamKeyColumns(revokeStreamKey)
-            : streamKeyColumns(revokeStreamKey).filter(column => column.key !== 'action')
+            ? streamKeyColumns(revokeStreamKey, revealStreamKey, revealedStreamKeys)
+            : streamKeyColumns(revokeStreamKey, revealStreamKey, revealedStreamKeys).filter(
+                column => column.key !== 'action' && column.key !== 'streamKey',
+              )
         }
         dataSource={keys}
         rowKey="id"
@@ -281,6 +326,7 @@ export default function Streamers() {
   const [keyModalOpen, setKeyModalOpen] = useState(false);
   const [selectedStreamer, setSelectedStreamer] = useState<Streamer | null>(null);
   const [newStreamKey, setNewStreamKey] = useState('');
+  const [revealedStreamKeys, setRevealedStreamKeys] = useState<Record<number, string>>({});
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
   const [keyForm] = Form.useForm();
@@ -301,6 +347,7 @@ export default function Streamers() {
       ]);
       setStreamers(streamerResult || []);
       setStreamKeys(keyResult || []);
+      setRevealedStreamKeys({});
       setAdminSession(adminSessionResult || null);
     } catch (error) {
       console.error(error);
@@ -335,6 +382,21 @@ export default function Streamers() {
       data: { id },
     });
     await loadStreamers();
+  };
+
+  const revealStreamKey = async (id: number) => {
+    try {
+      const result = await fetchData(BOUNCECAST_STREAM_KEY_REVEAL, {
+        method: 'POST',
+        data: { id },
+      });
+      setRevealedStreamKeys(current => ({
+        ...current,
+        [id]: result.streamKey,
+      }));
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : 'Unable to reveal stream key');
+    }
   };
 
   const openKeyModal = (streamer?: Streamer) => {
@@ -534,6 +596,8 @@ export default function Streamers() {
                 streamKeys={streamKeys}
                 openKeyModal={canManageStreamerAccess ? openKeyModal : () => undefined}
                 revokeStreamKey={canManageStreamerAccess ? revokeStreamKey : () => undefined}
+                revealStreamKey={canManageStreamerAccess ? revealStreamKey : () => undefined}
+                revealedStreamKeys={revealedStreamKeys}
                 canManage={canManageStreamerAccess}
               />
             ),

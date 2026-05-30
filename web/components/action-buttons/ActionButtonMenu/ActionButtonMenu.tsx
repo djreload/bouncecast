@@ -15,20 +15,27 @@ const HeartOutlined = dynamic(() => import('@ant-design/icons/HeartOutlined'), {
   ssr: false,
 });
 
+const GiftOutlined = dynamic(() => import('@ant-design/icons/GiftOutlined'), {
+  ssr: false,
+});
+
 const BellOutlined = dynamic(() => import('@ant-design/icons/BellOutlined'), {
   ssr: false,
 });
 
 const NOTIFY_KEY = 'notify';
 const FOLLOW_KEY = 'follow';
+const REWARDS_KEY = 'rewards';
 
 export type ActionButtonMenuProps = {
   actions: ExternalAction[];
   showFollowItem?: boolean;
   showNotifyItem?: boolean;
+  showRewardsItem?: boolean;
   externalActionSelected: (action: ExternalAction) => void;
   notifyItemSelected: () => void;
   followItemSelected: () => void;
+  rewardsItemSelected?: () => void;
   className?: string;
 };
 
@@ -37,8 +44,10 @@ export const ActionButtonMenu: FC<ActionButtonMenuProps> = ({
   externalActionSelected,
   notifyItemSelected,
   followItemSelected,
+  rewardsItemSelected,
   showFollowItem,
   showNotifyItem,
+  showRewardsItem,
   className,
 }) => {
   const onClick = a => {
@@ -48,6 +57,10 @@ export const ActionButtonMenu: FC<ActionButtonMenuProps> = ({
     }
     if (a.key === FOLLOW_KEY) {
       followItemSelected();
+      return;
+    }
+    if (a.key === REWARDS_KEY) {
+      rewardsItemSelected?.();
       return;
     }
     // Find the action using the utility function
@@ -73,6 +86,17 @@ export const ActionButtonMenu: FC<ActionButtonMenuProps> = ({
       label: (
         <span className={styles.item}>
           <HeartOutlined className={styles.icon} /> Follow this stream
+        </span>
+      ),
+    });
+  }
+
+  if (showRewardsItem) {
+    items.unshift({
+      key: REWARDS_KEY,
+      label: (
+        <span className={styles.item}>
+          <GiftOutlined className={styles.icon} /> Rewards Wheel
         </span>
       ),
     });

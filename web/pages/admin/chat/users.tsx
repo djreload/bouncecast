@@ -73,7 +73,7 @@ export default function ChatUsers() {
 
   const connectedUsers = online ? (
     <>
-      <ClientTable data={clients} />
+      <ClientTable data={clients} onRefresh={getInfo} />
       <p className="description">
         {t('Visit the')}{' '}
         <a
@@ -105,7 +105,7 @@ export default function ChatUsers() {
       {t('Banned Users')} ({disabledUsers.length})
     </span>
   );
-  const bannedUsersTable = <UserTable data={disabledUsers} />;
+  const bannedUsersTable = <UserTable data={disabledUsers} onRefresh={getInfo} />;
 
   const bannedIPTabTitle = (
     <span>
@@ -131,7 +131,7 @@ export default function ChatUsers() {
           {t('Learn more about chat moderation here.')}
         </Link>
       </p>
-      <UserTable data={moderators} />
+      <UserTable data={moderators} onRefresh={getInfo} />
     </>
   );
 

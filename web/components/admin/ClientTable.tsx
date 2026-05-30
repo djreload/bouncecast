@@ -1,4 +1,4 @@
-import { Input, Table } from 'antd';
+import { Input, Space, Table, Typography } from 'antd';
 import { FilterDropdownProps, SortOrder } from 'antd/lib/table/interface';
 import { ColumnsType } from 'antd/es/table';
 import { formatDistanceToNow } from 'date-fns';
@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic';
 import { Client } from '../../types/chat';
 import { UserPopover } from './UserPopover';
 import { BanUserButton } from './BanUserButton';
+import { DeleteUserButton } from './DeleteUserButton';
 import { formatUAstring } from '../../utils/format';
 
 // Lazy loaded components
@@ -17,9 +18,10 @@ const SearchOutlined = dynamic(() => import('@ant-design/icons/SearchOutlined'),
 
 export type ClientTableProps = {
   data: Client[];
+  onRefresh?: () => void;
 };
 
-export const ClientTable: FC<ClientTableProps> = ({ data }) => {
+export const ClientTable: FC<ClientTableProps> = ({ data, onRefresh }) => {
   const columns: ColumnsType<Client> = [
     {
       title: 'Display Name',
@@ -29,8 +31,13 @@ export const ClientTable: FC<ClientTableProps> = ({ data }) => {
         const { user, connectedAt, messageCount, userAgent } = client;
         const connectionInfo = { connectedAt, messageCount, userAgent };
         return (
-          <UserPopover user={user} connectionInfo={connectionInfo}>
-            <span className="display-name">{user.displayName}</span>
+          <UserPopover user={user} connectionInfo={connectionInfo} onUserChanged={onRefresh}>
+            <Space direction="vertical" size={0}>
+              <span className="display-name">{user.displayName}</span>
+              <Typography.Text type="secondary" copyable>
+                {user.id}
+              </Typography.Text>
+            </Space>
           </UserPopover>
         );
       },
@@ -93,7 +100,12 @@ export const ClientTable: FC<ClientTableProps> = ({ data }) => {
       title: '',
       key: 'block',
       className: 'actions-col',
-      render: (_, row) => <BanUserButton user={row.user} isEnabled={!row.user.disabledAt} />,
+      render: (_, row) => (
+        <Space>
+          <BanUserButton user={row.user} isEnabled={!row.user.disabledAt} onClick={onRefresh} />
+          <DeleteUserButton user={row.user} onDeleted={onRefresh} />
+        </Space>
+      ),
     },
   ];
 
@@ -107,4 +119,8 @@ export const ClientTable: FC<ClientTableProps> = ({ data }) => {
       rowKey="id"
     />
   );
+};
+
+ClientTable.defaultProps = {
+  onRefresh: null,
 };

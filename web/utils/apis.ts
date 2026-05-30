@@ -33,6 +33,9 @@ export const DISABLED_USERS = `${API_LOCATION}chat/users/disabled`;
 // Disable/enable a single user
 export const USER_ENABLED_TOGGLE = `${API_LOCATION}chat/users/setenabled`;
 
+// Delete a chat/account user
+export const USER_DELETE = `${API_LOCATION}chat/users/delete`;
+
 // Get banned IP addresses
 export const BANNED_IPS = `${API_LOCATION}chat/users/ipbans`;
 
@@ -118,6 +121,8 @@ export const BOUNCECAST_STREAMER_PASSWORD = `${API_LOCATION}bouncecast/streamers
 
 export const BOUNCECAST_STREAM_KEYS = `${API_LOCATION}bouncecast/streamkeys`;
 
+export const BOUNCECAST_STREAM_KEY_REVEAL = `${API_LOCATION}bouncecast/streamkeys/reveal`;
+
 export const BOUNCECAST_STREAM_KEY_REVOKE = `${API_LOCATION}bouncecast/streamkeys/revoke`;
 
 export const BOUNCECAST_LIVE_EVENTS = `${API_LOCATION}bouncecast/live-events`;
@@ -199,6 +204,8 @@ export const BOUNCECAST_REWARDS_ACHIEVEMENTS = `${API_LOCATION}bouncecast/reward
 export const BOUNCECAST_USERS = `${API_LOCATION}bouncecast/users`;
 
 export const BOUNCECAST_USER_PERMISSIONS = `${API_LOCATION}bouncecast/users/permissions`;
+
+export const BOUNCECAST_USER_DELETE = `${API_LOCATION}bouncecast/users/delete`;
 
 export const BOUNCECAST_COMMAND_CENTER = `${API_LOCATION}bouncecast/command-center`;
 

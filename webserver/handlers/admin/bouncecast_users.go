@@ -12,6 +12,7 @@ import (
 	"github.com/owncast/owncast/core/chat"
 	"github.com/owncast/owncast/core/data"
 	"github.com/owncast/owncast/models"
+	"github.com/owncast/owncast/persistence/userrepository"
 	"github.com/owncast/owncast/utils"
 	webutils "github.com/owncast/owncast/webserver/utils"
 )
@@ -36,6 +37,10 @@ type BounceCastUserAccount struct {
 type setBounceCastUserPermissionsRequest struct {
 	UserID      string   `json:"userId"`
 	Permissions []string `json:"permissions"`
+}
+
+type deleteBounceCastUserRequest struct {
+	UserID string `json:"userId"`
 }
 
 var bounceCastUserPermissionToScope = map[string]string{
@@ -184,6 +189,31 @@ func SetBounceCastUserPermissions(w http.ResponseWriter, r *http.Request) {
 
 	_ = chat.SendConnectedClientInfoToUser(request.UserID)
 	webutils.WriteSimpleResponse(w, true, "updated user permissions")
+}
+
+// DeleteBounceCastUser permanently removes a viewer/account row.
+func DeleteBounceCastUser(w http.ResponseWriter, r *http.Request) {
+	var request deleteBounceCastUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+	request.UserID = strings.TrimSpace(request.UserID)
+	if request.UserID == "" {
+		webutils.BadRequestHandler(w, errors.New("userId is required"))
+		return
+	}
+
+	clients, clientsErr := chat.GetClientsForUser(request.UserID)
+	if err := userrepository.Get().DeleteUser(request.UserID); err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+	if clientsErr == nil && len(clients) > 0 {
+		chat.DisconnectClients(clients)
+	}
+
+	webutils.WriteSimpleResponse(w, true, "deleted user")
 }
 
 func normalizeBounceCastPermissionScopes(permissions []string) ([]string, error) {

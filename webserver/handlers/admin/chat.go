@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/owncast/owncast/core/chat"
 	"github.com/owncast/owncast/core/chat/events"
@@ -21,6 +22,10 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
+
+type deleteChatUserRequest struct {
+	UserID string `json:"userId"`
+}
 
 // ExternalUpdateMessageVisibility updates an array of message IDs to have the same visiblity.
 func ExternalUpdateMessageVisibility(integration models.ExternalAPIUser, w http.ResponseWriter, r *http.Request) {
@@ -148,6 +153,42 @@ func UpdateUserEnabled(w http.ResponseWriter, r *http.Request) {
 	}
 
 	webutils.WriteSimpleResponse(w, true, fmt.Sprintf("%s enabled: %t", *request.UserId, *request.Enabled))
+}
+
+// DeleteChatUser permanently deletes a viewer account and its owned records.
+func DeleteChatUser(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		webutils.WriteSimpleResponse(w, false, r.Method+" not supported")
+		return
+	}
+
+	var request deleteChatUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		webutils.WriteSimpleResponse(w, false, err.Error())
+		return
+	}
+	request.UserID = strings.TrimSpace(request.UserID)
+	if request.UserID == "" {
+		webutils.WriteSimpleResponse(w, false, "userId is required")
+		return
+	}
+
+	clients, clientsErr := chat.GetClientsForUser(request.UserID)
+	userRepository := userrepository.Get()
+	deletedUser := userRepository.GetUserByID(request.UserID)
+	if err := userRepository.DeleteUser(request.UserID); err != nil {
+		webutils.WriteSimpleResponse(w, false, err.Error())
+		return
+	}
+
+	if clientsErr == nil && len(clients) > 0 {
+		chat.DisconnectClients(clients)
+	}
+	if deletedUser != nil {
+		_ = chat.SendSystemAction(fmt.Sprintf("**%s** has been deleted by an administrator.", deletedUser.DisplayName), true)
+	}
+
+	webutils.WriteSimpleResponse(w, true, "deleted user")
 }
 
 func updateUserStatus(request generated.UpdateUserEnabledJSONBody) error {

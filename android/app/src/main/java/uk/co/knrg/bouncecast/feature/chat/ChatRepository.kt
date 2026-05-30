@@ -15,6 +15,8 @@ import okhttp3.WebSocketListener
 import uk.co.knrg.bouncecast.core.model.ChatEvent
 import uk.co.knrg.bouncecast.core.model.ChatRegistrationRequest
 import uk.co.knrg.bouncecast.core.model.ChatRegistrationResponse
+import uk.co.knrg.bouncecast.core.model.ChatUser
+import uk.co.knrg.bouncecast.core.model.ViewerIdentity
 import uk.co.knrg.bouncecast.core.network.BounceCastApi
 import java.net.URLEncoder
 
@@ -37,20 +39,83 @@ class ChatRepository(
     private val _accessToken = MutableStateFlow("")
     val accessToken: StateFlow<String> = _accessToken
 
+    private val _userId = MutableStateFlow("")
+    val userId: StateFlow<String> = _userId
+
+    private val _displayName = MutableStateFlow("Android Viewer")
+    val displayName: StateFlow<String> = _displayName
+
     private var websocket: WebSocket? = null
     private var currentAccessToken: String = ""
+    private var currentUserId: String = ""
+    private var currentDisplayName: String = "Android Viewer"
+
+    fun restoreIdentity(identity: ViewerIdentity) {
+        val normalized = identity.normalized()
+        currentUserId = normalized.userId
+        currentAccessToken = normalized.accessToken
+        currentDisplayName = normalized.displayName
+        _userId.value = normalized.userId
+        _accessToken.value = normalized.accessToken
+        _displayName.value = normalized.displayName
+    }
+
+    fun clearIdentity() {
+        disconnect()
+        currentUserId = ""
+        currentAccessToken = ""
+        currentDisplayName = "Android Viewer"
+        _userId.value = ""
+        _accessToken.value = ""
+        _displayName.value = "Android Viewer"
+        _events.value = emptyList()
+        _overlayEvents.value = emptyList()
+    }
 
     suspend fun register(registerUrl: String, displayName: String): ChatRegistrationResponse {
         if (currentAccessToken.isNotBlank()) {
-            return ChatRegistrationResponse(accessToken = currentAccessToken, displayName = displayName)
+            return ChatRegistrationResponse(
+                id = currentUserId,
+                accessToken = currentAccessToken,
+                displayName = currentDisplayName.ifBlank { displayName.ifBlank { "Android Viewer" } },
+            )
         }
 
+        val requestedDisplayName = displayName.ifBlank { "Android Viewer" }
         return api.post<ChatRegistrationRequest, ChatRegistrationResponse>(
             url = registerUrl,
-            body = ChatRegistrationRequest(displayName = displayName),
+            body = ChatRegistrationRequest(displayName = requestedDisplayName),
         ).also { response ->
             currentAccessToken = response.accessToken
+            currentUserId = response.id
+            currentDisplayName = response.displayName.ifBlank { requestedDisplayName }
             _accessToken.value = response.accessToken
+            _userId.value = response.id
+            _displayName.value = currentDisplayName
+        }
+    }
+
+    suspend fun updateProfile(profileUrl: String, displayName: String): ChatRegistrationResponse {
+        if (currentAccessToken.isBlank()) {
+            throw IllegalStateException("Create your app viewer first.")
+        }
+        val cleanDisplayName = displayName.ifBlank { "Android Viewer" }
+        val separator = if (profileUrl.contains("?")) "&" else "?"
+        return api.post<ChatProfileUpdateRequest, ChatProfileUpdateResponse>(
+            url = "$profileUrl${separator}accessToken=${currentAccessToken.urlEncode()}",
+            body = ChatProfileUpdateRequest(displayName = cleanDisplayName, profileImageUrl = ""),
+        ).let { response ->
+            val user = response.user
+            currentUserId = user?.id?.ifBlank { currentUserId } ?: currentUserId
+            currentDisplayName = user?.displayName?.ifBlank { cleanDisplayName } ?: cleanDisplayName
+            _userId.value = currentUserId
+            _displayName.value = currentDisplayName
+            ChatRegistrationResponse(
+                id = currentUserId,
+                accessToken = currentAccessToken,
+                displayName = currentDisplayName,
+                displayColor = user?.displayColor ?: 0,
+            )
         }
     }
 
@@ -189,6 +254,18 @@ private data class ChatReactionOutboundEvent(
     val type: String = "CHAT_REACTION",
     @SerialName("messageId") val messageId: String,
     val reaction: String,
+)
+
+@kotlinx.serialization.Serializable
+private data class ChatProfileUpdateRequest(
+    @SerialName("displayName") val displayName: String,
+    @SerialName("profileImageUrl") val profileImageUrl: String,
+)
+
+@kotlinx.serialization.Serializable
+private data class ChatProfileUpdateResponse(
+    val user: ChatUser? = null,
+    val message: String = "",
 )
 
 private fun String.urlEncode(): String = URLEncoder.encode(this, Charsets.UTF_8.name())

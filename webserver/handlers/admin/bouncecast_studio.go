@@ -68,6 +68,8 @@ type BounceCastStreamKey struct {
 	StreamerID int64      `json:"streamerId"`
 	Label      string     `json:"label"`
 	Enabled    bool       `json:"enabled"`
+	StreamKey  string     `json:"streamKey,omitempty"`
+	Revealable bool       `json:"revealable"`
 	CreatedAt  time.Time  `json:"createdAt"`
 	LastUsedAt *time.Time `json:"lastUsedAt,omitempty"`
 	RevokedAt  *time.Time `json:"revokedAt,omitempty"`
@@ -241,6 +243,10 @@ type createStreamKeyRequest struct {
 }
 
 type revokeStreamKeyRequest struct {
+	ID int64 `json:"id"`
+}
+
+type revealStreamKeyRequest struct {
 	ID int64 `json:"id"`
 }
 
@@ -563,7 +569,7 @@ func SetBounceCastStreamerPassword(w http.ResponseWriter, r *http.Request) {
 // GetBounceCastStreamKeys returns the per-streamer RTMP keys without exposing raw secrets.
 func GetBounceCastStreamKeys(w http.ResponseWriter, r *http.Request) {
 	rows, err := data.GetDatabase().Query(`
-		SELECT id, streamer_id, COALESCE(label, ''), enabled, created_at, last_used_at, revoked_at
+		SELECT id, streamer_id, COALESCE(label, ''), enabled, COALESCE(raw_key, ''), created_at, last_used_at, revoked_at
 		FROM bouncecast_streamer_stream_keys
 		ORDER BY created_at DESC
 	`)
@@ -576,12 +582,14 @@ func GetBounceCastStreamKeys(w http.ResponseWriter, r *http.Request) {
 	streamKeys := []BounceCastStreamKey{}
 	for rows.Next() {
 		var key BounceCastStreamKey
+		var rawKey string
 		var lastUsedAt sql.NullTime
 		var revokedAt sql.NullTime
-		if err := rows.Scan(&key.ID, &key.StreamerID, &key.Label, &key.Enabled, &key.CreatedAt, &lastUsedAt, &revokedAt); err != nil {
+		if err := rows.Scan(&key.ID, &key.StreamerID, &key.Label, &key.Enabled, &rawKey, &key.CreatedAt, &lastUsedAt, &revokedAt); err != nil {
 			webutils.InternalErrorHandler(w, err)
 			return
 		}
+		key.Revealable = strings.TrimSpace(rawKey) != ""
 		if lastUsedAt.Valid {
 			key.LastUsedAt = &lastUsedAt.Time
 		}
@@ -618,9 +626,9 @@ func CreateBounceCastStreamKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := data.GetDatabase().Exec(`
-		INSERT INTO bouncecast_streamer_stream_keys(streamer_id, key_hash, label)
-		VALUES(?, ?, NULLIF(?, ''))
-	`, request.StreamerID, hashedKey, strings.TrimSpace(request.Label))
+		INSERT INTO bouncecast_streamer_stream_keys(streamer_id, key_hash, raw_key, label)
+		VALUES(?, ?, ?, NULLIF(?, ''))
+	`, request.StreamerID, hashedKey, rawKey, strings.TrimSpace(request.Label))
 	if err != nil {
 		webutils.InternalErrorHandler(w, err)
 		return
@@ -630,6 +638,50 @@ func CreateBounceCastStreamKey(w http.ResponseWriter, r *http.Request) {
 	recordBounceCastAuditEvent(r, "stream_key_created", "stream_key", strconv.FormatInt(id, 10), map[string]interface{}{"streamerId": request.StreamerID})
 	webutils.WriteResponse(w, map[string]interface{}{
 		"id":        id,
+		"streamKey": rawKey,
+	})
+}
+
+// RevealBounceCastStreamKey returns the raw key for keys created after reveal support was added.
+func RevealBounceCastStreamKey(w http.ResponseWriter, r *http.Request) {
+	var request revealStreamKeyRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		webutils.BadRequestHandler(w, err)
+		return
+	}
+	if request.ID == 0 {
+		webutils.BadRequestHandler(w, errors.New("id is required"))
+		return
+	}
+
+	var rawKey string
+	var streamerID int64
+	var enabled bool
+	var revokedAt sql.NullTime
+	if err := data.GetDatabase().QueryRow(`
+		SELECT COALESCE(raw_key, ''), streamer_id, enabled, revoked_at
+		FROM bouncecast_streamer_stream_keys
+		WHERE id = ?
+	`, request.ID).Scan(&rawKey, &streamerID, &enabled, &revokedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			webutils.BadRequestHandler(w, errors.New("stream key not found"))
+			return
+		}
+		webutils.InternalErrorHandler(w, err)
+		return
+	}
+	if !enabled || revokedAt.Valid {
+		webutils.BadRequestHandler(w, errors.New("revoked stream keys cannot be shown"))
+		return
+	}
+	if strings.TrimSpace(rawKey) == "" {
+		webutils.BadRequestHandler(w, errors.New("this stream key was created before reveal support; create a new key to show it later"))
+		return
+	}
+
+	recordBounceCastAuditEvent(r, "stream_key_revealed", "stream_key", strconv.FormatInt(request.ID, 10), map[string]interface{}{"streamerId": streamerID})
+	webutils.WriteResponse(w, map[string]interface{}{
+		"id":        request.ID,
 		"streamKey": rawKey,
 	})
 }

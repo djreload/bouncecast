@@ -87,6 +87,10 @@ export default function StarsAdmin() {
   const [packageForm] = Form.useForm<StarPackage>();
   const [overlayTestForm] = Form.useForm();
   const [adjustForm] = Form.useForm();
+  const paypalWebhookUrl =
+    typeof window === 'undefined'
+      ? '/api/stars/paypal/webhook'
+      : `${window.location.origin}/api/stars/paypal/webhook`;
 
   const loadStars = async () => {
     setLoading(true);
@@ -201,6 +205,25 @@ export default function StarsAdmin() {
             label: 'Settings',
             children: (
               <>
+                <Card title="PayPal webhook setup" style={{ marginBottom: 16 }} loading={loading}>
+                  <Space direction="vertical" style={{ width: '100%' }}>
+                    <Text>
+                      Add this webhook URL in your PayPal app, then paste the PayPal webhook ID into
+                      the field below.
+                    </Text>
+                    <Typography.Paragraph copyable={{ text: paypalWebhookUrl }}>
+                      <code>{paypalWebhookUrl}</code>
+                    </Typography.Paragraph>
+                    <Text type="secondary">
+                      In PayPal Developer, create or open your app, copy the client ID and secret
+                      into this page, create a webhook using the same sandbox/live environment, and
+                      subscribe to PAYMENT.CAPTURE.COMPLETED, PAYMENT.CAPTURE.DENIED,
+                      PAYMENT.CAPTURE.DECLINED, PAYMENT.CAPTURE.REFUNDED, and
+                      PAYMENT.CAPTURE.REVERSED. Save the webhook, copy its webhook ID here, then
+                      enable Stars and create at least one active package.
+                    </Text>
+                  </Space>
+                </Card>
                 <Card loading={loading}>
                   <Form form={settingsForm} layout="vertical" initialValues={defaultSettings}>
                     <Row gutter={16}>
